@@ -1,11 +1,45 @@
-<div align="center">
+# RandSeed Developer Portal (RSdev)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Standalone developer website extracted from the RandSeed homepage. Includes:
 
-  <h1>Built with AI Studio</h2>
+- Developer landing (`/`)
+- Organization onboarding (`/onboarding`)
+- Developer portal shell and dashboard (`/dashboard`, `/games`, …)
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## Develop
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+```bash
+npm install
+npm run dev
+```
 
-</div>
+Default dev server: http://localhost:3001
+
+## Environment
+
+Copy `.env.example` to `.env` and set:
+
+- `VITE_MAIN_SITE_URL` — main RandSeed site URL for footer links (default: `https://randseed.org`)
+
+## Build
+
+```bash
+npm run lint
+npm run build
+npm run preview
+```
+
+## Routes
+
+| Path | Page |
+|------|------|
+| `/` | Developer landing |
+| `/onboarding` | Create developer organization |
+| `/dashboard` | Portal dashboard |
+| `/games`, `/sandbox`, `/data`, `/revenue`, `/docs`, `/settings` | Portal sections (placeholders) |
+
+Auth and organization data are stored in `localStorage` (mock wallet sign-in), same keys as the main site when sharing an origin.
+
+## Deploy
+
+Vercel SPA rewrites are configured in `vercel.json`.

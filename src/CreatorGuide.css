@@ -1,0 +1,220 @@
+.creator-guide {
+  min-height: 100vh;
+  background-color: #f8f8fb;
+  font-family: var(--app-font-family);
+  color: #101014;
+}
+
+.guide-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.guide-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(248, 248, 251, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(16, 16, 20, 0.08);
+  height: 72px;
+}
+
+.guide-header__inner {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.guide-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #101014;
+  text-decoration: none;
+}
+
+.guide-brand__mark {
+  width: 34px;
+  height: 34px;
+}
+
+.guide-main {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  gap: 60px;
+}
+
+.guide-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+}
+
+.guide-nav {
+  position: sticky;
+  top: 112px;
+}
+
+.guide-nav__section {
+  margin-bottom: 32px;
+}
+
+.guide-nav__section h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #62626c;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.guide-nav__section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guide-nav__section a {
+  display: block;
+  font-size: 15px;
+  color: #101014;
+  text-decoration: none;
+  padding: 6px 12px;
+  margin-left: -12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.guide-nav__section a:hover {
+  background-color: rgba(16, 16, 20, 0.04);
+}
+
+.guide-nav__section a.active {
+  color: #61369a;
+  background-color: rgba(97, 54, 154, 0.08);
+  font-weight: 600;
+}
+
+.guide-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.guide-content h1 {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+  line-height: 1.1;
+}
+
+.guide-content h2 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 48px;
+  margin-bottom: 20px;
+}
+
+.guide-content p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #3b3b42;
+  margin-bottom: 24px;
+}
+
+.guide-content .lead {
+  font-size: 20px;
+  color: #62626c;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+
+.guide-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(16, 16, 20, 0.06);
+  margin: 40px 0;
+}
+
+.guide-card h2 {
+  margin-top: 0;
+}
+
+.guide-card ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.guide-card li {
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #3b3b42;
+  line-height: 1.5;
+}
+
+.guide-content ul {
+  padding-left: 20px;
+  margin-bottom: 24px;
+}
+
+.guide-content li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.guide-steps {
+  counter-reset: guide-step;
+  list-style: none;
+  padding: 0;
+}
+
+.guide-steps li {
+  position: relative;
+  padding-left: 48px;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.guide-steps li::before {
+  counter-increment: guide-step;
+  content: counter(guide-step);
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 32px;
+  height: 32px;
+  background: #e9e3f4;
+  color: #61369a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .guide-main {
+    flex-direction: column;
+    padding: 24px;
+    gap: 40px;
+  }
+  
+  .guide-sidebar {
+    width: 100%;
+    display: none; /* Hide sidebar on mobile for now, or could make it a dropdown */
+  }
+}

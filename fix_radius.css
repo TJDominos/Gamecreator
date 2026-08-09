@@ -1,0 +1,16 @@
+.hero-game-card .game-card-creator-info {
+  border-radius: 0 0 21px 21px;
+}
+
+@media (max-width: 1040px) {
+  .hero-game-card .game-card-creator-info {
+    border-radius: 0 0 21px 21px;
+  }
+}
+
+@media (max-width: 820px) {
+  .hero-game-card .game-card-creator-info {
+    /* border-width is 4px, border-radius is 18px -> 14px inner radius */
+    border-radius: 0 0 14px 14px;
+  }
+}

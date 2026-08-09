@@ -1,0 +1,20 @@
+@import "tailwindcss" source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+:root {
+  --max-content-width-pc: 1024px;
+  --app-font-family: "SF Pro", "Segoe UI", Roboto;
+  --app-font-display: "SF Pro", "Segoe UI", Roboto;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+.route-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-family: system-ui, sans-serif;
+}
