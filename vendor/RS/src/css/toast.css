@@ -1,0 +1,45 @@
+/**
+ * RS Design System — Toast
+ * A transient notification: a dark translucent surface (black 65%) with light
+ * text. Its width is content-sized between token bounds (min 200px, max 384px)
+ * and clamped to the viewport, so it never overflows on narrow screens. Stack
+ * and position several with the optional .toast-viewport. The
+ * show/hide/auto-dismiss behaviour is app-managed. Tokens only.
+ * Dismiss is handled by the app (e.g. auto-timeout); no close button.
+ */
+
+.toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  inline-size: max-content; /* size to content, bounded below/above by tokens */
+  min-inline-size: var(--toast-min-width); /* 200px floor — short toasts stay tidy */
+  max-inline-size: min(var(--toast-max-width), calc(100vw - var(--space-8))); /* 384px cap; shrinks with a gutter on narrow screens */
+  min-block-size: var(--toast-min-height); /* 60px — grows with content */
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--font-line-height-normal);
+  color: var(--toast-text);
+
+  background-color: var(--toast-bg);
+  border-radius: var(--radius-lg);
+}
+
+/* Optional fixed stack (bottom-centre by default). */
+.toast-viewport {
+  position: fixed;
+  inset-block-end: var(--space-6);
+  inset-inline: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+.toast-viewport > .toast {
+  pointer-events: auto;
+}

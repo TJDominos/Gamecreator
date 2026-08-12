@@ -1,0 +1,97 @@
+/**
+ * RS Design System — Refresh
+ * A small icon button that refreshes a value. The circular-arrow icon spins two
+ * full turns on trigger — once when the view loads (signalling the value was
+ * refreshed) and again on each click. Purple (Foreground Purple) icon.
+ *
+ * Real <button> + aria-label; the spin is driven by src/js/refresh.js, which
+ * toggles `.is-spinning` (removed on animationend) and emits a `refresh` event.
+ * For an async reload, `.refresh--busy` spins continuously until it clears.
+ * All values reference design tokens.
+ *
+ *   <button class="refresh" data-refresh aria-label="Refresh balance">
+ *     <span class="refresh__icon" aria-hidden="true"></span>
+ *   </button>
+ */
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--refresh-icon);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.refresh:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.refresh:disabled,
+.refresh[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The circular-arrow glyph. `currentColor` fill through the mask keeps it the
+   token colour; sized at the mobile tier, switching to the desktop tier at
+   48rem — the same breakpoint the Select chevron uses. */
+.refresh__icon {
+  display: block;
+  width: var(--refresh-icon-size-mobile);
+  height: var(--refresh-icon-size-mobile);
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpolyline%20points='23%204%2023%2010%2017%2010'/%3E%3Cpath%20d='M20.49%2015a9%209%200%201%201-2.12-9.36L23%2010'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpolyline%20points='23%204%2023%2010%2017%2010'/%3E%3Cpath%20d='M20.49%2015a9%209%200%201%201-2.12-9.36L23%2010'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+@media (min-width: 48rem) {
+  .refresh__icon {
+    width: var(--refresh-icon-size);
+    height: var(--refresh-icon-size);
+  }
+}
+
+/* Two full turns per trigger (page load + each click). */
+.refresh.is-spinning .refresh__icon {
+  animation: refresh-spin-2 1s ease;
+}
+
+/* Async reload: keep turning until the app clears `--busy`. */
+.refresh--busy .refresh__icon {
+  animation: refresh-spin 1s linear infinite;
+}
+
+@keyframes refresh-spin {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Trigger spin — two turns in one continuous easing (not two eased laps). */
+@keyframes refresh-spin-2 {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(720deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh.is-spinning .refresh__icon,
+  .refresh--busy .refresh__icon {
+    animation: none;
+  }
+}

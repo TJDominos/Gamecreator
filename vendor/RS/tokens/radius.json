@@ -1,0 +1,11 @@
+{
+  "radius": {
+    "none": { "$value": "0",       "$type": "dimension", "$description": "0px — square" },
+    "sm":   { "$value": "0.25rem", "$type": "dimension", "$description": "4px — chips, small controls" },
+    "md":   { "$value": "0.5rem",  "$type": "dimension", "$description": "8px — cards, menus" },
+    "snug": { "$value": "0.625rem","$type": "dimension", "$description": "10px — multi-line inputs (textarea)" },
+    "lg":   { "$value": "0.75rem", "$type": "dimension", "$description": "12px — surfaces, modals" },
+    "xl":   { "$value": "1.25rem", "$type": "dimension", "$description": "20px — inputs (component default), large surfaces" },
+    "full": { "$value": "9999px",  "$type": "dimension", "$description": "pill — buttons (component default), avatars" }
+  }
+}

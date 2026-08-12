@@ -1,0 +1,38 @@
+{
+  "name": "@tripletree/rs-design-system",
+  "version": "0.1.0",
+  "description": "RS Design System — design tokens, framework-agnostic CSS components, and documentation.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "files": [
+    "dist",
+    "src",
+    "tailwind.preset.js",
+    "Design.md"
+  ],
+  "exports": {
+    "./tokens.css": "./dist/tokens.css",
+    "./tokens.scss": "./dist/tokens.scss",
+    "./tokens.js": "./dist/tokens.js",
+    "./design-system.css": "./dist/design-system.css",
+    "./input.js": "./src/js/input.js",
+    "./select.js": "./src/js/select.js",
+    "./popup.js": "./src/js/popup.js",
+    "./loading.js": "./src/js/loading.js",
+    "./refresh.js": "./src/js/refresh.js",
+    "./tailwind": "./tailwind.preset.js"
+  },
+  "scripts": {
+    "tokens": "node style-dictionary.config.js",
+    "css": "node scripts/build-css.js",
+    "build": "npm run tokens && npm run css",
+    "docs:dev": "npm run build && vitepress dev docs",
+    "docs:build": "npm run build && vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "style-dictionary": "^4.3.0",
+    "vitepress": "^1.6.3"
+  }
+}

@@ -1,0 +1,19 @@
+/**
+ * RS Design System — CSS entry point.
+ * Imports the generated token variables followed by all components.
+ * For a pre-bundled single file, use dist/design-system.css instead.
+ */
+@import url('../../dist/tokens.css');
+@import url('./base.css');
+@import url('./button.css');
+@import url('./checkbox.css');
+@import url('./input.css');
+@import url('./loading.css');
+@import url('./select.css');
+@import url('./spinner.css');
+@import url('./switch.css');
+@import url('./popup.css');
+@import url('./refresh.css');
+@import url('./tabs.css');
+@import url('./toast.css');
+@import url('./typography.css');

@@ -1,0 +1,170 @@
+{
+  "text": {
+    "primary": { "$value": "{color.black}",      "$type": "color" },
+    "subtle":  { "$value": "{color.black-alpha.65}", "$type": "color", "$description": "Secondary text — captions / muted copy (black 65%)." },
+    "accent":  { "$value": "{color.purple.600}", "$type": "color" },
+    "disabled":{ "$value": "{color.neutral.400}","$type": "color" },
+    "danger":  { "$value": "{color.danger.600}", "$type": "color", "$description": "Error / validation message text — #C11717 (AA on white, ~6.2:1)." }
+  },
+
+  "bg": {
+    "subtle":  { "$value": "{color.purple.50}", "$type": "color", "$description": "Background Purple surface." }
+  },
+
+  "border": {
+    "accent":  { "$value": "{color.purple.600}",  "$type": "color" },
+    "invalid": { "$value": "{color.danger.600}",  "$type": "color", "$description": "Error / invalid field border." }
+  },
+
+  "focus": {
+    "ring": { "$value": "{color.purple.600}", "$type": "color", "$description": "Focus-visible outline color." }
+  },
+
+  "button": {
+    "solid": {
+      "bg":           { "$value": "{color.black}",       "$type": "color" },
+      "bg-hover":     { "$value": "{color.black-alpha.85}", "$type": "color", "$description": "Solid (primary) button hover — 85% black (#000000D9)." },
+      "bg-active":    { "$value": "{color.neutral.900}", "$type": "color" },
+      "bg-disabled":  { "$value": "{color.black-alpha.10}", "$type": "color", "$description": "Solid (primary) button disabled fill — 10% black (#0000001A)." },
+      "text":         { "$value": "{color.white}",       "$type": "color" },
+      "text-disabled":{ "$value": "{color.black-alpha.25}", "$type": "color", "$description": "Solid (primary) button disabled text — 25% black (#00000040)." }
+    },
+    "outline": {
+      "border":        { "$value": "{color.black}",       "$type": "color" },
+      "text":          { "$value": "{color.black}",       "$type": "color" },
+      "bg":            { "$value": "transparent",         "$type": "color" },
+      "bg-hover":      { "$value": "{color.neutral.50}",  "$type": "color" },
+      "bg-active":     { "$value": "{color.neutral.100}", "$type": "color" }
+    },
+    "solid-accent": {
+      "bg":           { "$value": "{color.purple.50}",  "$type": "color", "$description": "Purple solid button — Background Purple fill." },
+      "bg-hover":     { "$value": "{color.purple.100}", "$type": "color" },
+      "bg-active":    { "$value": "{color.purple.200}", "$type": "color" },
+      "bg-disabled":  { "$value": "{color.black-alpha.10}", "$type": "color", "$description": "Disabled fill — black 10% (same as solid)." },
+      "text":         { "$value": "{color.purple.600}", "$type": "color", "$description": "Purple solid button — Foreground Purple text." },
+      "text-disabled":{ "$value": "{color.black-alpha.25}", "$type": "color", "$description": "Disabled text — black 25% (same as solid)." }
+    }
+  },
+
+  "input": {
+    "bg":            { "$value": "{color.black-alpha.5}", "$type": "color", "$description": "Input field background — black 5% (#0000000D)." },
+    "text":          { "$value": "{color.black}",       "$type": "color", "$description": "Entered value text." },
+    "placeholder":   { "$value": "{color.black-alpha.30}", "$type": "color", "$description": "Placeholder text — black 30% (#0000004D)." },
+    "border-focus":  { "$value": "{color.purple.600}",  "$type": "color", "$description": "Focus border — Foreground Purple (no resting border)." },
+    "border-invalid":{ "$value": "{color.danger.600}",  "$type": "color", "$description": "Invalid field border / ring." },
+    "label":         { "$value": "{color.black}",       "$type": "color", "$description": "Field label text." },
+    "required":      { "$value": "{color.danger.500}",  "$type": "color", "$description": "Required-field asterisk marker." }
+  },
+
+  "shadow": {
+    "dropdown": { "$value": "0px 4px 12px rgba(0, 0, 0, 0.1)", "$type": "shadow", "$description": "Bottom-sheet / overlay elevation — 0 4 12 black 10%." },
+    "popover":  { "$value": "0px 8px 24px rgba(0, 0, 0, 0.12)", "$type": "shadow", "$description": "Select popover elevation — 0 8 24 black 12%." }
+  },
+
+  "select": {
+    "value":            { "$value": "{color.black}",          "$type": "color", "$description": "Chosen value — black, regular weight, reads like input text (both types)." },
+    "placeholder":      { "$value": "{color.black-alpha.30}", "$type": "color", "$description": "Trigger placeholder — black 30% (matches input.placeholder)." },
+    "caret":            { "$value": "{color.black-alpha.60}", "$type": "color", "$description": "Trigger chevron — black 60%." },
+    "border-invalid":   { "$value": "{color.danger.600}",     "$type": "color", "$description": "Error-state trigger border (aria-invalid)." },
+    "icon-size":        { "$value": "1rem",    "$type": "dimension", "$description": "16px chevron — desktop." },
+    "icon-size-mobile": { "$value": "1.25rem", "$type": "dimension", "$description": "20px chevron — mobile." },
+
+    "form-bg":               { "$value": "{color.black-alpha.5}",  "$type": "color", "$description": "Form select fill — black 5%, same as input.bg. No border, no hover change." },
+    "form-height":           { "$value": "2.25rem", "$type": "dimension", "$description": "36px desktop — same as the input default." },
+    "form-height-mobile":    { "$value": "3rem",    "$type": "dimension", "$description": "48px mobile — same as .input--lg." },
+    "form-padding-x":        { "$value": "{space.3}", "$type": "dimension", "$description": "12px desktop." },
+    "form-padding-x-mobile": { "$value": "{space.4}", "$type": "dimension", "$description": "16px mobile." },
+    "form-font-size":        { "$value": "{font.size.sm}", "$type": "dimension", "$description": "14px desktop." },
+    "form-font-size-mobile": { "$value": "{font.size.md}", "$type": "dimension", "$description": "16px mobile — ≥16px avoids iOS zoom-on-focus." },
+    "form-radius":           { "$value": "{radius.xl}", "$type": "dimension", "$description": "20px — same radius as input." },
+
+    "filter-bg":               { "$value": "{color.white}",          "$type": "color" },
+    "filter-border":           { "$value": "{color.black-alpha.10}", "$type": "color", "$description": "Filter select outline — black 10% hairline. No hover change." },
+    "filter-height":           { "$value": "2rem",    "$type": "dimension", "$description": "32px desktop — one step below the form select." },
+    "filter-height-mobile":    { "$value": "2.25rem", "$type": "dimension", "$description": "36px mobile." },
+    "filter-min-width":        { "$value": "6rem",  "$type": "dimension", "$description": "96px — keeps short labels ('All') comfortable." },
+    "filter-max-width":        { "$value": "15rem", "$type": "dimension", "$description": "240px desktop cap (mobile caps at 60% of the container)." },
+    "filter-padding-x":        { "$value": "{space.3}", "$type": "dimension", "$description": "12px." },
+    "filter-font-size":        { "$value": "{font.size.xs}", "$type": "dimension", "$description": "12px desktop." },
+    "filter-font-size-mobile": { "$value": "{font.size.sm}", "$type": "dimension", "$description": "14px mobile." },
+    "filter-radius":           { "$value": "{radius.full}", "$type": "dimension", "$description": "Pill." },
+    "filter-gap":              { "$value": "{space.2}", "$type": "dimension", "$description": "8px between adjacent filters (.select-group)." },
+
+    "panel-bg":                { "$value": "{color.white}",          "$type": "color", "$description": "Dropdown panel background." },
+    "panel-border":            { "$value": "{color.black-alpha.10}", "$type": "color", "$description": "Dropdown panel hairline border — black 10%." },
+    "panel-max-height":        { "$value": "20rem", "$type": "dimension", "$description": "320px desktop (~8 options) — overflow scrolls." },
+    "panel-max-height-mobile": { "$value": "18rem", "$type": "dimension", "$description": "288px mobile (~6.5 options)." },
+    "panel-max-width":         { "$value": "20rem", "$type": "dimension", "$description": "320px — the panel may grow past the trigger up to this cap." },
+    "panel-offset":            { "$value": "{space.1}", "$type": "dimension", "$description": "4px gap from the trigger." },
+    "panel-radius":            { "$value": "{radius.md}", "$type": "dimension", "$description": "8px desktop." },
+    "panel-radius-mobile":     { "$value": "{radius.lg}", "$type": "dimension", "$description": "12px mobile." },
+
+    "option-text":             { "$value": "{color.black}",         "$type": "color", "$description": "Dropdown option text." },
+    "option-hover-bg":         { "$value": "{color.black-alpha.5}", "$type": "color", "$description": "Option hover / keyboard-active wash — black 5%." },
+    "option-selected-bg":      { "$value": "{color.black-alpha.5}", "$type": "color", "$description": "Selected option highlight." },
+    "option-check":            { "$value": "{color.purple.600}",    "$type": "color", "$description": "Selected checkmark — Foreground Purple." },
+    "option-height":           { "$value": "2.25rem", "$type": "dimension", "$description": "36px desktop row." },
+    "option-height-mobile":    { "$value": "2.75rem", "$type": "dimension", "$description": "44px mobile row — minimum touch target." },
+    "option-padding-x":        { "$value": "{space.3}", "$type": "dimension", "$description": "12px desktop." },
+    "option-padding-x-mobile": { "$value": "{space.4}", "$type": "dimension", "$description": "16px mobile." }
+  },
+
+  "checkbox": {
+    "bg":             { "$value": "{color.white}",       "$type": "color", "$description": "Unchecked fill." },
+    "bg-checked":     { "$value": "{color.purple.600}",  "$type": "color", "$description": "Checked fill — Foreground Purple." },
+    "bg-disabled":    { "$value": "{color.white}",       "$type": "color", "$description": "Disabled fill — white." },
+    "border":         { "$value": "{color.black-alpha.65}", "$type": "color", "$description": "Unchecked border — black 65%." },
+    "border-checked": { "$value": "{color.purple.600}",  "$type": "color" },
+    "border-disabled":{ "$value": "{color.black-alpha.30}", "$type": "color", "$description": "Disabled border — black 30%." },
+    "check":          { "$value": "{color.white}",       "$type": "color", "$description": "Check / dash glyph." },
+    "check-disabled": { "$value": "{color.neutral.400}", "$type": "color" }
+  },
+
+  "switch": {
+    "track-off": { "$value": "{color.neutral.300}", "$type": "color", "$description": "Switch track — off." },
+    "track-on":  { "$value": "{color.purple.600}", "$type": "color", "$description": "Switch track — on (Foreground Purple)." },
+    "thumb":     { "$value": "{color.white}",       "$type": "color", "$description": "Switch knob." }
+  },
+
+  "popup": {
+    "bg":      { "$value": "{color.white}",          "$type": "color", "$description": "Bottom-sheet background." },
+    "overlay": { "$value": "{color.black-alpha.30}", "$type": "color", "$description": "Scrim behind the sheet — black 30%." },
+    "title":   { "$value": "{color.black}",          "$type": "color", "$description": "Sheet title — 16px semibold, black." },
+    "body":    { "$value": "{color.black-alpha.50}", "$type": "color", "$description": "Sheet subtitle / body — 12px regular, black 50%." }
+  },
+
+  "loading": {
+    "bar-track":  { "$value": "{color.white-alpha.45}", "$type": "color", "$description": "Unfilled part of the progress bar — white 45% (on dark surfaces)." },
+    "bar-fill":   { "$value": "{color.white}",          "$type": "color", "$description": "Filled part of the progress bar — white." },
+    "text":       { "$value": "{color.white}",          "$type": "color", "$description": "Percent label — white (on dark surfaces)." },
+    "bar-width":  { "$value": "16.5rem", "$type": "dimension", "$description": "264px default bar width (never overflows its parent; override with width)." },
+    "bar-height": { "$value": "0.25rem", "$type": "dimension", "$description": "4px bar." }
+  },
+
+  "spinner": {
+    "label":     { "$value": "{color.neutral.500}", "$type": "color", "$description": "“Loading…” caption under the icon — neutral.500." },
+    "icon-size": { "$value": "3rem", "$type": "dimension", "$description": "48px brand icon." },
+    "gap":       { "$value": "{space.3}", "$type": "dimension", "$description": "12px between icon and label." }
+  },
+
+  "refresh": {
+    "icon":             { "$value": "{color.purple.600}", "$type": "color",     "$description": "Refresh control icon — Foreground Purple." },
+    "icon-size":        { "$value": "{size.icon.sm}",     "$type": "dimension", "$description": "Refresh icon — 16px on desktop." },
+    "icon-size-mobile": { "$value": "{size.icon.md}",     "$type": "dimension", "$description": "Refresh icon — 20px on mobile." }
+  },
+
+  "toast": {
+    "bg":         { "$value": "{color.black-alpha.65}", "$type": "color", "$description": "Toast background — black at 65%." },
+    "text":       { "$value": "{color.white}",          "$type": "color", "$description": "Toast text / icon — light on the dark surface." },
+    "min-width":  { "$value": "12.5rem", "$type": "dimension", "$description": "Toast minimum width (200px) — short toasts stay compact." },
+    "max-width":  { "$value": "24rem",   "$type": "dimension", "$description": "Toast maximum width on desktop (384px) — longer messages wrap; clamped to the viewport on narrow screens." },
+    "min-height": { "$value": "3.75rem", "$type": "dimension", "$description": "Toast minimum height (60px) — grows with content." }
+  },
+
+  "tabs": {
+    "text":        { "$value": "{color.black-alpha.65}", "$type": "color", "$description": "Inactive tab label — black 65%." },
+    "text-active": { "$value": "{color.black}",          "$type": "color", "$description": "Active tab label — black." },
+    "line":        { "$value": "{color.black-alpha.65}", "$type": "color", "$description": "Inactive underline — 1px black 65%." },
+    "line-active": { "$value": "{color.black}",          "$type": "color", "$description": "Active underline — 2px black." }
+  }
+}

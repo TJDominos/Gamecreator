@@ -1,0 +1,84 @@
+/**
+ * RS Design System — Loading (progress bar)
+ * A slim determinate/indeterminate progress bar with an optional percent
+ * label. Progress is driven by the --loading-progress custom property (0–100);
+ * the enhancer in src/js/loading.js keeps ARIA and the label in sync. All
+ * values reference design tokens.
+ *
+ *   <div class="loading" data-loading data-progress="86">
+ *     <div class="loading__bar"><div class="loading__bar-fill"></div></div>
+ *     <p class="loading__label" data-template="Loading… {value}%">Loading… 86%</p>
+ *   </div>
+ *
+ * Default width is 264px; it never overflows its parent. Set `width` on
+ * `.loading` (e.g. width: 100%) to span a container.
+ */
+
+.loading {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2); /* 8px between bar and label */
+  width: min(var(--loading-bar-width), 100%);
+  box-sizing: border-box;
+  font-family: var(--font-family-sans);
+}
+
+.loading[hidden] {
+  display: none;
+}
+
+.loading__bar {
+  width: 100%;
+  height: var(--loading-bar-height);
+  border-radius: var(--radius-full);
+  background-color: var(--loading-bar-track);
+  overflow: hidden;
+}
+
+.loading__bar-fill {
+  width: calc(var(--loading-progress, 0) * 1%);
+  height: 100%;
+  border-radius: var(--radius-full);
+  background-color: var(--loading-bar-fill);
+  transition: width 200ms ease-out;
+}
+
+/* Unknown duration — a 40% segment sweeps the track. */
+.loading__bar--indeterminate .loading__bar-fill {
+  width: 40%;
+  animation: loading-sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* "Loading… 86%" — optional; tabular digits so the number doesn't jitter. The
+   doubled selector outranks element-level typography (e.g. a host page's
+   `p { … }`) so the token colour and zeroed margin hold anywhere. */
+.loading .loading__label {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--loading-text);
+}
+
+/* ---------------------------------------------------------- Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .loading__bar-fill {
+    transition: none;
+  }
+  .loading__bar--indeterminate .loading__bar-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5; /* still reads as "busy", without the sweep */
+    transform: none;
+  }
+}

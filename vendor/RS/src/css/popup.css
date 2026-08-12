@@ -1,0 +1,113 @@
+/**
+ * RS Design System — Popup (bottom sheet)
+ * A bottom-anchored overlay that slides up. Behaviour + ARIA live in
+ * src/js/popup.js. All values reference design tokens.
+ *
+ *   <button class="btn btn--solid" data-popup-open="demo">Open</button>
+ *   <div class="popup" id="demo" hidden>
+ *     <div class="popup__overlay" data-popup-close></div>
+ *     <div class="popup__sheet" role="dialog" aria-modal="true" aria-labelledby="demo-title">
+ *       <h2 id="demo-title" class="popup__title">Title</h2>
+ *       <p class="popup__body">…</p>
+ *       <div class="popup__footer">
+ *         <button class="btn btn--outline" data-popup-close>Close</button>
+ *       </div>
+ *     </div>
+ *   </div>
+ */
+
+.popup {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* pin the sheet to the bottom */
+}
+
+.popup[hidden] {
+  display: none;
+}
+
+/* Scrim — tap to dismiss. */
+.popup__overlay {
+  position: absolute;
+  inset: 0;
+  background-color: var(--popup-overlay);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+/* Sheet — white, top corners rounded, slides up from the bottom. */
+.popup__sheet {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--space-4); /* 16px global padding (top / left / right) */
+
+  background-color: var(--popup-bg);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0; /* 20px top only */
+  box-shadow: var(--shadow-dropdown);
+
+  transform: translateY(100%);
+  transition: transform 240ms ease;
+  /* Let the browser handle vertical scrolling of overflowing content;
+     popup.js claims downward drags that start at the top of the scroll
+     area for the swipe-down dismiss (see attachSwipe). */
+  touch-action: pan-y;
+  overscroll-behavior-y: contain; /* don't chain overscroll to the page (pull-to-refresh) */
+}
+
+/* Sheet text hierarchy (tokens only).
+   Header Title — 16px semibold, black. Subtitle / body — 12px regular, black 50%.
+   Buttons inside the sheet use the standard .btn component. */
+.popup__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+  color: var(--popup-title);
+}
+
+.popup__body {
+  margin: var(--space-2) 0 0; /* 8px — title → subtitle rhythm */
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-normal);
+  color: var(--popup-body);
+}
+
+/* Bottom action bar — a row of buttons that sticks to the sheet's bottom edge
+   while the content above scrolls. White background, full-bleed to the sheet
+   edges (negative margins cancel the sheet's 16px padding), with a comfortable
+   gap from the content above (content → button rhythm). */
+.popup__footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-6) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-4);
+  background-color: var(--popup-bg);
+}
+
+/* Open state (toggled by the enhancer). */
+.popup.is-open .popup__overlay {
+  opacity: 1;
+}
+.popup.is-open .popup__sheet {
+  transform: none;
+}
+
+.popup__sheet:focus {
+  outline: none; /* programmatic focus target; visible focus stays on controls */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup__overlay,
+  .popup__sheet {
+    transition: none;
+  }
+}

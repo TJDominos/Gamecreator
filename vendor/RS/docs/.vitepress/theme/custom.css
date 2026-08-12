@@ -1,0 +1,151 @@
+/* Docs-only helpers for laying out live demos and swatches. */
+
+/* The Select panel is a real <ul>/<li>, so VitePress's prose list rules
+   (`.vp-doc ul`, `.vp-doc li + li` — specificity 0,1,1) outrank the component's
+   single-class styles (`.select__panel` — 0,1,0) and leak in list indent,
+   block margins and inter-row gaps. Re-assert the component layout under
+   `.vp-doc` so the docs demo matches the shipped CSS (and the Figma frame). */
+.vp-doc .select__panel {
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+}
+
+.vp-doc .select__option + .select__option {
+  margin-top: 0;
+}
+
+/* VitePress's prose rule `.vp-doc h2` (specificity 0,1,1) adds a top divider
+   line + large top margin to every <h2>. Inside the popup demo's sheet that
+   renders a stray horizontal rule above the heading. Re-assert the component
+   layout so the demo matches the shipped sheet (heading flush to the top). */
+.vp-doc .popup__sheet h2 {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.ds-demo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4, 1rem);
+  padding: var(--space-6, 1.5rem);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: var(--radius-md, 0.5rem);
+  margin: 1rem 0;
+}
+
+.ds-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-4, 1rem);
+  margin: 1rem 0;
+}
+
+.ds-swatch {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: var(--radius-md, 0.5rem);
+  overflow: hidden;
+  font-size: 0.8rem;
+}
+
+.ds-swatch__chip {
+  height: 72px;
+}
+
+.ds-swatch__meta {
+  padding: 0.5rem 0.75rem;
+}
+
+.ds-swatch__name {
+  font-weight: 600;
+}
+
+.ds-swatch__hex {
+  font-family: var(--font-family-mono, monospace);
+  color: var(--vp-c-text-2);
+}
+
+/* Spacing scale — a labelled bar whose length equals the token value. */
+.ds-scale {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+  margin: 1rem 0;
+}
+
+.ds-scale__row {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  align-items: center;
+  gap: var(--space-4, 1rem);
+}
+
+.ds-scale__label {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.8rem;
+  color: var(--vp-c-text-2);
+}
+
+.ds-bar {
+  height: 16px;
+  border-radius: var(--radius-sm, 0.25rem);
+  background: var(--color-purple-600, #5f40a1);
+}
+
+/* Radius scale — a sample box rendered at each corner-radius token. */
+.ds-radii {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6, 1.5rem);
+  margin: 1rem 0;
+}
+
+.ds-radius {
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.ds-radius__box {
+  width: 96px;
+  height: 96px;
+  background: var(--color-purple-50, #f4f0fb);
+  border: 2px solid var(--color-purple-600, #5f40a1);
+  margin-bottom: 0.5rem;
+}
+
+.ds-radius__label {
+  font-family: var(--font-family-mono, monospace);
+  color: var(--vp-c-text-2);
+}
+
+/* Sizing — square swatches drawn at their real token dimension, bottom-aligned
+   so the growth of the box reads left to right. */
+.ds-size-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-6, 1.5rem);
+  margin: 1.25rem 0;
+}
+
+.ds-size {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.75rem;
+  color: var(--vp-c-text-2);
+}
+
+.ds-size__box {
+  background: var(--color-neutral-100, #f5f5f5);
+  border: 1px solid var(--color-neutral-300, #d4d4d4);
+  border-radius: var(--radius-md, 0.5rem);
+}
+
+.ds-size__box--round {
+  border-radius: var(--radius-full, 9999px);
+}

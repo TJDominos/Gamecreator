@@ -1,0 +1,61 @@
+/**
+ * RS Design System — base layer.
+ * Maps native HTML elements onto steps of the type scale, so apps inherit
+ * correct type without per-element classes. Each element matches the same rule
+ * as the corresponding `.text-*` utility (see typography.css). Tokens only.
+ *
+ * Step         Element        Token  Weight     Color
+ * Heading      h1             3xl    semibold   text.primary
+ * Section      h2             2xl    semibold   text.primary
+ * Subsection   h3             xl     semibold   text.primary
+ * (emphasis)   strong, b      —      semibold*  inherit
+ * Body         body, p        sm     regular    text.primary
+ * Caption      small, figcap. xs     regular    text.subtle (65%)
+ * (*) strong/b stay inline: weight only, no size change.
+ */
+body {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--font-line-height-normal);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-regular);
+}
+
+p {
+  font-size: var(--font-size-sm);
+  line-height: var(--font-line-height-normal);
+  color: var(--text-primary);
+}
+
+h1 {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+  color: var(--text-primary);
+}
+
+h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+  color: var(--text-primary);
+}
+
+h3 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+  color: var(--text-primary);
+}
+
+strong,
+b {
+  font-weight: var(--font-weight-semibold);
+}
+
+small,
+figcaption {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-subtle);
+}

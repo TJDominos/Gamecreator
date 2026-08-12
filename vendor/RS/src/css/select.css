@@ -1,0 +1,299 @@
+/**
+ * RS Design System — Select (custom, JS-driven listbox)
+ * The design system's dropdown — use it wherever a value is picked from a
+ * list. Two variants, chosen by context (never sized per page):
+ *
+ *   .select--form    form fields, next to inputs — grey fill, no border,
+ *                    fills its container (constrain width at the container)
+ *   .select (bare)   list/data-page filters — white outlined pill, sized by
+ *                    its content between min/max bounds (the default look)
+ *
+ * Every size switches between a mobile and a desktop tier at 48rem. Markup is
+ * a button trigger + a role="listbox" panel; behaviour and ARIA wiring live
+ * in src/js/select.js. All values reference design tokens.
+ *
+ *   <div class="select select--form" data-select>
+ *     <button type="button" class="select__trigger" aria-haspopup="listbox" aria-expanded="false">
+ *       <span class="select__value select__value--placeholder">Choose an option…</span>
+ *       <span class="select__caret" aria-hidden="true"></span>
+ *     </button>
+ *     <ul class="select__panel" role="listbox" tabindex="-1" hidden>
+ *       <li class="select__option" role="option" data-value="london">London</li>
+ *     </ul>
+ *   </div>
+ */
+
+/* Mobile tier first; the 48rem media query below switches every private
+   custom property to the desktop tier in one place. */
+.select {
+  --_height: var(--select-filter-height-mobile);
+  --_pad-x: var(--select-filter-padding-x);
+  --_font: var(--select-filter-font-size-mobile);
+  --_radius: var(--select-filter-radius);
+  --_icon: var(--select-icon-size-mobile);
+  --_opt-h: var(--select-option-height-mobile);
+  --_opt-pad-x: var(--select-option-padding-x-mobile);
+  --_panel-max-h: var(--select-panel-max-height-mobile);
+  --_panel-radius: var(--select-panel-radius-mobile);
+
+  position: relative;
+  display: inline-block;
+  min-width: var(--select-filter-min-width);
+  max-width: 60%; /* filter cap on mobile — don't crowd sibling filters */
+}
+
+.select--form {
+  --_height: var(--select-form-height-mobile);
+  --_pad-x: var(--select-form-padding-x-mobile);
+  --_font: var(--select-form-font-size-mobile);
+  --_radius: var(--select-form-radius);
+
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+@media (min-width: 48rem) {
+  .select {
+    --_height: var(--select-filter-height);
+    --_font: var(--select-filter-font-size);
+    --_icon: var(--select-icon-size);
+    --_opt-h: var(--select-option-height);
+    --_opt-pad-x: var(--select-option-padding-x);
+    --_panel-max-h: var(--select-panel-max-height);
+    --_panel-radius: var(--select-panel-radius);
+
+    max-width: var(--select-filter-max-width);
+  }
+  .select--form {
+    --_height: var(--select-form-height);
+    --_pad-x: var(--select-form-padding-x);
+    --_font: var(--select-form-font-size);
+
+    max-width: none;
+  }
+}
+
+/* A row of filter selects, e.g. at the top of a list page. */
+.select-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--select-filter-gap);
+}
+
+/* ------------------------------------------------------------------ Trigger */
+.select__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+  height: var(--_height);
+  padding: 0 var(--_pad-x);
+  font-family: var(--font-family-sans);
+  font-size: var(--_font);
+  line-height: var(--font-line-height-normal);
+  text-align: left;
+  background-color: var(--select-filter-bg);
+  border: 1px solid var(--select-filter-border);
+  border-radius: var(--_radius);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+/* Form fill has no visible border — kept 1px transparent so the error state
+   doesn't shift layout. */
+.select--form .select__trigger {
+  background-color: var(--select-form-bg);
+  border-color: transparent;
+}
+
+/* Focus — purple border + 1px shadow read as a single ~2px ring (same recipe
+   as .input). Opening the panel adds no ring; the panel appearing plus the
+   rotated chevron are the open affordance. Transparent outline is a
+   high-contrast / forced-colors fallback. */
+.select__trigger:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
+}
+
+/* Disabled = the normal trigger at 50% opacity — no separate palette. */
+.select__trigger:disabled,
+.select__trigger[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Error — set aria-invalid="true" on the trigger and link the message text
+   with aria-describedby (style the message with text.danger, 12px). */
+.select__trigger[aria-invalid='true'] {
+  border-color: var(--select-border-invalid);
+}
+.select__trigger[aria-invalid='true']:focus-visible {
+  border-color: var(--select-border-invalid);
+  box-shadow: 0 0 0 1px var(--select-border-invalid);
+}
+
+/* Chosen value — plain black like input text, regular weight, single line with
+   ellipsis. Colour alone sets it apart from the grey placeholder below. */
+.select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--select-value);
+  font-weight: var(--font-weight-regular);
+}
+
+/* Nothing chosen yet — grey, regular weight. The enhancer adds/removes this. */
+.select__value--placeholder {
+  color: var(--select-placeholder);
+  font-weight: var(--font-weight-regular);
+}
+
+/* Chevron-down icon, drawn via mask so tokens can color it. */
+.select__caret {
+  flex: none;
+  width: var(--_icon);
+  height: var(--_icon);
+  background-color: var(--select-caret);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m3.5 6 4.5 4.5L12.5 6'/%3E%3C/svg%3E")
+    no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m3.5 6 4.5 4.5L12.5 6'/%3E%3C/svg%3E")
+    no-repeat center / contain;
+  transition: transform 150ms ease-out;
+}
+
+.select__trigger[aria-expanded='true'] .select__caret {
+  transform: rotate(180deg);
+}
+
+/* ------------------------------------------------------------------- Panel */
+.select__panel {
+  position: absolute;
+  left: 0;
+  top: calc(100% + var(--select-panel-offset));
+  z-index: 50;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%; /* at least as wide as the trigger… */
+  max-width: min(var(--select-panel-max-width), calc(100vw - var(--space-8)));
+  margin: 0;
+  padding: var(--space-1); /* breathing room so option hover is inset */
+  list-style: none;
+  max-height: var(--_panel-max-h); /* ~6.5 rows mobile / ~8 desktop */
+  overflow-y: auto;
+  background-color: var(--select-panel-bg);
+  border: 1px solid var(--select-panel-border);
+  border-radius: var(--_panel-radius);
+  box-shadow: var(--shadow-popover);
+  animation: select-panel-in 150ms ease-out;
+}
+
+.select__panel[hidden] {
+  display: none;
+}
+
+/* The enhancer flips the panel above the trigger when there's no room below. */
+.select__panel--up {
+  top: auto;
+  bottom: calc(100% + var(--select-panel-offset));
+  animation-name: select-panel-in-up;
+}
+
+/* Closing — the enhancer sets data-closing, then hides on animationend. */
+.select__panel[data-closing] {
+  animation: select-panel-out 100ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes select-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--space-1)));
+  }
+}
+@keyframes select-panel-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-1));
+  }
+}
+@keyframes select-panel-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ Option */
+/* -webkit-box lets long labels wrap to at most two lines, then truncate.
+   line-height is fixed so the paddings center a single-line row exactly. */
+.select__option {
+  position: relative;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  box-sizing: border-box;
+  min-height: var(--_opt-h);
+  padding: calc((var(--_opt-h) - 1.25rem) / 2) var(--_opt-pad-x);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-sans);
+  font-size: var(--_font);
+  line-height: 1.25rem;
+  color: var(--select-option-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Pointer hover and keyboard active share the same wash. */
+.select__option:hover,
+.select__option[data-active='true'] {
+  background-color: var(--select-option-hover-bg);
+}
+
+/* Selected — grey highlight, medium weight, and a purple ✓ on the right. */
+.select__option[aria-selected='true'] {
+  background-color: var(--select-option-selected-bg);
+  padding-right: calc(var(--_opt-pad-x) + 1.25rem);
+}
+
+.select__option[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: var(--_opt-pad-x);
+  width: 1rem;
+  height: 1rem;
+  transform: translateY(-50%);
+  background-color: var(--select-option-check);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m3 8.5 3.5 3.5L13 5'/%3E%3C/svg%3E")
+    no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m3 8.5 3.5 3.5L13 5'/%3E%3C/svg%3E")
+    no-repeat center / contain;
+}
+
+.select__option[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------- Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .select__panel {
+    animation: none;
+  }
+  .select__panel[data-closing] {
+    display: none;
+  }
+  .select__caret {
+    transition: none;
+  }
+}

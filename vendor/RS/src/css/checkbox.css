@@ -1,0 +1,94 @@
+/**
+ * RS Design System — Checkbox
+ * Framework-agnostic. Apply .checkbox to a native <input type="checkbox">.
+ * Sizes: .checkbox--sm | .checkbox--lg (default medium, 20px). Checked, hover,
+ * focus, and disabled states are automatic. The check is drawn with a mask so
+ * it scales and stays token-coloured.
+ */
+
+.checkbox {
+  --_check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E");
+
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  display: inline-block;
+  position: relative;
+  vertical-align: -0.15em;
+  inline-size: 1.25rem; /* md — 20px */
+  block-size: 1.25rem;
+  margin: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--checkbox-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--checkbox-bg);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+/* The glyph — masked so its colour comes from a token and it scales with size. */
+.checkbox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--checkbox-check);
+  opacity: 0;
+  -webkit-mask: var(--_check) center / 72% no-repeat;
+  mask: var(--_check) center / 72% no-repeat;
+}
+
+.checkbox:not(:disabled):hover {
+  border-color: var(--checkbox-border-checked);
+}
+
+.checkbox:checked {
+  background-color: var(--checkbox-bg-checked);
+  border-color: var(--checkbox-border-checked);
+}
+.checkbox:checked::before {
+  opacity: 1;
+}
+
+/* Keyboard focus — purple ring (matches buttons/inputs). */
+.checkbox:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.checkbox:disabled {
+  cursor: not-allowed;
+  background-color: var(--checkbox-bg-disabled);
+  border-color: var(--checkbox-border-disabled);
+}
+.checkbox:disabled:checked {
+  background-color: var(--checkbox-bg-disabled);
+  border-color: var(--checkbox-border-disabled);
+}
+.checkbox:disabled::before {
+  background-color: var(--checkbox-check-disabled);
+}
+
+/* ---------------------------------------------------------------- Sizes */
+.checkbox--sm {
+  inline-size: 1rem; /* 16px */
+  block-size: 1rem;
+  border-width: 1px;
+  border-radius: var(--radius-sm);
+}
+.checkbox--lg {
+  inline-size: 1.5rem; /* 24px */
+  block-size: 1.5rem;
+}
+
+/* Optional label layout: <label class="checkbox-field"> input + text </label> */
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.checkbox-field:has(.checkbox:disabled) {
+  cursor: not-allowed;
+  color: var(--text-disabled);
+}
