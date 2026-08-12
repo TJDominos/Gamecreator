@@ -30,7 +30,7 @@ import { useAuth } from "../auth/AuthContext";
 import { GameCard } from "../components/GameCard";
 import "./DeveloperLanding.css";
 
-function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: { reverse?: boolean, type?: 'dark' | 'light', variant?: 'arcade' | 'rpg' | 'platform' | 'puzzle' }) {
+function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: { reverse?: boolean, type?: 'dark' | 'light' | 'racing', variant?: 'arcade' | 'rpg' | 'platform' | 'puzzle' | 'racing' }) {
   // Fighting / Arcade (Street Fighter inspired)
   const arcades = [
     <svg viewBox="0 0 16 16" className="marquee-pixel-icon" key="1"><path d="M3,12 h10 v2 h-10 z M2,14 h12 v2 h-12 z M7,4 h2 v8 h-2 z M6,2 h4 v2 h-4 z M11,10 h2 v2 h-2 z M13,8 h2 v2 h-2 z" fill="currentColor"/></svg>,
@@ -63,12 +63,17 @@ function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: {
     <svg viewBox="0 0 16 16" className="marquee-pixel-icon" key="4"><path d="M2,3 h4 v2 h-4 z M10,3 h4 v2 h-4 z M1,5 h14 v4 h-14 z M3,9 h10 v2 h-10 z M5,11 h6 v2 h-6 z M7,13 h2 v2 h-2 z" fill="currentColor"/></svg>
   ];
 
-  const iconSet = variant === 'arcade' ? arcades : variant === 'rpg' ? rpgs : variant === 'platform' ? platforms : puzzles;
-
+  
+  const racings = [
+    <svg viewBox="0 0 16 16" className="marquee-pixel-icon marquee-pixel-icon--racing" key="1" style={{width: '32px', height: '32px'}}><rect width="8" height="8" fill="#fff"/><rect x="8" width="8" height="8" fill="#111"/><rect y="8" width="8" height="8" fill="#111"/><rect x="8" y="8" width="8" height="8" fill="#fff"/></svg>,
+    <svg viewBox="0 0 16 16" className="marquee-pixel-icon marquee-pixel-icon--racing" key="2" style={{width: '32px', height: '32px'}}><rect width="8" height="8" fill="#fff"/><rect x="8" width="8" height="8" fill="#111"/><rect y="8" width="8" height="8" fill="#111"/><rect x="8" y="8" width="8" height="8" fill="#fff"/></svg>
+  ];
+  const iconSet = variant === 'arcade' ? arcades : variant === 'rpg' ? rpgs : variant === 'platform' ? platforms : variant === 'racing' ? racings : puzzles;
+  
   return (
     <div className={`game-marquee-container game-marquee-container--${type}`} aria-hidden="true">
       <div className={`game-marquee-track ${reverse ? 'reverse' : ''}`}>
-        {[...Array(20)].map((_, i) => (
+        {[...Array(60)].map((_, i) => (
            <React.Fragment key={i}>
              {iconSet}
            </React.Fragment>
@@ -188,17 +193,17 @@ function HeroGameDeck(): React.ReactElement {
 
 const aiIterationFeatures = [
   {
-    image: "https://images.unsplash.com/photo-1605379399642-870262d3d051?auto=format&fit=crop&q=80&w=600",
+    image: "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600",
     title: "AI Skills",
     text: "Integrate specialized AI capabilities directly into your workflow to automate complex development tasks.",
   },
   {
-    image: "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=600",
+    image: "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80&w=600",
     title: "Sandbox Environment",
     text: "Safely test and iterate on your game mechanics in a fully isolated, production-mirrored sandbox.",
   },
   {
-    image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=600",
+    image: "https://images.unsplash.com/photo-1532981019623-f3277685a498?auto=format&fit=crop&q=80&w=600",
     title: "Live Game Data",
     text: "Harness real-time analytics and player metrics to continuously refine and optimize your game.",
   },
@@ -233,91 +238,197 @@ const showcaseGames = [
 
 import { SiteHeader } from "../components/SiteHeader";
 
-export default function DeveloperLanding(): React.ReactElement {
-  const { isSignedIn, organization, signIn } = useAuth();
-  const navigate = useNavigate();
-  const [isWalletConnectModalOpen, setWalletConnectModalOpen] = useState(false);
-  const signInButtonRef = useRef<HTMLButtonElement>(null);
 
-  function openPortal(): void {
-    if (isSignedIn) {
-      navigate(getPortalPath(Boolean(organization)));
-      return;
+
+function TachometerWidget() {
+  const [rpm, setRpm] = React.useState(0);
+  
+  React.useEffect(() => {
+    let animationFrameId;
+    let startTime = Date.now();
+    const duration = 4000;
+    
+    const keyframes = [
+      { time: 0, rpm: 0.1 },
+      { time: 0.2, rpm: 0.75 },
+      { time: 0.35, rpm: 0.3 },
+      { time: 0.55, rpm: 0.95 },
+      { time: 0.65, rpm: 0.8 },
+      { time: 0.85, rpm: 0.1 },
+      { time: 1.0, rpm: 0.1 }
+    ];
+
+    function animate() {
+      const now = Date.now();
+      let t = ((now - startTime) % duration) / duration;
+      let currentRpm = 0.1;
+      for (let i = 0; i < keyframes.length - 1; i++) {
+        const k1 = keyframes[i];
+        const k2 = keyframes[i + 1];
+        if (t >= k1.time && t <= k2.time) {
+          const progress = (t - k1.time) / (k2.time - k1.time);
+          const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+          currentRpm = k1.rpm + (k2.rpm - k1.rpm) * ease;
+          break;
+        }
+      }
+      setRpm(currentRpm);
+      animationFrameId = requestAnimationFrame(animate);
     }
-    setWalletConnectModalOpen(true);
-  }
-
-  function openSignInModal(): void {
-    setWalletConnectModalOpen(true);
-  }
-
-  function handleWalletConnectClose(verifiedId?: string): void {
-    setWalletConnectModalOpen(false);
-    if (typeof verifiedId === "string") {
-      signIn(verifiedId);
-      navigate(getPortalPath(Boolean(organization)));
-    }
-    signInButtonRef.current?.focus();
-  }
-
-  useEffect(() => {
-    const previousTitle = document.title;
-    document.title = "Build on RandSeed �?Launch, Grow & Earn";
-    document.documentElement.classList.add("developer-landing-active");
-    return () => {
-      document.title = previousTitle;
-      document.documentElement.classList.remove("developer-landing-active");
-    };
+    animate();
+    
+    return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
+  const displayRpm = (rpm * 10).toFixed(1);
+  const needleRotation = -120 + (rpm * 240);
+
   return (
-    <div className="developer-landing">
-      <a className="skip-link" href="#main-content">
-        Skip to content
-      </a>
+    <div className="racing-hud__tachometer">
+      <svg viewBox="0 0 200 200" className="racing-hud__gauge">
+        <circle cx="100" cy="100" r="90" fill="rgba(0,0,0,0.6)" stroke="#333" strokeWidth="4"/>
+        <path d="M 40 160 A 85 85 0 1 1 160 160" fill="none" stroke="#fff" strokeWidth="10" strokeDasharray="2 12" />
+        <path d="M 140 50 A 85 85 0 0 1 160 160" fill="none" stroke="#ff003c" strokeWidth="10" />
+        <text x="100" y="110" fill="#fff" fontSize="48" fontWeight="900" fontStyle="italic" textAnchor="middle">{displayRpm}</text>
+        <text x="100" y="135" fill="#a1a1aa" fontSize="14" fontWeight="bold" textAnchor="middle">x1000 RPM</text>
+        <g style={{ transform: `rotate(${needleRotation}deg)`, transformOrigin: '100px 100px' }}>
+          <circle cx="100" cy="100" r="8" fill="#ff003c" />
+          <polygon points="96,100 104,100 100,25" fill="#ff003c" />
+        </g>
+      </svg>
+    </div>
+  );
+}
 
+function RacingHUD() {
+  const [rpm, setRpm] = React.useState(0);
+  
+  React.useEffect(() => {
+    let animationFrameId;
+    let startTime = Date.now();
+    const duration = 4000;
+    
+    const keyframes = [
+      { time: 0, rpm: 0.1 },
+      { time: 0.2, rpm: 0.75 },
+      { time: 0.35, rpm: 0.3 },
+      { time: 0.55, rpm: 0.95 },
+      { time: 0.65, rpm: 0.8 },
+      { time: 0.85, rpm: 0.1 },
+      { time: 1.0, rpm: 0.1 }
+    ];
+
+    function animate() {
+      const now = Date.now();
+      let t = ((now - startTime) % duration) / duration;
+      let currentRpm = 0.1;
+      for (let i = 0; i < keyframes.length - 1; i++) {
+        const k1 = keyframes[i];
+        const k2 = keyframes[i + 1];
+        if (t >= k1.time && t <= k2.time) {
+          const progress = (t - k1.time) / (k2.time - k1.time);
+          const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+          currentRpm = k1.rpm + (k2.rpm - k1.rpm) * ease;
+          break;
+        }
+      }
+      setRpm(currentRpm);
+      animationFrameId = requestAnimationFrame(animate);
+    }
+    animate();
+    
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
+  const displaySpeed = Math.floor(180 + rpm * 80);
+  const gear = rpm < 0.4 ? 4 : rpm < 0.8 ? 5 : 6;
+
+  return (
+    <div className="racing-hud">
+      <div className="racing-hud__speedometer">
+        <svg viewBox="0 0 200 200" className="racing-hud__gauge">
+          <circle cx="100" cy="100" r="90" fill="rgba(0,0,0,0.6)" stroke="#333" strokeWidth="4"/>
+          <path d="M 30 150 A 90 90 0 1 1 170 150" fill="none" stroke="#ff003c" strokeWidth="8" strokeLinecap="round" strokeDasharray="300" strokeDashoffset="100" />
+          <text x="100" y="110" fill="#fff" fontSize="48" fontWeight="900" fontStyle="italic" textAnchor="middle">{displaySpeed}</text>
+          <text x="100" y="135" fill="#a1a1aa" fontSize="14" fontWeight="bold" textAnchor="middle">KM/H</text>
+          <text x="145" y="80" fill="#ff003c" fontSize="24" fontWeight="900" fontStyle="italic">{gear}</text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+
+export default function DeveloperLanding(): React.ReactElement {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isWalletConnectModalOpen, setIsWalletConnectModalOpen] = useState(false);
+
+  const openSignInModal = () => {
+    if (user) {
+      navigate(getPortalPath(true));
+    } else {
+      setIsWalletConnectModalOpen(true);
+    }
+  };
+
+  const handleWalletConnectClose = () => {
+    setIsWalletConnectModalOpen(false);
+  };
+
+  return (
+    <div className="landing-page">
       <SiteHeader />
+      <main>
+        {/* P1: Hero section */}
+        <section className="landing-hero" id="home">
+          <div className="landing-container">
+            <div className="landing-hero__grid">
+              
+              <div className="landing-hero__copy">
+                <h1>
+                  <span className="hero-title-purple">Games Reflect How You See the World.</span>
+                </h1>
+                
+                <p className="landing-hero__lede">
+                  Launch faster, connect with players, and let real-time feedback shape your next hit
+                </p>
+                <div className="landing-actions" style={{ marginTop: '34px' }}>
+                  <button className="button button--primary button--large" style={{ backgroundColor: 'var(--landing-purple)', color: '#fff', padding: '0 24px', minHeight: '52px', borderRadius: '12px', fontSize: '15px', fontWeight: '700' }} onClick={openSignInModal}>
+                    Start Building <ArrowRight aria-hidden="true" size={18} style={{ marginLeft: '8px' }} />
+                  </button>
+                </div>
 
-      <main id="main-content">
-        <section className="landing-hero">
-          <div className="landing-hero__shape landing-hero__shape--one" />
-          <div className="landing-hero__shape landing-hero__shape--two" />
-          <div className="landing-container landing-hero__grid">
-            <div className="landing-hero__copy">
-              <h1 className="hero-title-effect">
-                Games are an expression of your worldview
-              </h1>
-              <p className="landing-hero__lede">
-                Launch faster, connect with players, and let real-time feedback shape your next hit
-              </p>
+              </div>
+              
+              <HeroGameDeck />
             </div>
-            <HeroGameDeck />
           </div>
         </section>
 
         <section className="capability-strip" aria-label="Platform capabilities">
           <div className="landing-container capability-strip__grid">
             <div>
-              <strong>AI Loop</strong>
-              <span>full integration cycle</span>
+              <strong>Full AI<br />Integration</strong>
             </div>
             <div>
-              <strong>Instant</strong>
-              <span>from upload to publish</span>
+              <strong>Instant<br />Publishing</strong>
             </div>
             <div>
-              <strong>Monetize</strong>
-              <span>flexible earning models</span>
+              <strong>In-App<br />Purchase</strong>
             </div>
             <div>
-              <strong>VRF</strong>
-              <span>verifiable randomness</span>
+              <strong>Public Verifiable<br />Randomness</strong>
             </div>
           </div>
-        </section>        <GameSeparator type="dark" reverse variant="arcade" />
+        </section>
+
+        <GameSeparator type="racing" variant="racing" />
+        
         {/* P2: The AI-Powered Iteration Loop */}
-        <section className="landing-section landing-section--light" id="grow">
-          <div className="landing-container">
+        <section className="landing-section landing-section--racing" id="grow">
+          <RacingHUD />
+<div className="landing-container relative-z">
             <div className="section-heading section-heading--center">
               <h2>End-to-End AI Integration</h2>
               <p>
@@ -326,7 +437,9 @@ export default function DeveloperLanding(): React.ReactElement {
             </div>
             <div className="feature-grid">
               {aiIterationFeatures.map(({ image, title, text }, index) => (
-                <article className="feature-card feature-card--with-image" key={title}>
+                <div key={title} style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                  {index === 0 && <TachometerWidget />}
+                  <article className="feature-card feature-card--with-image" style={{ flex: 1 }}>
                   <span className="feature-card__number">0{index + 1}</span>
                   <div className="feature-card__image-container">
                     <img src={image} alt={title} className="feature-card__image" />
@@ -334,12 +447,13 @@ export default function DeveloperLanding(): React.ReactElement {
                   <h3>{title}</h3>
                   <p>{text}</p>
                 </article>
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        <GameSeparator type="dark" variant="platform" />
+        <GameSeparator type="dark" reverse variant="arcade" />
         {/* P3: From Concept to hit */}
         <section className="landing-section landing-section--light landing-section--process">
           <div className="landing-container process-layout">
