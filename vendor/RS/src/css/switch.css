@@ -1,0 +1,88 @@
+/**
+ * RS Design System — Switch (toggle)
+ * A binary on/off control. Wrap a native checkbox so it stays accessible and
+ * form-friendly; the visible track + knob is a sibling <span>. Add role="switch"
+ * to the input. All values reference design tokens.
+ *
+ *   <label class="switch">
+ *     <input type="checkbox" role="switch" />
+ *     <span class="switch__slider"></span>
+ *     <span class="switch__label">Notifications</span>   <!-- optional -->
+ *   </label>
+ */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+/* The real checkbox — visually hidden but focusable and submitted with forms. */
+.switch > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+/* Track */
+.switch__slider {
+  position: relative;
+  flex: none;
+  width: 2.25rem; /* 36px */
+  height: 1.25rem; /* 20px */
+  border-radius: var(--radius-full);
+  background-color: var(--switch-track-off);
+  transition: background-color 120ms ease;
+}
+
+/* Knob */
+.switch__slider::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem; /* 16px */
+  height: 1rem;
+  border-radius: var(--radius-full);
+  background-color: var(--switch-thumb);
+  transition: transform 120ms ease;
+}
+
+.switch > input:checked + .switch__slider {
+  background-color: var(--switch-track-on);
+}
+.switch > input:checked + .switch__slider::before {
+  transform: translateX(1rem); /* 36 − 16 − 2 − 2 = 16px travel */
+}
+
+/* Keyboard focus — purple ring hugging the track (a11y). */
+.switch > input:focus-visible + .switch__slider {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* Disabled = the whole control at 50% opacity (on/off stays distinguishable). */
+.switch > input:disabled + .switch__slider {
+  opacity: 0.5;
+}
+.switch:has(> input:disabled) {
+  cursor: not-allowed;
+}
+
+.switch__label {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--font-line-height-normal);
+  color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch__slider,
+  .switch__slider::before {
+    transition: none;
+  }
+}

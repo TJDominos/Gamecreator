@@ -1,0 +1,63 @@
+/**
+ * RS Design System — typography scale utilities.
+ * One opt-in class per step of the size scale (see Design.md / typography docs).
+ * Each rule bundles the canonical weight + line-height for that size; colour is
+ * left to the element / a separate text-colour role. Tokens only.
+ *
+ * Class            Token  Size   Weight     Line-height
+ * .text-display    4xl    36px   bold       tight
+ * .text-heading    3xl    32px   semibold   tight
+ * .text-section    2xl    24px   semibold   tight
+ * .text-subsection xl     20px   semibold   tight
+ * .text-lead       lg     18px   regular    normal
+ * .text-body-lg    md     16px   regular    normal
+ * .text-body       sm     14px   regular    normal
+ * .text-caption    xs     12px   regular    normal
+ */
+.text-display {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--font-line-height-tight);
+}
+
+.text-heading {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+}
+
+.text-section {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+}
+
+.text-subsection {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+}
+
+.text-lead {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-normal);
+}
+
+.text-body-lg {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-normal);
+}
+
+.text-body {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-normal);
+}
+
+.text-caption {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-normal);
+}

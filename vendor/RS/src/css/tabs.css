@@ -1,0 +1,58 @@
+/**
+ * RS Design System — Tabs
+ * Content switcher with a bottom-line indicator. Mark up a row of `.tab`
+ * buttons in `.tabs`; the selected one gets `.tab--active` (or
+ * `aria-selected="true"`). Active = black label (semibold) + 2px black line;
+ * inactive = black 65% label + 1px black 65% line. Tokens only.
+ */
+
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-6);
+}
+
+.tab {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: var(--space-3) 0;
+  background: none;
+  border: 0;
+
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-tight);
+  color: var(--tabs-text);
+  white-space: nowrap;
+  cursor: pointer;
+
+  /* Inactive indicator — 1px black 65%. box-shadow draws the line without
+     shifting layout when it grows to 2px on the active tab. */
+  box-shadow: inset 0 -1px 0 var(--tabs-line);
+  transition: color 120ms ease, box-shadow 120ms ease;
+}
+
+.tab:hover {
+  color: var(--tabs-text-active);
+}
+
+.tab--active,
+.tab[aria-selected='true'] {
+  color: var(--tabs-text-active);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: inset 0 -2px 0 var(--tabs-line-active);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.tab:disabled,
+.tab[aria-disabled='true'] {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}

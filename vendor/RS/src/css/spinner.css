@@ -1,0 +1,92 @@
+/**
+ * RS Design System — Spinner
+ * A compact "working…" indicator: a brand icon that spins, with an optional
+ * caption below. No scrim — it sits inline in whatever region is loading.
+ * Pure CSS (no JS); mark it `role="status"` so assistive tech announces it.
+ * All values reference design tokens.
+ *
+ *   <div class="spinner" role="status">
+ *     <span class="spinner__icon spinner__icon--brand" aria-hidden="true"></span>
+ *     <p class="spinner__label">Loading…</p>
+ *   </div>
+ *
+ * The icon is your own <img>/<svg> inside .spinner__icon, or add
+ * .spinner__icon--brand for the RS clover. Add .spinner--block to fill the
+ * width and centre horizontally inside a card or column.
+ */
+
+.spinner {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spinner-gap);
+  font-family: var(--font-family-sans);
+}
+
+.spinner[hidden] {
+  display: none;
+}
+
+/* Fills the width and centres horizontally — for a card or content column. */
+.spinner--block {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+/* Centres the whole unit — both axes — inside a positioned parent, without
+   disturbing its own icon-over-label layout (absolute + inset + margin:auto).
+   Give the parent `position: relative` (or absolute/fixed) and a height. Use
+   this for a full-page load or a loading panel; placement is identical on
+   mobile and desktop — only the surrounding whitespace grows. */
+.spinner--center {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
+}
+
+/* Spinning icon. Continuous rotation reads as "working"; the RS clover is
+   radially symmetric so it spins cleanly. For a non-symmetric logo, override
+   `animation` (e.g. a pulse) so it doesn't tumble. */
+.spinner__icon {
+  display: block;
+  width: var(--spinner-icon-size);
+  height: var(--spinner-icon-size);
+  animation: spinner-spin 1.2s linear infinite;
+}
+
+.spinner__icon > svg,
+.spinner__icon > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The RS clover, baked in — no markup inside needed. */
+.spinner__icon--brand {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M15.8595 18.2535C15.0268 15.3673 12.2503 12.8819 11.0014 12C9.75256 12.7216 6.70073 15.6078 6.07627 18.4941C5.3896 21.6678 9.5444 23.545 11.0014 20.1777C11.834 23.545 16.9002 21.8614 15.8595 18.2535Z' fill='%231569B2'/%3E%3Cpath d='M15.8595 3.74646C15.0268 6.63271 12.2503 9.11809 11.0014 10C9.75256 9.27844 6.70073 6.39219 6.07627 3.50594C5.3896 0.332184 9.5444 -1.54499 11.0014 1.8223C11.834 -1.545 16.9002 0.138649 15.8595 3.74646Z' fill='%23EF9331'/%3E%3Cpath d='M3.74646 15.8598C6.63271 15.0271 9.11809 12.2506 10 11.0017C9.27844 9.75286 6.39219 6.70104 3.50594 6.07658C0.332184 5.38991 -1.54499 9.54471 1.8223 11.0017C-1.54499 11.8343 0.138649 16.9005 3.74646 15.8598Z' fill='%236E3892'/%3E%3Cpath d='M18.2535 15.8598C15.3673 15.0271 12.8819 12.2506 12 11.0017C12.7216 9.75286 15.6078 6.70104 18.4941 6.07658C21.6678 5.38991 23.545 9.54471 20.1777 11.0017C23.545 11.8343 21.8614 16.9005 18.2535 15.8598Z' fill='%2346B186'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+@keyframes spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* "Loading…" — the doubled selector outranks a host page's `p { … }`. */
+.spinner .spinner__label {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--font-line-height-normal);
+  color: var(--spinner-label);
+}
+
+/* ---------------------------------------------------------- Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .spinner__icon {
+    animation: none;
+  }
+}

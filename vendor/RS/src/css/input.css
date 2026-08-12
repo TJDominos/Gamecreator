@@ -1,0 +1,148 @@
+/**
+ * RS Design System — Input
+ * Framework-agnostic text field. Apply .input to <input> or <textarea>, plus
+ * an optional size (.input--sm | .input--lg). Hover, focus, and disabled
+ * states are automatic. All values reference design tokens.
+ */
+
+.input {
+  /* layout */
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+
+  /* typography */
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--font-line-height-normal);
+  color: var(--input-text);
+
+  /* shape — default (md) size. Filled, no resting border: the grey fill is the
+     field affordance. The 1px transparent border reserves space so the focus /
+     error border doesn't shift layout. No hover change (reads like a fill). */
+  padding: var(--space-2) var(--space-3);
+  min-height: 2.25rem; /* 36px */
+  background-color: var(--input-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xl);
+
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.input::placeholder {
+  color: var(--input-placeholder);
+  opacity: 1; /* Firefox dims placeholders by default */
+}
+
+/* Keyboard/pointer focus — purple ring that hugs the corner radius. The 1px
+   box-shadow plus the 1px focus border (below) read as a single ~2px ring.
+   Transparent outline kept as a forced-colors / high-contrast fallback. */
+.input:focus,
+.input:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 1px var(--focus-ring);
+}
+
+/* Disabled = the normal field at 60% opacity — no separate disabled palette. */
+.input:disabled,
+.input[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------- Invalid state */
+/* Add .input--invalid (mirror with aria-invalid="true" on the element). */
+.input--invalid,
+.input[aria-invalid='true'] {
+  border-color: var(--input-border-invalid);
+}
+.input--invalid:focus,
+.input--invalid:focus-visible,
+.input[aria-invalid='true']:focus,
+.input[aria-invalid='true']:focus-visible {
+  border-color: var(--input-border-invalid);
+  box-shadow: 0 0 0 1px var(--border-invalid);
+}
+
+/* Multi-line fields are taller and use a snugger radius than single-line. */
+textarea.input {
+  min-height: 7.125rem; /* 114px */
+  border-radius: var(--radius-snug); /* 10px */
+  resize: vertical;
+}
+
+/* ---------------------------------------------------------------- Sizes */
+.input--sm {
+  font-size: var(--font-size-xs);
+  padding: var(--space-1) var(--space-2);
+  min-height: 2rem;
+}
+
+.input--lg {
+  font-size: var(--font-size-md);
+  padding: var(--space-3) var(--space-4);
+  min-height: 3rem;
+}
+
+/* ----------------------------------------------------------- Field label */
+/* Pair every field (input / textarea) with a label. .input-label is a
+   block, bold caption sitting above the control. Add .input-label--required for
+   the danger-red asterisk rendered before the text (e.g. "*Name"); always back
+   it with the field's `required` attribute so the state is conveyed to AT. */
+.input-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--font-line-height-normal);
+  color: var(--input-label);
+}
+
+.input-label--required::before {
+  content: "*";
+  margin-right: 0.125em;
+  color: var(--input-required);
+}
+
+/* ------------------------------------------------- Character count (opt-in) */
+/* Wrap the field in .input-field and add a .input-field__count element to show
+   an in-field counter (e.g. "7/30"). Add .input-field--multiline for textarea.
+   The count text is app-managed; only the styling lives here. */
+.input-field {
+  position: relative;
+  display: block;
+}
+/* Reserve room so the value never runs under the counter. */
+.input-field > .input {
+  padding-right: var(--space-12);
+}
+.input-field--multiline > .input {
+  padding-right: var(--space-3);
+  padding-bottom: var(--space-8);
+}
+
+.input-field__count {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  color: var(--input-placeholder);
+  pointer-events: none;
+}
+.input-field--multiline .input-field__count {
+  top: auto;
+  bottom: var(--space-3);
+  transform: none;
+}
+
+/* Over the soft limit (data-maxlength, via src/js/input.js) — the counter turns
+   danger-red; the field itself gets .input--invalid from the enhancer. */
+.input-field__count--over {
+  color: var(--text-danger);
+}

@@ -1,0 +1,206 @@
+/**
+ * RS Design System — Button
+ * Framework-agnostic. Apply .btn plus a variant (.btn--solid | .btn--outline)
+ * and optionally a size (.btn--sm | .btn--lg). All values reference design tokens.
+ */
+
+.btn {
+  /* layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+
+  /* typography */
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-tight);
+  text-decoration: none;
+  white-space: nowrap;
+
+  /* shape — default (md) size; 28px tall, text centred (no vertical padding) */
+  padding: 0 var(--space-4);
+  min-height: 1.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+/* Keyboard focus — purple ring that hugs the corner radius. Buttons have no
+   focus border, so a 2px box-shadow matches the ~2px ring on inputs (1px
+   border + 1px ring). Transparent outline kept as a forced-colors fallback. */
+.btn:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* ---------------------------------------------------------------- Sizes */
+.btn--sm {
+  font-size: var(--font-size-xs);
+  /* 20px tall: zero vertical padding so the text line fits inside min-height. */
+  padding: 0 var(--space-3);
+  min-height: 1.25rem;
+}
+
+.btn--lg {
+  font-size: var(--font-size-md);
+  /* 40px tall, text centred (no vertical padding). */
+  padding: 0 var(--space-6);
+  min-height: 2.5rem;
+}
+
+/* ------------------------------------------------------- Icon in button */
+/* .btn is already inline-flex with a gap, so an icon + label just works.
+   Wrap an SVG in .btn__icon (or put the class on the <svg>); it inherits the
+   text color via currentColor and scales with the button's font-size. Mark
+   decorative icons aria-hidden="true". */
+.btn__icon {
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+  fill: currentColor;
+}
+.btn__icon > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Icon-only button — square. Always give it an aria-label. */
+.btn--icon-only {
+  padding-left: 0;
+  padding-right: 0;
+  width: 1.75rem; /* match medium height (28px) */
+  aspect-ratio: 1 / 1;
+}
+.btn--icon-only.btn--sm {
+  width: 1.25rem; /* 20px */
+}
+.btn--icon-only.btn--lg {
+  width: 2.5rem; /* 40px */
+}
+
+/* --------------------------------------------------------- Loading state */
+/* Add .btn--loading (and aria-busy="true"). The label + any icon fade out, a
+   centered spinner shows, and pointer interaction is off — but the brand color
+   stays (unlike :disabled). The button keeps its size so layout doesn't shift.
+   The spinner color is set per variant below (currentColor is transparent here). */
+.btn--loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1em;
+  height: 1em;
+  border: 2px solid;
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  animation: btn-spin 0.6s linear infinite;
+}
+.btn--solid.btn--loading::after {
+  border-color: var(--button-solid-text);
+  border-top-color: transparent;
+}
+.btn--outline.btn--loading::after {
+  border-color: var(--button-outline-text);
+  border-top-color: transparent;
+}
+.btn--solid.btn--accent.btn--loading::after {
+  border-color: var(--button-solid-accent-text);
+  border-top-color: transparent;
+}
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Respect reduced-motion — slow the spin rather than stop it (still conveys busy). */
+@media (prefers-reduced-motion: reduce) {
+  .btn--loading::after {
+    animation-duration: 1.5s;
+  }
+}
+
+/* --------------------------------------------------------- Solid variant */
+/* No visible stroke — fill only. The base keeps a 1px transparent border so the
+   button still shows an outline in forced-colors / high-contrast mode. */
+.btn--solid {
+  background-color: var(--button-solid-bg);
+  color: var(--button-solid-text);
+}
+.btn--solid:hover {
+  background-color: var(--button-solid-bg-hover);
+}
+.btn--solid:active {
+  background-color: var(--button-solid-bg-active);
+}
+.btn--solid:disabled,
+.btn--solid[aria-disabled='true'] {
+  background-color: var(--button-solid-bg-disabled);
+  color: var(--button-solid-text-disabled);
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------- Outline variant */
+.btn--outline {
+  background-color: var(--button-outline-bg);
+  color: var(--button-outline-text);
+  border-color: var(--button-outline-border);
+}
+.btn--outline:hover {
+  background-color: var(--button-outline-bg-hover);
+}
+.btn--outline:active {
+  background-color: var(--button-outline-bg-active);
+}
+/* Disabled = the normal outline at 25% opacity (border + text fade uniformly). */
+.btn--outline:disabled,
+.btn--outline[aria-disabled='true'] {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* Purple accent modifier (--accent = purple treatment).
+   Pair with .btn--outline for a purple-outlined secondary button, or with
+   .btn--solid for a purple tonal button (Background Purple fill, Foreground
+   Purple text). */
+.btn--accent.btn--outline {
+  color: var(--text-accent);
+  border-color: var(--border-accent);
+}
+.btn--accent.btn--outline:hover {
+  background-color: var(--bg-subtle);
+}
+
+.btn--solid.btn--accent {
+  background-color: var(--button-solid-accent-bg);
+  color: var(--button-solid-accent-text);
+}
+.btn--solid.btn--accent:hover {
+  background-color: var(--button-solid-accent-bg-hover);
+}
+.btn--solid.btn--accent:active {
+  background-color: var(--button-solid-accent-bg-active);
+}
+.btn--solid.btn--accent:disabled,
+.btn--solid.btn--accent[aria-disabled='true'] {
+  background-color: var(--button-solid-accent-bg-disabled);
+  color: var(--button-solid-accent-text-disabled);
+}
+
+/* Loading base — kept last so its transparent label color wins over every
+   variant's color (equal specificity, later source order). The spinner itself
+   is drawn by .btn--loading::after above, colored per variant. */
+.btn.btn--loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+  cursor: wait;
+}

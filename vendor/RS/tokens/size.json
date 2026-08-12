@@ -1,0 +1,17 @@
+{
+  "size": {
+    "icon": {
+      "sm": { "$value": "1rem",    "$type": "dimension", "$description": "Small icon — 16px. Inline with text, dense toolbars." },
+      "md": { "$value": "1.25rem", "$type": "dimension", "$description": "Medium icon — 20px. Default UI icon (buttons, inputs, list rows)." },
+      "lg": { "$value": "1.5rem",  "$type": "dimension", "$description": "Large icon — 24px. Section headers, primary actions." },
+      "xl": { "$value": "2rem",    "$type": "dimension", "$description": "Extra-large icon — 32px. Feature tiles, empty states." }
+    },
+    "avatar": {
+      "sm":  { "$value": "1.5rem", "$type": "dimension", "$description": "Small avatar — 24px. Inline mentions, dense lists." },
+      "md":  { "$value": "2rem",   "$type": "dimension", "$description": "Medium avatar — 32px. Default list / comment avatar." },
+      "lg":  { "$value": "2.5rem", "$type": "dimension", "$description": "Large avatar — 40px. Cards, account nav." },
+      "xl":  { "$value": "3rem",   "$type": "dimension", "$description": "Extra-large avatar — 48px. List / card headers." },
+      "2xl": { "$value": "4rem",   "$type": "dimension", "$description": "2XL avatar — 64px. Profile headers." }
+    }
+  }
+}

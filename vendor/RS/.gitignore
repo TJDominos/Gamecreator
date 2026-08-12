@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+*.log
+
+# VitePress build artifacts
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Keep dist/ committed so consumers can use tokens without a build step.

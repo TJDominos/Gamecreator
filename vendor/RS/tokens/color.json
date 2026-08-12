@@ -1,0 +1,54 @@
+{
+  "color": {
+    "black": { "$value": "#000000", "$type": "color" },
+    "white": { "$value": "#FFFFFF", "$type": "color" },
+
+    "neutral": {
+      "50":  { "$value": "#F7F7F8", "$type": "color" },
+      "100": { "$value": "#EDEDEF", "$type": "color" },
+      "200": { "$value": "#D9D9DE", "$type": "color" },
+      "300": { "$value": "#B8B8C0", "$type": "color" },
+      "400": { "$value": "#8E8E99", "$type": "color" },
+      "500": { "$value": "#6B6B75", "$type": "color" },
+      "600": { "$value": "#4D4D55", "$type": "color" },
+      "700": { "$value": "#3A3A40", "$type": "color" },
+      "800": { "$value": "#26262B", "$type": "color" },
+      "900": { "$value": "#131316", "$type": "color" }
+    },
+
+    "purple": {
+      "50":  { "$value": "#F4F0FB", "$type": "color", "$description": "Background Purple — surfaces, subtle fills, hover tints." },
+      "100": { "$value": "#E9E1F6", "$type": "color" },
+      "200": { "$value": "#D3C3ED", "$type": "color" },
+      "300": { "$value": "#B49CDF", "$type": "color" },
+      "400": { "$value": "#8B6BC9", "$type": "color" },
+      "500": { "$value": "#6F4FB0", "$type": "color" },
+      "600": { "$value": "#5F40A1", "$type": "color", "$description": "Foreground Purple — text, icons, accents on light backgrounds." },
+      "700": { "$value": "#4C3380", "$type": "color" },
+      "800": { "$value": "#3A2762", "$type": "color" },
+      "900": { "$value": "#281A45", "$type": "color" }
+    },
+
+    "danger": {
+      "500": { "$value": "#DB2121", "$type": "color" },
+      "600": { "$value": "#C11717", "$type": "color", "$description": "Danger — borders, icons, focus ring." }
+    },
+
+    "coin": { "$value": "#FDC700", "$type": "color", "$description": "Coin / currency gold — coin icons and amounts." },
+
+    "white-alpha": {
+      "45": { "$value": "#FFFFFF73", "$type": "color", "$description": "White at 45% — progress-bar track on dark surfaces." }
+    },
+
+    "black-alpha": {
+      "5":  { "$value": "#0000000D", "$type": "color", "$description": "Black at 5% — subtle hover wash (list rows / menu items)." },
+      "10": { "$value": "#0000001A", "$type": "color", "$description": "Black at 10% — solid (primary) button disabled fill." },
+      "25": { "$value": "#00000040", "$type": "color", "$description": "Black at 25% — solid (primary) button disabled text." },
+      "30": { "$value": "#0000004D", "$type": "color", "$description": "Black at 30% — disabled borders / text on white; popup / sheet overlay scrim." },
+      "50": { "$value": "#00000080", "$type": "color", "$description": "Black at 50%." },
+      "60": { "$value": "#00000099", "$type": "color", "$description": "Black at 60% — select trigger caret." },
+      "65": { "$value": "#000000A6", "$type": "color", "$description": "Black at 65% — secondary text (captions)." },
+      "85": { "$value": "#000000D9", "$type": "color", "$description": "Black at 85% — solid (primary) button hover." }
+    }
+  }
+}

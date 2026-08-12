@@ -1,0 +1,35 @@
+{
+  "font": {
+    "family": {
+      "sans": {
+        "$value": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
+        "$type": "fontFamily"
+      },
+      "mono": {
+        "$value": "'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace",
+        "$type": "fontFamily"
+      }
+    },
+    "weight": {
+      "regular":  { "$value": "400", "$type": "fontWeight" },
+      "medium":   { "$value": "500", "$type": "fontWeight" },
+      "semibold": { "$value": "600", "$type": "fontWeight" },
+      "bold":     { "$value": "700", "$type": "fontWeight" }
+    },
+    "size": {
+      "xs":  { "$value": "0.75rem",  "$type": "dimension", "$description": "12px" },
+      "sm":  { "$value": "0.875rem", "$type": "dimension", "$description": "14px" },
+      "md":  { "$value": "1rem",     "$type": "dimension", "$description": "16px" },
+      "lg":  { "$value": "1.125rem", "$type": "dimension", "$description": "18px" },
+      "xl":  { "$value": "1.25rem",  "$type": "dimension", "$description": "20px" },
+      "2xl": { "$value": "1.5rem",   "$type": "dimension", "$description": "24px" },
+      "3xl": { "$value": "2rem",     "$type": "dimension", "$description": "32px" },
+      "4xl": { "$value": "2.25rem",  "$type": "dimension", "$description": "36px" }
+    },
+    "lineHeight": {
+      "tight":  { "$value": "1.2",  "$type": "number" },
+      "normal": { "$value": "1.5",  "$type": "number" },
+      "relaxed":{ "$value": "1.65", "$type": "number" }
+    }
+  }
+}
