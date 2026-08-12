@@ -2,6 +2,7 @@
   "text": {
     "primary": { "$value": "{color.black}",      "$type": "color" },
     "subtle":  { "$value": "{color.black-alpha.65}", "$type": "color", "$description": "Secondary text — captions / muted copy (black 65%)." },
+    "micro":   { "$value": "{color.black-alpha.45}", "$type": "color", "$description": "Tertiary micro text — black 45%." },
     "accent":  { "$value": "{color.purple.600}", "$type": "color" },
     "disabled":{ "$value": "{color.neutral.400}","$type": "color" },
     "danger":  { "$value": "{color.danger.600}", "$type": "color", "$description": "Error / validation message text — #C11717 (AA on white, ~6.2:1)." }
@@ -130,7 +131,7 @@
     "bg":      { "$value": "{color.white}",          "$type": "color", "$description": "Bottom-sheet background." },
     "overlay": { "$value": "{color.black-alpha.30}", "$type": "color", "$description": "Scrim behind the sheet — black 30%." },
     "title":   { "$value": "{color.black}",          "$type": "color", "$description": "Sheet title — 16px semibold, black." },
-    "body":    { "$value": "{color.black-alpha.50}", "$type": "color", "$description": "Sheet subtitle / body — 12px regular, black 50%." }
+    "body":    { "$value": "{text.subtle}", "$type": "color", "$description": "Sheet subtitle / body — 12px regular, black 65%." }
   },
 
   "loading": {

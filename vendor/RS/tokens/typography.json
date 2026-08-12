@@ -2,7 +2,7 @@
   "font": {
     "family": {
       "sans": {
-        "$value": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
+        "$value": "'SF Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
         "$type": "fontFamily"
       },
       "mono": {
@@ -17,6 +17,7 @@
       "bold":     { "$value": "700", "$type": "fontWeight" }
     },
     "size": {
+      "2xs": { "$value": "0.625rem", "$type": "dimension", "$description": "10px" },
       "xs":  { "$value": "0.75rem",  "$type": "dimension", "$description": "12px" },
       "sm":  { "$value": "0.875rem", "$type": "dimension", "$description": "14px" },
       "md":  { "$value": "1rem",     "$type": "dimension", "$description": "16px" },

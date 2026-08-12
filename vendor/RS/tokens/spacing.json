@@ -9,6 +9,16 @@
     "6":  { "$value": "1.5rem",  "$type": "dimension", "$description": "24px" },
     "8":  { "$value": "2rem",    "$type": "dimension", "$description": "32px" },
     "10": { "$value": "2.5rem",  "$type": "dimension", "$description": "40px" },
-    "12": { "$value": "3rem",    "$type": "dimension", "$description": "48px" }
+    "12": { "$value": "3rem",    "$type": "dimension", "$description": "48px" },
+    "16": { "$value": "4rem",    "$type": "dimension", "$description": "64px" },
+
+    "xxs": { "$value": "{space.1}",  "$type": "dimension", "$description": "4px semantic spacing token." },
+    "xs":  { "$value": "{space.2}",  "$type": "dimension", "$description": "8px semantic spacing token." },
+    "sm":  { "$value": "{space.3}",  "$type": "dimension", "$description": "12px semantic spacing token." },
+    "md":  { "$value": "{space.4}",  "$type": "dimension", "$description": "16px semantic spacing token." },
+    "lg":  { "$value": "{space.6}",  "$type": "dimension", "$description": "24px semantic spacing token." },
+    "xl":  { "$value": "{space.8}",  "$type": "dimension", "$description": "32px semantic spacing token." },
+    "2xl": { "$value": "{space.12}", "$type": "dimension", "$description": "48px semantic spacing token." },
+    "3xl": { "$value": "{space.16}", "$type": "dimension", "$description": "64px semantic spacing token." }
   }
 }

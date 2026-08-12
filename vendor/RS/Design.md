@@ -76,9 +76,9 @@ component code:
 
 ## 3. Typography
 
-- **Family:** `font.family.sans` → native system UI stack: `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'` (no web font loaded)
+- **Family:** `font.family.sans` → `"SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`
 - **Weights:** regular 400, medium 500, semibold 600, bold 700
-- **Sizes:** `xs` 0.75rem (12px) → `4xl` 2.25rem (36px); `3xl` = 2rem (32px) (`font.size.*`)
+- **Sizes:** `2xs` 0.625rem (10px) → `4xl` 2.25rem (36px); `3xl` = 2rem (32px) (`font.size.*`)
 - **Line height:** `tight` 1.2 (headings/buttons), `normal` 1.5 (body)
 - **Type rules** — one rule per size step (size + weight + line-height), each shipped
   as a `.text-*` utility and mapped onto native elements by `dist/design-system.css`:
@@ -87,18 +87,20 @@ component code:
   - Section → `.text-section`, `h2`: 2xl 24px / 600 / tight
   - Subsection → `.text-subsection`, `h3`: xl 20px / 600 / tight (`strong`/`b`: weight only)
   - Lead → `.text-lead`: lg 18px / 400 / normal
-  - Body Large → `.text-body-lg`: md 16px / 400 / normal
+  - Emphasis → `.text-emphasis`, `.text-body-lg`: md 16px / 600 / normal
   - Body → `.text-body`, `body`, `p`: sm 14px / 400 / normal
-  - Caption → `.text-caption`, `small`, `figcaption`: xs 12px / 400 / normal (also `text.subtle`, 65%)
+  - Tips → `.text-tips`, `.text-caption`, `small`, `figcaption`: xs 12px / 400 / normal (`text.subtle`, 65%)
+  - Micro → `.text-micro`: 2xs 10px / 400 / normal (`text.micro`, 45%)
 
 ---
 
 ## 4. Spacing, Radius & Sizing
 
 - **Spacing:** 4px base unit (`space.1`). Scale: `space.0` 0 · `1` 4px · `2` 8px ·
-  `3` 12px · `4` 16px · `5` 20px · `6` 24px · `8` 32px · `10` 40px · `12` 48px
+  `3` 12px · `4` 16px · `5` 20px · `6` 24px · `8` 32px · `10` 40px · `12` 48px · `16` 64px
   (`space.*`). Drives padding/margin/gap via CSS vars (`--space-*`) and the
   Tailwind preset (`p-*`, `m-*`, `gap-*`).
+  Semantic aliases: `space.xxs` 4 · `xs` 8 · `sm` 12 · `md` 16 · `lg` 24 · `xl` 32 · `2xl` 48 · `3xl` 64.
 - **Radius:** `radius.none` 0 · `sm` 4px (chips) · `md` 8px (cards/menus) ·
   `lg` 12px (surfaces/modals) · `xl` 20px (**inputs — component default**) ·
   `full` pill (**buttons — component default**) (`radius.*` → `--radius-*`, Tailwind `rounded-*`).
@@ -341,16 +343,16 @@ Escape, or swiping the sheet down.
 
 **Text hierarchy** (tokens only): title `.popup__title` — `font.size.md` (16px) /
 `font.weight.semibold` / `popup.title` (black); body `.popup__body` —
-`font.size.xs` (12px) / `font.weight.regular` / `popup.body` (black 50%).
+`font.size.xs` (12px) / `font.weight.regular` / `popup.body` (black 65%).
 Buttons inside the sheet use the standard `.btn` component.
 
-**Spacing:** sheet padding `space.4` (16px, top/left/right); title → subtitle
-`space.2` (8px); content → footer `space.6` (24px). `.popup__footer` is a
+**Spacing:** sheet padding `space.md` (16px, top/left/right); title → subtitle
+`space.xs` (8px); content → footer `space.lg` (24px). `.popup__footer` is a
 sticky, white, full-bleed button bar pinned to the sheet's bottom edge while the
-content above scrolls.
+content above scrolls, and includes `safe-area-inset-bottom` padding.
 
 **Token mapping:** `popup.bg` (white) · `popup.overlay` (black 30%) ·
-`popup.title` (black) · `popup.body` (black 50%); radius `radius.xl`
+`popup.title` (black) · `popup.body` (black 65%); radius `radius.xl`
 (20px, top corners only); elevation `shadow.dropdown`.
 
 **Accessibility:** `role="dialog"` + `aria-modal`; label via `aria-labelledby`;

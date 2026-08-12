@@ -1,22 +1,18 @@
 # Typography
 
-The type system uses the **native system UI font** (`font.family.sans`) —
-no web font is loaded. It resolves to the platform's own UI typeface
-(SF Pro on Apple, Segoe UI on Windows, Roboto on Android/Linux), with
-CJK coverage (PingFang SC, Microsoft YaHei, Noto Sans CJK SC) and emoji
-fallbacks (Apple Color Emoji, Segoe UI Emoji).
+The type system uses the shared sans stack from `font.family.sans`:
+
+`"SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`
 
 ## Scale
 
 <div class="ds-demo" style="flex-direction:column; align-items:flex-start; gap:0.75rem;">
-  <div style="font-size:2.25rem; font-weight:700;">4xl · 2.25rem (36px) — Display</div>
-  <div style="font-size:2rem; font-weight:700;">3xl · 2rem (32px) — Heading</div>
-  <div style="font-size:1.5rem; font-weight:600;">2xl · 1.5rem (24px) — Section</div>
-  <div style="font-size:1.25rem; font-weight:600;">xl · 1.25rem (20px) — Subsection</div>
-  <div style="font-size:1.125rem;">lg · 1.125rem (18px) — Lead</div>
-  <div style="font-size:1rem;">md · 1rem (16px) — Body Large</div>
-  <div style="font-size:0.875rem;">sm · 0.875rem (14px) — Body</div>
-  <div style="font-size:0.75rem;">xs · 0.75rem (12px) — Caption</div>
+  <div style="font-size:2rem; font-weight:600;">First-level title · 32px / 600</div>
+  <div style="font-size:1.5rem; font-weight:600;">Secondary title · 24px / 600</div>
+  <div style="font-size:1rem; font-weight:600;">Emphasized text · 16px / 600</div>
+  <div style="font-size:0.875rem;">Body / regular · 14px / 400</div>
+  <div style="font-size:0.75rem; color:#000000a6;">Tips / note · 12px / 400 / #000000A6</div>
+  <div style="font-size:0.625rem; color:#00000073;">Micro text · 10px / 400 / #00000073</div>
 </div>
 
 ## Type rules
@@ -26,29 +22,25 @@ weight, and line-height. The bundled `dist/design-system.css` ships every rule
 as a `.text-*` utility class, and maps the matching rules onto **native HTML
 elements** so apps inherit correct type without opting in per element.
 
-| Rule | Class | Token · Size | Weight | Line-height | Element |
-| --- | --- | --- | --- | --- | --- |
-| Display | `.text-display` | 4xl · 36px | 700 bold | tight | — |
-| Heading | `.text-heading` | 3xl · 32px | 600 semibold | tight | `h1` |
-| Section | `.text-section` | 2xl · 24px | 600 semibold | tight | `h2` |
-| Subsection | `.text-subsection` | xl · 20px | 600 semibold | tight | `h3` |
-| Lead | `.text-lead` | lg · 18px | 400 regular | normal | — |
-| Body Large | `.text-body-lg` | md · 16px | 400 regular | normal | — |
-| Body | `.text-body` | sm · 14px | 400 regular | normal | `body`, `p` |
-| Caption | `.text-caption` | xs · 12px | 400 regular | normal | `small`, `figcaption`* |
+| Role | Class | Token · Size | Weight | Color |
+| --- | --- | --- | --- | --- |
+| First-level title | `.text-title-1` | `font.size.3xl` · 32px | 600 semibold | `text.primary` |
+| Secondary title | `.text-title-2` | `font.size.2xl` · 24px | 600 semibold | `text.primary` |
+| Emphasized text | `.text-emphasis` | `font.size.md` · 16px | 600 semibold | `text.primary` |
+| Body / regular | `.text-body` | `font.size.sm` · 14px | 400 regular | `text.primary` |
+| Tips / note | `.text-tips` | `font.size.xs` · 12px | 400 regular | `text.subtle` |
+| Micro text | `.text-micro` | `font.size.2xs` · 10px | 400 regular | `text.micro` |
 
-\* `small` and `figcaption` additionally pick up `text.subtle` (65%);
-`strong` / `b` take the semibold weight inline only.
+`h1`, `h2`, `body`, `p`, `small`, and `figcaption` map to the matching role tokens
+in `src/css/base.css`.
 
 <div class="ds-demo" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
-  <span class="text-display">Display</span>
-  <span class="text-heading">Heading</span>
-  <span class="text-section">Section</span>
-  <span class="text-subsection">Subsection</span>
-  <span class="text-lead">Lead</span>
-  <span class="text-body-lg">Body Large</span>
+  <span class="text-title-1">First-level title</span>
+  <span class="text-title-2">Secondary title</span>
+  <span class="text-emphasis">Emphasized text</span>
   <span class="text-body">Body</span>
-  <span class="text-caption">Caption</span>
+  <span class="text-tips">Tips / note</span>
+  <span class="text-micro">Micro text</span>
 </div>
 
 ## Tokens
@@ -57,9 +49,9 @@ elements** so apps inherit correct type without opting in per element.
 | --- | --- |
 | Family | `font.family.sans`, `font.family.mono` |
 | Weight | regular 400, medium 500, semibold 600, bold 700 |
-| Size | `xs` 0.75rem (12px) · `sm` 0.875rem (14px) · `md` 1rem (16px) · `lg` 1.125rem (18px) · `xl` 1.25rem (20px) · `2xl` 1.5rem (24px) · `3xl` 2rem (32px) · `4xl` 2.25rem (36px) |
+| Size | `2xs` 0.625rem (10px) · `xs` 0.75rem (12px) · `sm` 0.875rem (14px) · `md` 1rem (16px) · `lg` 1.125rem (18px) · `xl` 1.25rem (20px) · `2xl` 1.5rem (24px) · `3xl` 2rem (32px) · `4xl` 2.25rem (36px) |
 | Line height | `tight` 1.2 · `normal` 1.5 · `relaxed` 1.65 |
-| Text color | `text.primary` (black) · `text.subtle` (black 65%) · `text.accent` · `text.disabled` |
+| Text color | `text.primary` (black) · `text.subtle` (black 65%) · `text.micro` (black 45%) · `text.accent` · `text.disabled` |
 
 Use `font.line-height.tight` for headings and buttons, `normal` for body copy.
 

@@ -10,10 +10,71 @@
  * .text-section    2xl    24px   semibold   tight
  * .text-subsection xl     20px   semibold   tight
  * .text-lead       lg     18px   regular    normal
- * .text-body-lg    md     16px   regular    normal
+ * .text-body-lg    md     16px   semibold   normal
  * .text-body       sm     14px   regular    normal
- * .text-caption    xs     12px   regular    normal
+ * .text-caption    xs     12px   regular    normal (subtle color)
  */
+:root {
+  --type-title-1-size: var(--font-size-3xl);
+  --type-title-1-weight: var(--font-weight-semibold);
+  --type-title-1-color: var(--text-primary);
+
+  --type-title-2-size: var(--font-size-2xl);
+  --type-title-2-weight: var(--font-weight-semibold);
+  --type-title-2-color: var(--text-primary);
+
+  --type-emphasis-size: var(--font-size-md);
+  --type-emphasis-weight: var(--font-weight-semibold);
+  --type-emphasis-color: var(--text-primary);
+
+  --type-body-size: var(--font-size-sm);
+  --type-body-weight: var(--font-weight-regular);
+  --type-body-color: var(--text-primary);
+
+  --type-tips-size: var(--font-size-xs);
+  --type-tips-weight: var(--font-weight-regular);
+  --type-tips-color: var(--text-subtle);
+
+  --type-micro-size: var(--font-size-2xs);
+  --type-micro-weight: var(--font-weight-regular);
+  --type-micro-color: var(--text-micro);
+}
+
+.text-title-1 {
+  font-size: var(--type-title-1-size);
+  font-weight: var(--type-title-1-weight);
+  line-height: var(--font-line-height-tight);
+  color: var(--type-title-1-color);
+}
+
+.text-title-2 {
+  font-size: var(--type-title-2-size);
+  font-weight: var(--type-title-2-weight);
+  line-height: var(--font-line-height-tight);
+  color: var(--type-title-2-color);
+}
+
+.text-emphasis {
+  font-size: var(--type-emphasis-size);
+  font-weight: var(--type-emphasis-weight);
+  line-height: var(--font-line-height-normal);
+  color: var(--type-emphasis-color);
+}
+
+.text-tips {
+  font-size: var(--type-tips-size);
+  font-weight: var(--type-tips-weight);
+  line-height: var(--font-line-height-normal);
+  color: var(--type-tips-color);
+}
+
+.text-micro {
+  font-size: var(--type-micro-size);
+  font-weight: var(--type-micro-weight);
+  line-height: var(--font-line-height-normal);
+  color: var(--type-micro-color);
+}
+
 .text-display {
   font-size: var(--font-size-4xl);
   font-weight: var(--font-weight-bold);
@@ -21,15 +82,17 @@
 }
 
 .text-heading {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-title-1-size);
+  font-weight: var(--type-title-1-weight);
   line-height: var(--font-line-height-tight);
+  color: var(--type-title-1-color);
 }
 
 .text-section {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-title-2-size);
+  font-weight: var(--type-title-2-weight);
   line-height: var(--font-line-height-tight);
+  color: var(--type-title-2-color);
 }
 
 .text-subsection {
@@ -45,19 +108,22 @@
 }
 
 .text-body-lg {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-regular);
+  font-size: var(--type-emphasis-size);
+  font-weight: var(--type-emphasis-weight);
   line-height: var(--font-line-height-normal);
+  color: var(--type-emphasis-color);
 }
 
 .text-body {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-regular);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
   line-height: var(--font-line-height-normal);
+  color: var(--type-body-color);
 }
 
 .text-caption {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-regular);
+  font-size: var(--type-tips-size);
+  font-weight: var(--type-tips-weight);
   line-height: var(--font-line-height-normal);
+  color: var(--type-tips-color);
 }

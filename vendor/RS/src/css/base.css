@@ -15,30 +15,30 @@
  */
 body {
   font-family: var(--font-family-sans);
-  font-size: var(--font-size-sm);
+  font-size: var(--type-body-size);
   line-height: var(--font-line-height-normal);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-regular);
+  color: var(--type-body-color);
+  font-weight: var(--type-body-weight);
 }
 
 p {
-  font-size: var(--font-size-sm);
+  font-size: var(--type-body-size);
   line-height: var(--font-line-height-normal);
-  color: var(--text-primary);
+  color: var(--type-body-color);
 }
 
 h1 {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-title-1-size);
+  font-weight: var(--type-title-1-weight);
   line-height: var(--font-line-height-tight);
-  color: var(--text-primary);
+  color: var(--type-title-1-color);
 }
 
 h2 {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-title-2-size);
+  font-weight: var(--type-title-2-weight);
   line-height: var(--font-line-height-tight);
-  color: var(--text-primary);
+  color: var(--type-title-2-color);
 }
 
 h3 {
@@ -55,7 +55,7 @@ b {
 
 small,
 figcaption {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-regular);
-  color: var(--text-subtle);
+  font-size: var(--type-tips-size);
+  font-weight: var(--type-tips-weight);
+  color: var(--type-tips-color);
 }
