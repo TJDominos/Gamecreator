@@ -45,6 +45,7 @@ export default {
           "10": "#0000001a",
           "25": "#00000040",
           "30": "#0000004d",
+          "45": "#00000073",
           "50": "#00000080",
           "60": "#00000099",
           "65": "#000000a6",
@@ -53,6 +54,7 @@ export default {
         "text": {
           "primary": "#000000",
           "subtle": "#000000a6",
+          "micro": "#00000073",
           "accent": "#5f40a1",
           "disabled": "#8e8e99",
           "danger": "#c11717"
@@ -135,7 +137,7 @@ export default {
           "bg": "#ffffff",
           "overlay": "#0000004d",
           "title": "#000000",
-          "body": "#00000080"
+          "body": "#000000a6"
         },
         "loading": {
           "bar-track": "#ffffff73",
@@ -169,7 +171,16 @@ export default {
         "6": "1.5rem",
         "8": "2rem",
         "10": "2.5rem",
-        "12": "3rem"
+        "12": "3rem",
+        "16": "4rem",
+        "xxs": "0.25rem",
+        "xs": "0.5rem",
+        "sm": "0.75rem",
+        "md": "1rem",
+        "lg": "1.5rem",
+        "xl": "2rem",
+        "2xl": "3rem",
+        "3xl": "4rem"
       },
       "borderRadius": {
         "none": "0",
@@ -181,6 +192,7 @@ export default {
         "full": "9999px"
       },
       "fontSize": {
+        "2xs": "0.625rem",
         "xs": "0.75rem",
         "sm": "0.875rem",
         "md": "1rem",
@@ -192,19 +204,12 @@ export default {
       },
       "fontFamily": {
         "sans": [
-          "system-ui",
+          "'SF Pro'",
           "-apple-system",
           "BlinkMacSystemFont",
           "'Segoe UI'",
-          "Roboto",
-          "'Helvetica Neue'",
-          "Arial",
-          "'PingFang SC'",
-          "'Microsoft YaHei'",
-          "'Noto Sans CJK SC'",
-          "sans-serif",
-          "'Apple Color Emoji'",
-          "'Segoe UI Emoji'"
+          "system-ui",
+          "sans-serif"
         ],
         "mono": [
           "'SFMono-Regular'",

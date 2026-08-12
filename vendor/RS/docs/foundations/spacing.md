@@ -8,7 +8,8 @@ hard-code pixel values.
 ## Spacing scale
 
 A linear 4px scale (`space.1` = 4px) with larger steps doubling as the values
-grow. Each bar below is drawn at its real token width.
+grow. Semantic aliases (`space.xxs` → `space.3xl`) map onto this same scale.
+Each bar below is drawn at its real token width.
 
 <div class="ds-scale">
   <div class="ds-scale__row"><span class="ds-scale__label">space.0 · 0</span><span>—</span></div>
@@ -21,6 +22,7 @@ grow. Each bar below is drawn at its real token width.
   <div class="ds-scale__row"><span class="ds-scale__label">space.8 · 32px</span><span class="ds-bar" style="width:2rem"></span></div>
   <div class="ds-scale__row"><span class="ds-scale__label">space.10 · 40px</span><span class="ds-bar" style="width:2.5rem"></span></div>
   <div class="ds-scale__row"><span class="ds-scale__label">space.12 · 48px</span><span class="ds-bar" style="width:3rem"></span></div>
+  <div class="ds-scale__row"><span class="ds-scale__label">space.16 · 64px</span><span class="ds-bar" style="width:4rem"></span></div>
 </div>
 
 | Token | Value | px | Typical use |
@@ -35,6 +37,20 @@ grow. Each bar below is drawn at its real token width.
 | `space.8` | 2rem | 32 | block separation |
 | `space.10` | 2.5rem | 40 | — |
 | `space.12` | 3rem | 48 | large section rhythm |
+| `space.16` | 4rem | 64 | extra-large section rhythm |
+
+### Semantic spacing aliases
+
+| Semantic token | Alias of | px |
+| --- | --- | --- |
+| `space.xxs` | `space.1` | 4 |
+| `space.xs` | `space.2` | 8 |
+| `space.sm` | `space.3` | 12 |
+| `space.md` | `space.4` | 16 |
+| `space.lg` | `space.6` | 24 |
+| `space.xl` | `space.8` | 32 |
+| `space.2xl` | `space.12` | 48 |
+| `space.3xl` | `space.16` | 64 |
 
 ## Radius scale
 

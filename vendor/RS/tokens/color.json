@@ -45,6 +45,7 @@
       "10": { "$value": "#0000001A", "$type": "color", "$description": "Black at 10% — solid (primary) button disabled fill." },
       "25": { "$value": "#00000040", "$type": "color", "$description": "Black at 25% — solid (primary) button disabled text." },
       "30": { "$value": "#0000004D", "$type": "color", "$description": "Black at 30% — disabled borders / text on white; popup / sheet overlay scrim." },
+      "45": { "$value": "#00000073", "$type": "color", "$description": "Black at 45% — tertiary micro text." },
       "50": { "$value": "#00000080", "$type": "color", "$description": "Black at 50%." },
       "60": { "$value": "#00000099", "$type": "color", "$description": "Black at 60% — select trigger caret." },
       "65": { "$value": "#000000A6", "$type": "color", "$description": "Black at 65% — secondary text (captions)." },
