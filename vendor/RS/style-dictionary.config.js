@@ -33,6 +33,126 @@ StyleDictionary.registerFormat({
   },
 });
 
+/**
+ * Tailwind CSS v4 native theme format.
+ *
+ * Emits a CSS file with @theme blocks that expose all RS design tokens as
+ * Tailwind v4 theme variables (--color-*, --spacing-*, --radius-*, etc.).
+ * Semantic color tokens use @theme inline so they can reference other theme
+ * variables via var().
+ *
+ * Namespace mapping:
+ *   color.*         → --color-<name>          (e.g. --color-purple-600)
+ *   space.*         → --spacing-<name>        (e.g. --spacing-4)
+ *   radius.*        → --radius-<name>         (e.g. --radius-lg)
+ *   font.size.*     → --text-<name>           (e.g. --text-sm)
+ *   font.family.*   → --font-<name>           (e.g. --font-sans)
+ *   font.weight.*   → --font-weight-<name>    (e.g. --font-weight-semibold)
+ *   font.lineHeight.* → --leading-<name>      (e.g. --leading-tight)
+ *   size.icon.*     → --size-icon-<name>      (exposed on width/height/size)
+ *   size.avatar.*   → --size-avatar-<name>
+ *   Semantic colors → @theme inline block, referencing primitive vars
+ */
+StyleDictionary.registerFormat({
+  name: 'css/tailwind-v4-theme',
+  format: ({ dictionary }) => {
+    // Separate primitive tokens from semantic (reference-containing) tokens.
+    // Style Dictionary resolves all references before calling the formatter,
+    // so we detect originals that contained a reference by checking the raw
+    // DTCG $value before resolution.
+    const primitiveLines = [];
+    const semanticLines = [];
+
+    // Helper: emit a CSS custom-property line
+    const line = (name, value) => `  ${name}: ${value};`;
+
+    // Build a lookup of resolved value → CSS var name for primitive colors,
+    // so we can write semantic tokens as var() references instead of raw hex.
+    const primitiveColorVarByValue = new Map(); // hex -> var(--color-...)
+
+    // First pass: collect primitive tokens and build reverse map.
+    for (const t of dictionary.allTokens) {
+      const [head, second, third] = t.path;
+      const v = valueOf(t);
+      const raw = t.original?.$value ?? t.original?.value ?? '';
+      const isRef = typeof raw === 'string' && raw.startsWith('{');
+
+      if (typeOf(t) === 'color' && head === 'color') {
+        // Primitive color: color.purple.600 → --color-purple-600
+        const parts = t.path.slice(1); // drop 'color' head
+        const varName = '--color-' + parts.join('-');
+        primitiveLines.push(line(varName, v));
+        primitiveColorVarByValue.set(v.toLowerCase(), varName);
+      } else if (head === 'space' && !isRef) {
+        primitiveLines.push(line('--spacing-' + second, v));
+      } else if (head === 'space' && isRef) {
+        // semantic spacing alias — resolve to var()
+        const refPath = raw.slice(1, -1).split('.'); // e.g. ['space','4']
+        const refVarName = '--spacing-' + refPath.slice(1).join('-');
+        semanticLines.push(line('--spacing-' + second, `var(${refVarName})`));
+      } else if (head === 'radius') {
+        primitiveLines.push(line('--radius-' + second, v));
+      } else if (head === 'font' && second === 'size') {
+        primitiveLines.push(line('--text-' + third, v));
+      } else if (head === 'font' && second === 'family') {
+        primitiveLines.push(line('--font-' + third, v));
+      } else if (head === 'font' && second === 'weight') {
+        primitiveLines.push(line('--font-weight-' + third, v));
+      } else if (head === 'font' && second === 'lineHeight') {
+        primitiveLines.push(line('--leading-' + third, v));
+      } else if (head === 'size') {
+        // size.icon.md / size.avatar.lg
+        primitiveLines.push(line(`--size-${second}-${third}`, v));
+      }
+    }
+
+    // Second pass: collect semantic color tokens that reference primitives.
+    for (const t of dictionary.allTokens) {
+      const [head] = t.path;
+      const v = valueOf(t);
+      const raw = t.original?.$value ?? t.original?.value ?? '';
+      const isRef = typeof raw === 'string' && raw.startsWith('{');
+
+      if (typeOf(t) === 'color' && head !== 'color') {
+        // Semantic color: text.accent → --color-text-accent
+        const varName = '--color-' + t.path.join('-');
+        if (isRef) {
+          const refParts = raw.slice(1, -1).split('.');
+          // For primitive color refs (e.g. {color.purple.600}): drop the 'color'
+          // head to match the --color-purple-600 vars defined in @theme above.
+          // For cross-semantic refs (e.g. {text.subtle}): use the full path to
+          // reference the --color-text-subtle var defined in this same block.
+          // All RS token references are either {color.*} or point to another
+          // semantic group that is itself defined as --color-<group>-<name>.
+          const refVarName = '--color-' + (refParts[0] === 'color' ? refParts.slice(1) : refParts).join('-');
+          semanticLines.push(line(varName, `var(${refVarName})`));
+        } else {
+          // Literal value (e.g. transparent)
+          semanticLines.push(line(varName, v));
+        }
+      }
+    }
+
+    const lines = [
+      '/* Generated by Style Dictionary from tokens/. Do not edit by hand. */',
+      '/* Tailwind CSS v4 native theme — import after @import "tailwindcss". */',
+      '',
+      '/* Primitive tokens */',
+      '@theme {',
+      ...primitiveLines,
+      '}',
+      '',
+      '/* Semantic color aliases — use @theme inline so var() refs resolve correctly */',
+      '@theme inline {',
+      ...semanticLines,
+      '}',
+      '',
+    ];
+
+    return lines.join('\n');
+  },
+});
+
 StyleDictionary.registerFormat({
   name: 'javascript/tailwind-preset',
   format: ({ dictionary }) => {
@@ -78,7 +198,10 @@ StyleDictionary.registerFormat({
     };
     return (
       `// Generated by Style Dictionary from tokens/. Do not edit by hand.\n` +
-      `// Usage (this package is ESM):\n` +
+      `// @deprecated Tailwind v3 compatibility artifact.\n` +
+      `// For Tailwind CSS v4, import the CSS theme instead:\n` +
+      `//   @import "@tripletree/rs-design-system/tailwind.theme.css";\n` +
+      `// Usage (Tailwind v3 only):\n` +
       `//   import rsPreset from '@tripletree/rs-design-system/tailwind';\n` +
       `//   export default { presets: [rsPreset], ... };\n` +
       `export default ${JSON.stringify(preset, null, 2)};\n`
@@ -111,6 +234,11 @@ const sd = new StyleDictionary({
       buildPath: 'dist/',
       files: [{ destination: 'tokens.js', format: 'javascript/esm-nested' }],
     },
+    tailwindV4: {
+      transformGroup: 'css',
+      buildPath: './',
+      files: [{ destination: 'tailwind.theme.css', format: 'css/tailwind-v4-theme' }],
+    },
     tailwind: {
       transformGroup: 'js',
       buildPath: './',
@@ -121,4 +249,4 @@ const sd = new StyleDictionary({
 
 await sd.cleanAllPlatforms();
 await sd.buildAllPlatforms();
-console.log('✓ Tokens built → dist/tokens.{css,scss,js} + tailwind.preset.js');
+console.log('✓ Tokens built → dist/tokens.{css,scss,js} + tailwind.theme.css + tailwind.preset.js');
