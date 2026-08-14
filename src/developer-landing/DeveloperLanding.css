@@ -40,7 +40,7 @@
 .landing-nav a,
 .developer-landing > main a {
   color: inherit;
-  text-decoration: none;
+  
 }
 
 .landing-nav svg,
@@ -123,30 +123,14 @@
 .landing-nav__guide {
   font-size: 15px;
   font-weight: 600;
-  color: #000;
-  text-decoration: none;
+  
+  
   padding: 8px 12px;
   border-radius: 8px;
   position: relative;
 }
 
-.landing-nav__guide::after {
-  content: '';
-  position: absolute;
-  width: 100%;
-  transform: scaleX(0);
-  height: 2px;
-  bottom: 0;
-  left: 0;
-  background-color: var(--landing-purple);
-  transform-origin: bottom right;
-  transition: transform 0.25s ease-out;
-}
 
-.landing-nav__guide:hover::after {
-  transform: scaleX(1);
-  transform-origin: bottom left;
-}
 
 .landing-nav__desktop-actions {
   display: flex;
@@ -166,7 +150,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #000;
+  
 }
 
 .landing-nav__mobile-menu {
@@ -202,7 +186,7 @@
   min-height: 44px;
   padding: 0 19px;
   gap: 9px;
-  color: #000;
+  
   background: #fff;
   border: 1px solid var(--landing-ink);
   border-radius: 999px;
@@ -758,14 +742,15 @@
 .capability-strip__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  min-height: 146px;
+  min-height: 80px;
 }
 
 .capability-strip__grid > div {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 26px 34px;
+  padding: 0 34px;
+  height: 80px;
   border-right: 1px solid rgba(255, 255, 255, 0.13);
 }
 
@@ -1411,8 +1396,8 @@
   .landing-nav__guide-mobile {
     font-size: 16px;
     font-weight: 600;
-    color: #000;
-    text-decoration: none;
+    
+    
     padding: 12px 0;
     border-bottom: 1px solid rgba(0,0,0,0.05);
   }
@@ -1426,7 +1411,7 @@
   .landing-hero__lede { margin-right: auto; margin-left: auto; }
   .hero-game-stage { height: 450px; }
   .capability-strip__grid { grid-template-columns: repeat(2, 1fr); }
-  .capability-strip__grid > div { min-height: 120px; border-bottom: 1px solid rgba(255, 255, 255, 0.13); }
+  .capability-strip__grid > div { height: auto; min-height: 80px; padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.13); }
   .landing-section { padding: 95px 0; }
   .feature-grid,
   .earning-grid { grid-template-columns: 1fr; }
@@ -1472,7 +1457,7 @@
   .section-heading--center { text-align: left; }
   .section-heading--center .landing-eyebrow { justify-content: flex-start; }
   .feature-grid,
-  .earning-grid { margin-top: 42px; }
+  .earning-grid { margin-top: 80px; }
   .feature-card,
   .earning-card { min-height: 270px; padding: 28px; }
   .process-list li { grid-template-columns: 34px 48px 1fr; gap: 12px; }
@@ -1547,12 +1532,10 @@
   align-items: center;
   gap: 60px;
   white-space: nowrap;
-  animation: marquee-scroll 20s linear infinite;
   will-change: transform;
 }
 
 .game-marquee-track.reverse {
-  animation: marquee-scroll-reverse 20s linear infinite;
 }
 
 @keyframes marquee-scroll {
@@ -1629,6 +1612,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
   transition: transform 400ms ease;
 }
 
@@ -1696,19 +1680,18 @@
   z-index: 2;
 }
 
-/* HUD Overlay */
 .racing-hud {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none;
   z-index: 1;
-  overflow: hidden;
 }
 
 .racing-hud__speedometer {
   position: absolute;
-  bottom: 20px;
-  right: 40px;
+  bottom: -116px;
+  right: -196px;
+  transform: none;
   width: 200px;
   height: 200px;
   opacity: 0.8;
@@ -1717,9 +1700,9 @@
 
 .racing-hud__tachometer {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform: translate(-80%, -80%);
+  top: -166px;
+  left: -166px;
+  transform: none;
   width: 200px;
   height: 200px;
   opacity: 0.8;
@@ -1807,6 +1790,18 @@
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
 }
 
+.game-marquee-container--dating {
+  background: #ffffff;
+  color: #ff69b4;
+  border-top: 2px solid #ffb6c1;
+  border-bottom: 2px solid #ffb6c1;
+  box-shadow: none;
+}
+
+.game-marquee-container--dating .marquee-pixel-icon {
+  fill: #ff69b4;
+}
+
 .game-marquee-container--racing .game-marquee-track {
   gap: 0px; /* Checkered pattern should repeat seamlessly */
 }
@@ -1819,15 +1814,24 @@
 }
 
 @media (max-width: 768px) {
+  body {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  ::-webkit-scrollbar {
+    display: none;
+  }
   .racing-hud__tachometer {
-    top: 20px;
-    left: -40px;
+    top: -60px;
+    left: -60px;
+    transform: none;
     width: 120px;
     height: 120px;
   }
   .racing-hud__speedometer {
-    bottom: 10px;
-    right: 10px;
+    bottom: -60px;
+    right: -60px;
+    transform: none;
     width: 120px;
     height: 120px;
   }

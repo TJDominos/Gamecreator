@@ -9,7 +9,6 @@
     "dist",
     "src",
     "tailwind.preset.js",
-    "tailwind.theme.css",
     "Design.md"
   ],
   "exports": {
@@ -17,7 +16,6 @@
     "./tokens.scss": "./dist/tokens.scss",
     "./tokens.js": "./dist/tokens.js",
     "./design-system.css": "./dist/design-system.css",
-    "./tailwind.theme.css": "./tailwind.theme.css",
     "./input.js": "./src/js/input.js",
     "./select.js": "./src/js/select.js",
     "./popup.js": "./src/js/popup.js",

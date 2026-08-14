@@ -8,11 +8,10 @@ full spec** before generating or changing any UI.
 
 `tokens/` (W3C DTCG JSON) → compiled by Style Dictionary into:
 - `dist/tokens.css` (CSS custom properties), `dist/tokens.scss`, `dist/tokens.js`
-- `tailwind.theme.css` — Tailwind CSS v4 native `@theme` artifact (primary output)
-- `tailwind.preset.js` — Tailwind v3 compatibility preset (deprecated)
+- `tailwind.preset.js`
 - `dist/design-system.css` (tokens + components, bundled)
 
-Never edit `dist/`, `tailwind.theme.css`, or `tailwind.preset.js` by hand — edit `tokens/` and run `npm run build`.
+Never edit `dist/` or `tailwind.preset.js` by hand — edit `tokens/` and run `npm run build`.
 
 ## Rules when writing UI
 

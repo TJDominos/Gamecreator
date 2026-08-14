@@ -3,44 +3,14 @@
 The authoritative specification for the RS design language. This document is the
 human- and AI-readable source of truth for **principles, color, typography, and
 components**. The machine source of truth for values lives in [`tokens/`](./tokens)
-(W3C DTCG format) and is compiled into `dist/`, `tailwind.theme.css`, and `tailwind.preset.js`.
+(W3C DTCG format) and is compiled into `dist/` and `tailwind.preset.js`.
 
 > **Rule of thumb:** never hard-code a color, radius, or spacing value. Reference a
 > token. If a value you need does not exist as a token, add it to `tokens/` first.
 
-### Tailwind CSS v4 (recommended)
-
-```css
-/* src/index.css — import order matters */
-@import "tailwindcss" source(none);
-@import "@tripletree/rs-design-system/tailwind.theme.css";
-/* Adjust @source to match your project's source files */
-@source './src/**/*.{js,ts,jsx,tsx,html}';
-```
-
-This exposes all RS tokens as Tailwind v4 theme variables (`--color-purple-600`,
-`--spacing-4`, `--radius-lg`, `--text-sm`, etc.) and the semantic color aliases
-(`--color-text-accent`, `--color-bg-subtle`, etc.) so Tailwind utilities like
-`text-purple-600`, `bg-purple-50`, `text-text-accent`, `p-4`, `rounded-lg`, and
-`text-sm` all resolve to the correct RS token values.
-
-### Tailwind CSS v3 (deprecated)
-
-```js
-// tailwind.config.js — Tailwind v3 only
-import rsPreset from '@tripletree/rs-design-system/tailwind';
-export default { presets: [rsPreset] };
-```
-
-The v3 preset (`tailwind.preset.js`) is retained for backward compatibility but
-**will not be updated with new tokens**. Migrate to the CSS-native v4 theme.
-
----
-
 - **Design tokens:** [`tokens/`](./tokens) → `dist/tokens.css`, `dist/tokens.js`, `dist/tokens.scss`
 - **CSS components:** [`src/css/`](./src/css) → bundled as `dist/design-system.css`
-- **Tailwind v4 theme (CSS-native):** `tailwind.theme.css` — import in your CSS after `@import "tailwindcss"`
-- **Tailwind v3 preset (deprecated):** `tailwind.preset.js` — legacy `theme.extend` format; v3 only
+- **Tailwind preset:** `tailwind.preset.js`
 - **Interactive docs:** `docs/` (VitePress) — run `npm run docs:dev`
 - **Figma library:** https://www.figma.com/design/pGzbgIgTk5NXteRflrGCSB — **Variables** (`Primitives` + `Semantic`, aliased) — colors (incl. `black-alpha/5·30·65`, `color/coin` #FDC700), the `space/*` scale, `radius/*`, and the `size/*` icon &amp; avatar scale (`size/icon-sm…xl`, `size/avatar-sm…2xl`) — two **Effect Styles** (`shadow/dropdown`, `shadow/popover`) — eight **Text Styles** — one per step of the size scale (Display, Heading, Section, Subsection, Lead, Body Large, Body, Caption) — the **Button** component set (36 variants: Variant Solid / Solid-Accent / Outline / Outline-Accent × Size Small/Medium/Large × State Default/Hover/Disabled), the **Input** component set (12 variants: Size Small/Medium/Large × State Default/Focus/Disabled/Invalid) and the **Textarea** component set (4 variants: State Default/Focus/Disabled/Invalid), the **Select** + **Select Option** component sets (10 variants: Type Form/Filter × State Default/Filled/Focus/Disabled/Error — no hover state on either type, and open adds no ring so there's no separate Open state; the chosen value is black regular; options State Default/Hover/Selected/Disabled with the purple ✓), the **Checkbox** component set (12 variants: Size Small/Medium/Large × State Unchecked/Checked/Disabled/Checked-Disabled — the disabled-checked box carries the neutral.400 ✓), the **Switch** component set (4 variants: State Off/On/Off-Disabled/On-Disabled), the **Tab** component set (3 variants: State Active/Inactive/Disabled), the **Popup** component (bottom sheet over the black-30% scrim), the **Loading** component set (State Determinate/Indeterminate — a slim progress bar with an optional percent label), the **Spinner** component (the brand clover + “Loading…” caption, for indeterminate waits), the **Refresh** component (a purple circular-arrow icon button that spins once on load and on click to refresh a value), and the **Toast** component (a dark 65% translucent surface with white text; content-sized 200–384px, viewport-clamped), all bound to the same tokens. The file mirrors the docs: a **Foundations** page (Colors + Typography scale + Spacing &amp; Radius) and a **Components** page with a docs board + component set for every component above.
 

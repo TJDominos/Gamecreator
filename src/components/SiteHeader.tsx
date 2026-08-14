@@ -43,15 +43,15 @@ export function SiteHeader(): React.ReactElement {
           </a>
           
           <div className="landing-nav__desktop-actions">
-            <a className="landing-nav__guide" href="/bounties">
+            <a className="landing-nav__guide text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" href="/bounties">
               Creator Bounties
             </a>
-            <a className="landing-nav__guide" href="/guide">
+            <a className="landing-nav__guide text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" href="/guide">
               Creator Guide
             </a>
             <button
               ref={signInButtonRef}
-              className="button button--primary landing-nav__publish"
+              className="btn btn--solid"
               type="button"
               onClick={openPortal}
             >
@@ -62,7 +62,7 @@ export function SiteHeader(): React.ReactElement {
           <div className="landing-nav__mobile-actions">
             <button
               ref={signInButtonRef}
-              className="button button--primary landing-nav__publish"
+              className="btn btn--solid"
               type="button"
               onClick={openPortal}
             >
@@ -81,14 +81,14 @@ export function SiteHeader(): React.ReactElement {
         {isMobileMenuOpen && (
           <div className="landing-nav__mobile-menu">
             <a 
-              className="landing-nav__guide-mobile" 
+              className="landing-nav__guide-mobile text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" 
               href="/bounties"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Creator Bounties
             </a>
             <a 
-              className="landing-nav__guide-mobile" 
+              className="landing-nav__guide-mobile text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" 
               href="/guide"
               onClick={() => setIsMobileMenuOpen(false)}
             >

@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @import "../vendor/RS/tailwind.theme.css";
+@import "../vendor/RS/dist/design-system.css";
 @source '../**/*.{js,ts,jsx,tsx}';
 
 :root {
