@@ -40,3 +40,10 @@ export const GithubLogo = ({ size = 24, className = "" }) => (
   </svg>
 );
 
+
+export const AiStudioLogo = ({ size = 24, className = "" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 192 192" fill="currentColor" className={className}>
+    <path d="M30.77,136.24L112.08,93.89C138.94,79.9 170.99,99.5 170.99,129.92C170.99,152.34 152.91,170.51 130.62,170.5L39.05,170.46C20.17,170.46 14.01,144.96 30.77,136.24"/>
+    <path d="M161.23,55.76L79.92,98.11C53.06,112.1 21.01,92.5 21.01,62.08C21.01,39.66 39.09,21.49 61.38,21.5L152.95,21.54C171.83,21.54 177.99,47.04 161.23,55.76"/>
+  </svg>
+);

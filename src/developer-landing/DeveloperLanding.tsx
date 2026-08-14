@@ -30,7 +30,7 @@ import { useAuth } from "../auth/AuthContext";
 import { GameCard } from "../components/GameCard";
 import "./DeveloperLanding.css";
 import "./VisualNovelSection.css";
-import { GithubLogo, CopilotLogo, ClaudeCodeLogo, CodexLogo, CursorLogo } from "../assets/Logos";
+import { GithubLogo, CopilotLogo, ClaudeCodeLogo, CodexLogo, CursorLogo, AiStudioLogo } from "../assets/Logos";
 
 function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: { reverse?: boolean, type?: 'dark' | 'light' | 'racing' | 'dating', variant?: 'arcade' | 'rpg' | 'platform' | 'puzzle' | 'racing' | 'dating' }) {
   // Fighting / Arcade (Street Fighter inspired)
@@ -204,11 +204,12 @@ function HeroGameDeck(): React.ReactElement {
 
 const aiIterationFeatures = [
   {
-    image: "/websitesection2.1.png",
+    image: "/websitesection2.1.webp",
     imagePosition: "center 20%",
     title: "Plug-and-Play AI Skills",
     text: "Effortlessly connect our SDKs and structured API specs to your choice of AI IDE, feeding standard game rules and API schemas directly into your LLM toolchain.",
     logos: [
+      { name: "AI Studio", icon: <AiStudioLogo size={24} /> },
       { name: "Copilot", icon: <CopilotLogo size={24} /> },
       { name: "Claude Code", icon: <ClaudeCodeLogo size={24} /> },
       { name: "Cursor", icon: <CursorLogo size={24} /> },
@@ -216,7 +217,7 @@ const aiIterationFeatures = [
     ]
   },
   {
-    image: "/websitesection2,2new-1.png",
+    image: "/websitesection2,2new-1.webp",
     title: "Instant Preview",
     text: "Streamline your dev loop directly from GitHub to browser. Test AI-generated game code safely inside our lightweight iframe-based sandbox environment.",
     logos: [
@@ -224,7 +225,7 @@ const aiIterationFeatures = [
     ]
   },
   {
-    image: "/websitesection2.3.avif",
+    image: "/websitesection2.3.webp",
     title: "Real-Time Data & Tailored Analytics",
     text: "Build, customize, and export custom reporting dashboards to track player engagement, game performance metrics,—giving you and your AI agent the exact insights needed to continuously optimize game.",
   },
