@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import type { UserProfileInfo } from "../types/userProfile";
 import { WLAuthClient } from "./wlAuthClient";
+import { authApi } from "../services/authApi";
 
 const SESSION_KEY = "randseed_auth_session";
 const CUSTOM_TOKEN_KEY = "randseed_custom_jwt";
@@ -34,7 +35,7 @@ export interface DeveloperOrganization {
   level: string;
   revenueShare: number;
   platformAccount: string;
-  status: "pending_review";
+  status: "pending_review" | "approved" | "rejected";
   createdAt: string;
 }
 
@@ -55,13 +56,13 @@ interface AuthContextValue {
   organization: DeveloperOrganization | null;
   isSignedIn: boolean;
   signIn: (accountId: string) => void;
-  mockSignIn: (role: "creator" | "admin") => void;
+  mockSignIn: (role: "creator" | "admin" | "player") => void;
   signInWithSSO: () => void;
   signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile, accountId?: string) => void;
   saveOrganization: (
     input: DeveloperOrganizationInput,
-  ) => DeveloperOrganization;
+  ) => Promise<DeveloperOrganization>;
   isOrganizationNameAvailable: (name: string) => boolean;
 }
 
@@ -130,39 +131,85 @@ export function AuthProvider({
 
       if (ssoToken) {
         try {
-          console.log("Intercepted SSO Token. Exchanging via Worker...");
-          // --- WORKER EXCHANGE LOGIC (Placeholder) ---
-          // const res = await fetch("https://worker.randseed.org/verifyRandseedSSO", {
-          //   method: "POST",
-          //   headers: { "Content-Type": "application/json" },
-          //   body: JSON.stringify({ sso_token: ssoToken })
-          // });
-          // const { customToken, uid } = await res.json();
+          console.log("Intercepted SSO Token. Exchanging via Cloudflare Worker...");
           
-          // Simulated Worker Response:
-          const uid = `randseed:usr_${ssoToken.substring(0, 8)}`;
-          const customToken = `jwt_mock_${ssoToken}`;
-          const mockRole = ssoToken.includes("admin") ? "admin" : "creator";
-          
-          // Simulated Main Site Data Payload
-          const mockEmail = `test_${mockRole}@example.com`;
-          const mockEmailVerified = ssoToken.includes("verified");
+          let exchangeSuccess = false;
+          try {
+            // Real exchange with Cloudflare Worker D1 backend
+            const ssoRes = await authApi.verifySSO(ssoToken);
+            if (ssoRes && ssoRes.token) {
+              const uid = ssoRes.uid || ssoRes.user.principal_id;
+              localStorage.setItem(CUSTOM_TOKEN_KEY, ssoRes.token);
+              localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
 
-          // Save the custom token for API calls
-          localStorage.setItem(CUSTOM_TOKEN_KEY, customToken);
-          localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
-          
-          // Mock saving profile with role
-          const profiles = readProfiles();
-          profiles[uid] = { 
-            ...profiles[uid], 
-            role: mockRole,
-            email: mockEmail,
-            isEmailVerified: mockEmailVerified
-          };
-          localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-          
-          setAccountId(uid);
+              const profiles = readProfiles();
+              const updatedProfile: UserProfile = {
+                avatarUrl: profiles[uid]?.avatarUrl || "",
+                username: profiles[uid]?.username || (ssoRes.user.email?.split("@")[0] ?? uid.substring(0, 10)),
+                isVerified: ssoRes.user.isEmailVerified,
+                hasStake: profiles[uid]?.hasStake ?? false,
+                lastActive: "Just now",
+                bio: profiles[uid]?.bio || "",
+                location: profiles[uid]?.location || "",
+                joinedDate: profiles[uid]?.joinedDate || new Date().toISOString().split("T")[0],
+                role: ssoRes.user.role,
+                email: ssoRes.user.email ?? undefined,
+                isEmailVerified: ssoRes.user.isEmailVerified,
+              };
+
+              profiles[uid] = updatedProfile;
+              localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+              localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updatedProfile));
+
+              setAccountId(uid);
+              setProfile(updatedProfile);
+
+              if (ssoRes.organization) {
+                const orgs = readOrganizations();
+                orgs[uid] = ssoRes.organization;
+                localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
+                setOrganization(ssoRes.organization);
+              }
+
+              exchangeSuccess = true;
+            }
+          } catch (apiErr) {
+            console.warn("Worker API unreachable, using client-side mock exchange fallback", apiErr);
+          }
+
+          if (!exchangeSuccess) {
+            // Fallback client simulation if API server is offline
+            const uid = `randseed:usr_${ssoToken.substring(0, 8)}`;
+            const customToken = `jwt_mock_${ssoToken}`;
+            const mockRole = ssoToken.includes("admin") ? "admin" : ssoToken.includes("creator") ? "creator" : "player";
+            const mockEmail = `test_${mockRole}@example.com`;
+            const mockEmailVerified = ssoToken.includes("verified");
+
+            localStorage.setItem(CUSTOM_TOKEN_KEY, customToken);
+            localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
+
+            const profiles = readProfiles();
+            const fallbackProfile: UserProfile = {
+              avatarUrl: "",
+              username: `${mockRole}_${uid.substring(0, 6)}`,
+              isVerified: mockEmailVerified,
+              hasStake: false,
+              lastActive: "Just now",
+              bio: "",
+              location: "",
+              joinedDate: new Date().toISOString().split("T")[0],
+              role: mockRole,
+              email: mockEmail,
+              isEmailVerified: mockEmailVerified,
+            };
+
+            profiles[uid] = fallbackProfile;
+            localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+            localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(fallbackProfile));
+
+            setAccountId(uid);
+            setProfile(fallbackProfile);
+          }
 
           // Clean up the URL to remove the sso_token for security and UX
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -176,6 +223,35 @@ export function AuthProvider({
       const storedSession = readJson<string | null>(SESSION_KEY, null);
       if (storedSession) {
         setAccountId(storedSession);
+        // Sync fresh profile & organization from D1 backend if token exists
+        const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
+        if (token && !token.startsWith("jwt_mock_")) {
+          authApi.getMe()
+            .then((meRes) => {
+              if (meRes && meRes.user) {
+                setProfile((prev) => ({
+                  ...prev,
+                  avatarUrl: prev?.avatarUrl || "",
+                  username: prev?.username || (meRes.user.email?.split("@")[0] ?? storedSession),
+                  isVerified: meRes.user.isEmailVerified,
+                  hasStake: prev?.hasStake ?? false,
+                  lastActive: prev?.lastActive || "Recently",
+                  bio: prev?.bio || "",
+                  location: prev?.location || "",
+                  joinedDate: prev?.joinedDate || new Date().toISOString().split("T")[0],
+                  role: meRes.user.role,
+                  email: meRes.user.email ?? undefined,
+                  isEmailVerified: meRes.user.isEmailVerified,
+                }));
+                if (meRes.organization) {
+                  setOrganization(meRes.organization);
+                }
+              }
+            })
+            .catch(() => {
+              // Ignore background fetch error
+            });
+        }
       }
     };
     initAuth();
@@ -197,31 +273,70 @@ export function AuthProvider({
     setAccountId(nextAccountId);
   }, []);
 
-  // [DEV ONLY]: Mock Sign In
-  const mockSignIn = useCallback((role: "creator" | "admin") => {
-    // Add "verified" to simulate an already verified user
-    const ssoToken = role === "admin" ? "mock_admin_token_verified" : "mock_creator_token_unverified";
-    // Reuse the exact same init flow from useEffect via URL simulation or manual set
+  // [DEV ONLY]: Mock Sign In with Cloudflare Worker support
+  const mockSignIn = useCallback(async (role: "creator" | "admin" | "player") => {
+    try {
+      const res = await authApi.mockLogin(role);
+      if (res && res.token) {
+        localStorage.setItem(CUSTOM_TOKEN_KEY, res.token);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(res.uid));
+
+        const nextProfile: UserProfile = {
+          avatarUrl: "",
+          username: `${role}_user`,
+          isVerified: res.user.isEmailVerified,
+          hasStake: false,
+          lastActive: "Just now",
+          bio: "",
+          location: "",
+          joinedDate: new Date().toISOString().split("T")[0],
+          role: res.user.role,
+          email: res.user.email ?? undefined,
+          isEmailVerified: res.user.isEmailVerified,
+        };
+
+        const profiles = readProfiles();
+        profiles[res.uid] = nextProfile;
+        localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(nextProfile));
+
+        setAccountId(res.uid);
+        setProfile(nextProfile);
+        if (res.organization) {
+          setOrganization(res.organization);
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn("Mock login API call failed, falling back to URL redirect mock", e);
+    }
+
+    const ssoToken =
+      role === "admin"
+        ? "mock_admin_token_verified"
+        : role === "creator"
+        ? "mock_creator_token_verified"
+        : "mock_player_token_unverified";
+
     window.location.href = `/?sso_token=${ssoToken}`;
   }, []);
 
   // [PIPELINE B]: Redirect user to Main Site to get SSO Token
   const signInWithSSO = useCallback(() => {
-    // Note: Ideally, read the main site URL from environment variables, 
-    // e.g., import.meta.env.VITE_MAIN_SITE_URL or similar.
-    const mainSiteUrl = "https://randseed.org/login"; 
+    const mainSiteUrl =
+      import.meta.env.VITE_WL_LOGIN_URL ||
+      (import.meta.env.VITE_MAIN_SITE_URL
+        ? `${import.meta.env.VITE_MAIN_SITE_URL}/login`
+        : "https://test.randseed.org/login");
+
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-    
-    // Redirect to main site passing the return URI
     window.location.href = `${mainSiteUrl}?redirect_uri=${currentUrl}`;
   }, []);
-
-
 
   const signOut = useCallback(async () => {
     const client = WLAuthClient.getInstance();
     await client.logout(); // Clear local IC identity if it exists
-    
+
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(CUSTOM_TOKEN_KEY);
     localStorage.removeItem(USER_PROFILE_KEY);
@@ -258,7 +373,7 @@ export function AuthProvider({
   );
 
   const saveOrganization = useCallback<AuthContextValue["saveOrganization"]>(
-    (input) => {
+    async (input) => {
       if (!accountId) {
         throw new Error("You must sign in before creating an organization.");
       }
@@ -273,8 +388,26 @@ export function AuthProvider({
       ) {
         throw new Error("Complete all required organization fields.");
       }
+
+      let createdFromApi: DeveloperOrganization | null = null;
+      try {
+        const res = await authApi.createOrganization({
+          name: input.name,
+          contactEmail: input.contactEmail,
+          supportEmail: input.supportEmail,
+          logo: input.logo,
+          description: input.description,
+          socialLinks: input.socialLinks,
+        });
+        if (res && res.organization) {
+          createdFromApi = res.organization;
+        }
+      } catch (err) {
+        console.warn("Could not persist organization to Cloudflare D1, storing locally", err);
+      }
+
       const existing = readOrganizations()[accountId];
-      const nextOrganization: DeveloperOrganization = {
+      const nextOrganization: DeveloperOrganization = createdFromApi ?? {
         ...input,
         accountId,
         organizationId: existing?.organizationId ?? createOrganizationId(),
@@ -286,13 +419,19 @@ export function AuthProvider({
         status: "pending_review",
         createdAt: existing?.createdAt ?? new Date().toISOString(),
       };
+
       const organizations = readOrganizations();
       organizations[accountId] = nextOrganization;
       localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(organizations));
       setOrganization(nextOrganization);
+
+      // Upgrade local role to creator
+      setProfile((prev) => (prev ? { ...prev, role: "creator" } : prev));
+
       return nextOrganization;
     },
     [accountId, isOrganizationNameAvailable],
+  );
   );
 
   const value = useMemo<AuthContextValue>(

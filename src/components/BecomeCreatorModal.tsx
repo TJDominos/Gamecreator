@@ -43,8 +43,9 @@ export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps)
           <button
             onClick={() => {
               // Redirect to main site for verification, passing the return URI
+              const mainSiteUrl = import.meta.env.VITE_MAIN_SITE_URL || "https://test.randseed.org";
               const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-              window.location.href = `https://randseed.org/verify-email?redirect_uri=${currentUrl}`;
+              window.location.href = `${mainSiteUrl}/verify-email?redirect_uri=${currentUrl}`;
             }}
             className="w-full py-3.5 px-4 bg-blue-600 text-white text-[15px] font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm active:scale-[0.98]"
           >
@@ -66,10 +67,10 @@ export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps)
 
     setIsSubmitting(true);
     try {
-      saveOrganization({
+      await saveOrganization({
         name: `Studio-${accountId.substring(0, 6)}`,
-        contactEmail: "hello@example.com",
-        supportEmail: "support@example.com",
+        contactEmail: profile?.email || "hello@example.com",
+        supportEmail: profile?.email || "support@example.com",
         logo: "",
         description: "My AI Game Studio on Randseed",
         socialLinks: ["", ""],
