@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.date-container {
+  position: relative;
+  display: inline-block;
+  width: 150px;
+  height: 30px;
+  border: 1px solid #ccc;
+}
+.date-input {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+  <div class="date-container">
+    <span id="date-val">2026-07-24</span>
+    <input type="date" class="date-input" onchange="document.getElementById('date-val').innerText = this.value" />
+  </div>
+</body>
+</html>

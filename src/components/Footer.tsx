@@ -30,18 +30,8 @@ const Footer: React.FC = () => {
               <span className="font-bold">Randseed</span>
             </div>
             <p>
-              Decentralized Blockchain Games
-              <br />
-              Built on{" "}
-              <a
-                href="https://learn.internetcomputer.org/hc/en-us/articles/34209486239252-Chain-Key-Cryptography"
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-purple-600 transition-colors"
-              >
-                on-chain randomness
-              </a>{" "}
-              and public blockchain ledger
+              
+              Play, Build and Connect in AI games
             </p>
           </div>
 

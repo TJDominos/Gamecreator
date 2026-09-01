@@ -1,3 +1,4 @@
+
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap");
 
 .portal-layout,
@@ -135,6 +136,7 @@
   flex: 1;
   flex-direction: column;
   gap: 5px;
+  margin-top: 32px;
 }
 
 .portal-nav a {
@@ -159,6 +161,7 @@
   color: #fff;
   background: #61369a;
   box-shadow: 0 8px 24px rgba(97, 54, 154, 0.28);
+  text-decoration: none;
 }
 
 .portal-nav svg {
@@ -247,8 +250,8 @@
 
 .portal-account > button > span:first-child {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   overflow: hidden;
   place-items: center;
   color: #fff;
@@ -285,9 +288,12 @@
 .account-menu {
   position: absolute;
   top: calc(100% + 7px);
+  left: 0;
   right: 0;
-  min-width: 150px;
-  padding: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px;
+  box-sizing: border-box;
   background: #fff;
   border: 1px solid var(--portal-border);
   border-radius: 10px;
@@ -297,14 +303,15 @@
 .account-menu button {
   display: flex;
   width: 100%;
+  box-sizing: border-box;
   align-items: center;
-  padding: 9px 10px;
-  gap: 8px;
+  padding: 8px 12px;
+  gap: 18px;
   background: transparent;
   border: 0;
   border-radius: 7px;
   cursor: pointer;
-  font-size: 12px;
+  
 }
 
 .account-menu button:hover {
@@ -823,4 +830,142 @@
     flex-direction: column;
     gap: 18px;
   }
+}
+
+.portal-date-input {
+  background: transparent;
+  border: none;
+  color: inherit;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.portal-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+
+
+.custom-datepicker {
+  background: transparent;
+  border: none;
+  color: inherit;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  width: 85px;
+  text-align: center;
+}
+
+.react-datepicker-wrapper {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+}
+
+.react-datepicker-popper {
+  z-index: 100 !important;
+}
+
+.react-datepicker {
+  font-family: "Manrope", sans-serif !important;
+  border: 1px solid var(--portal-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.react-datepicker__header {
+  background-color: #f9f9f9 !important;
+  border-bottom: 1px solid var(--portal-border) !important;
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+}
+
+.react-datepicker__day--selected, .react-datepicker__day--in-selecting-range, .react-datepicker__day--in-range, .react-datepicker__month-text--selected, .react-datepicker__month-text--in-selecting-range, .react-datepicker__month-text--in-range, .react-datepicker__quarter-text--selected, .react-datepicker__quarter-text--in-selecting-range, .react-datepicker__quarter-text--in-range, .react-datepicker__year-text--selected, .react-datepicker__year-text--in-selecting-range, .react-datepicker__year-text--in-range {
+  background-color: var(--portal-purple) !important;
+  color: #fff !important;
+}
+
+.react-datepicker__day--keyboard-selected, .react-datepicker__month-text--keyboard-selected, .react-datepicker__quarter-text--keyboard-selected, .react-datepicker__year-text--keyboard-selected {
+  background-color: var(--portal-purple-soft) !important;
+  color: var(--portal-purple) !important;
+}
+
+.portal-date-hidden-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.portal-date-hidden-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 901px) {
+  .portal-sidebar.is-unpinned {
+    transform: translateX(-100%);
+  }
+}
+.portal-main.is-unpinned {
+  margin-left: 0;
+}
+@media (min-width: 901px) {
+  .portal-main.is-unpinned .portal-menu-button {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-right: 16px;
+    color: var(--portal-ink);
+  }
+  .portal-main:not(.is-unpinned) .portal-menu-button {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-right: 16px;
+    color: var(--portal-ink);
+  }
+}
+
+.portal-sidebar {
+  transition: transform 300ms ease;
+}
+.portal-main {
+  transition: margin-left 300ms ease;
+}
+.portal-menu-button {
+  transition: transform 200ms ease;
+}
+.portal-menu-button:active {
+  transform: scale(0.95);
 }

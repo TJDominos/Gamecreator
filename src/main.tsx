@@ -7,6 +7,7 @@ import DeveloperLanding from "./developer-landing/DeveloperLanding";
 import DeveloperPortal from "./developer-portal/DeveloperPortal";
 import CreatorGuide from "./CreatorGuide";
 import CreatorBounties from "./CreatorBounties";
+import PublicBountyDetail from "./PublicBountyDetail";
 import "./index.css";
 
 function App() {
@@ -16,10 +17,13 @@ function App() {
     return <DeveloperLanding />;
   }
 
-  if (location.pathname === "/guide") {
+  if (location.pathname === "/guides") {
     return <CreatorGuide />;
   }
   
+  if (location.pathname.startsWith("/bounties/")) {
+    return <PublicBountyDetail />;
+  }
   if (location.pathname === "/bounties") {
     return <CreatorBounties />;
   }

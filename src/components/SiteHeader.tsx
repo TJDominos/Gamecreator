@@ -1,7 +1,8 @@
 import React, { useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { WalletConnectModal } from "./WalletConnectModal";
+import { BecomeCreatorModal } from "./BecomeCreatorModal";
 import { Menu, X } from "lucide-react";
 import "../developer-landing/DeveloperLanding.css";
 
@@ -12,13 +13,19 @@ function getPortalPath(hasOrganization: boolean): string {
 export function SiteHeader(): React.ReactElement {
   const { isSignedIn, organization, signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isWalletConnectModalOpen, setWalletConnectModalOpen] = useState(false);
+  const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const signInButtonRef = useRef<HTMLButtonElement>(null);
 
   function openPortal(): void {
     if (isSignedIn) {
-      navigate(getPortalPath(Boolean(organization)));
+      if (organization) {
+        navigate("/dashboard");
+      } else {
+        setBecomeCreatorModalOpen(true);
+      }
       return;
     }
     setWalletConnectModalOpen(true);
@@ -28,7 +35,9 @@ export function SiteHeader(): React.ReactElement {
     setWalletConnectModalOpen(false);
     if (typeof verifiedId === "string") {
       signIn(verifiedId);
-      navigate(getPortalPath(Boolean(organization)));
+      if (organization) {
+        navigate("/dashboard");
+      }
     }
     signInButtonRef.current?.focus();
   }
@@ -43,10 +52,16 @@ export function SiteHeader(): React.ReactElement {
           </a>
           
           <div className="landing-nav__desktop-actions">
-            <a className="landing-nav__guide text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" href="/bounties">
+            <a 
+              className={`landing-nav__guide text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/bounties") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
+              href="/bounties"
+            >
               Creator Bounties
             </a>
-            <a className="landing-nav__guide text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" href="/guide">
+            <a 
+              className={`landing-nav__guide text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/guides") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
+              href="/guides"
+            >
               Creator Guide
             </a>
             <button
@@ -55,7 +70,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? "Dashboard" : "Sign In"}
+              {isSignedIn ? (organization ? "Dashboard" : "Build Game") : "Sign In"}
             </button>
           </div>
 
@@ -66,7 +81,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? "Dashboard" : "Sign In"}
+              {isSignedIn ? (organization ? "Dashboard" : "Build Game") : "Sign In"}
             </button>
             <button 
               className="landing-nav__hamburger"
@@ -81,15 +96,15 @@ export function SiteHeader(): React.ReactElement {
         {isMobileMenuOpen && (
           <div className="landing-nav__mobile-menu">
             <a 
-              className="landing-nav__guide-mobile text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" 
+              className={`landing-nav__guide-mobile text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/bounties") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
               href="/bounties"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Creator Bounties
             </a>
             <a 
-              className="landing-nav__guide-mobile text-black no-underline hover:text-purple-300 decoration-purple-300 hover:underline decoration-2 underline-offset-4" 
-              href="/guide"
+              className={`landing-nav__guide-mobile text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/guides") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
+              href="/guides"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Creator Guide
@@ -100,6 +115,10 @@ export function SiteHeader(): React.ReactElement {
       <WalletConnectModal
         isOpen={isWalletConnectModalOpen}
         onClose={handleWalletConnectClose}
+      />
+      <BecomeCreatorModal 
+        isOpen={isBecomeCreatorModalOpen}
+        onClose={() => setBecomeCreatorModalOpen(false)}
       />
     </>
   );

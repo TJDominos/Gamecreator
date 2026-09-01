@@ -1,8 +1,15 @@
+:root {
+  --portal-ink: #17151d;
+  --portal-purple: #61369a;
+  --portal-muted: #6b7280;
+  --portal-border: #e5e5ea;
+}
 .creator-guide {
   min-height: 100vh;
   background-color: #f8f8fb;
   font-family: var(--app-font-family);
   color: #101014;
+  padding-top: 82px;
 }
 
 .guide-container {
@@ -66,44 +73,6 @@
   margin-bottom: 32px;
 }
 
-.guide-nav__section h3 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #62626c;
-  margin-bottom: 12px;
-  font-weight: 700;
-}
-
-.guide-nav__section ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.guide-nav__section a {
-  display: block;
-  font-size: 15px;
-  color: #101014;
-  text-decoration: none;
-  padding: 6px 12px;
-  margin-left: -12px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.guide-nav__section a:hover {
-  background-color: rgba(16, 16, 20, 0.04);
-}
-
-.guide-nav__section a.active {
-  color: #61369a;
-  background-color: rgba(97, 54, 154, 0.08);
-  font-weight: 600;
-}
 
 .guide-content {
   flex: 1;
@@ -215,6 +184,65 @@
   
   .guide-sidebar {
     width: 100%;
-    display: none; /* Hide sidebar on mobile for now, or could make it a dropdown */
+    display: block;
   }
 }
+
+/* Bounty Card Responsive Layout */
+.bounty-card {
+  background: #fff;
+  border: 1px solid var(--portal-border, #e5e5ea);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  flex-direction: row;
+}
+
+.bounty-card-cover {
+  width: 240px;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  background: #f2f0f3;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bounty-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.bounty-card-action {
+  border-left: 1px solid var(--portal-border, #e5e5ea);
+  padding-left: 24px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .bounty-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+    gap: 16px;
+  }
+  .bounty-card-cover {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+  }
+  .bounty-card-action {
+    border-left: none;
+    border-top: 1px solid var(--portal-border, #e5e5ea);
+    padding-left: 0;
+    padding-top: 16px;
+    min-width: auto;
+  }
+}
+

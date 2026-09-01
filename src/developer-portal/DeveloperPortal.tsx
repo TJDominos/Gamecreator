@@ -1,6 +1,14 @@
-import React, { useEffect, useState } from "react";
+import { BountyHub } from "./bounties/BountyHub";
+import { BountyDetail } from "./bounties/BountyDetail";
+import { BountyManagement } from "./bounties/BountyManagement";
 import {
+  GameConsole, GameOverview, GameSettings,
+  GameDeployments } from "./games";
+import React, { useEffect, useState, useRef } from "react";
+import {
+  ArrowRight,
   AlertCircle,
+  Calendar,
   BarChart3,
   BookOpen,
   ChevronDown,
@@ -11,6 +19,7 @@ import {
   Menu,
   Plus,
   Settings,
+  Target,
   ShieldCheck,
   Users,
   Wrench,
@@ -26,6 +35,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router";
+import { MOCK_GAMES } from "./games/gameData";
 import { useAuth } from "../auth/AuthContext";
 import { WltLogo } from "../components/WltLogo";
 import { PortalHeader } from "../components/PortalHeader";
@@ -33,13 +43,11 @@ import { OnboardingHeader } from "../components/OnboardingHeader";
 import "./DeveloperPortal.css";
 
 const navigation = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/games", label: "Games", icon: Gamepad2 },
-  { to: "/sandbox", label: "Sandbox", icon: Wrench },
-  { to: "/data", label: "Users & Orders", icon: Users },
-  { to: "/revenue", label: "Revenue", icon: CircleDollarSign },
-  { to: "/docs", label: "Developer Resources", icon: BookOpen },
-  { to: "/settings", label: "Organization", icon: Settings },
+  { to: "/dashboard", end: true, label: "Dashboard", icon: LayoutDashboard },
+    { to: "/dashboard/bounties", label: "Creator Bounties", icon: Target },
+  { to: "/dashboard/data", label: "Users & Orders", icon: Users },
+  { to: "/dashboard/revenue", label: "Revenue", icon: CircleDollarSign },
+  { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 const dashboardStats = [
@@ -102,7 +110,7 @@ function DeveloperOnboarding(): React.ReactNode {
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
-    document.title = "Create your developer organization �?RandSeed";
+    document.title = "Create your creator organization �?RandSeed";
   }, []);
 
   useEffect(() => {
@@ -185,7 +193,7 @@ function DeveloperOnboarding(): React.ReactNode {
       <section className="onboarding-card">
         <div className="onboarding-intro">
           <p className="portal-eyebrow">One-time setup</p>
-          <h1>Create your developer organization</h1>
+          <h1>Create your creator organization</h1>
           <p>
             Tell us who publishes your games. You can update these details later
             from Organization settings.
@@ -288,13 +296,14 @@ function PortalShell(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(true);
   const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   const pageName =
     navigation.find((item) => location.pathname.startsWith(item.to))?.label ??
-    "Developer Portal";
+    "Creator Portal";
 
   function handleSignOut(): void {
     signOut();
@@ -303,12 +312,12 @@ function PortalShell(): React.ReactElement {
 
   return (
     <div className="portal-layout">
-      <aside className={`portal-sidebar${menuOpen ? " is-open" : ""}`}>
+      <aside className={`portal-sidebar ${menuOpen ? "is-open" : ""} ${!sidebarPinned ? "is-unpinned" : ""}`}>
         <div className="sidebar-heading">
-          <Link to="/dashboard" className="portal-brand">
+          <Link to="/" className="portal-brand">
             <WltLogo />
             <span>RandSeed</span>
-            <b>Developers</b>
+            <b>Creators</b>
           </Link>
           <button
             className="sidebar-close"
@@ -319,25 +328,13 @@ function PortalShell(): React.ReactElement {
             <X />
           </button>
         </div>
-        <div className="organization-switcher">
-          <span className="organization-avatar">
-            {organization?.logo ? (
-              <img src={organization.logo} alt="" />
-            ) : (
-              organization?.name.slice(0, 1)
-            )}
-          </span>
-          <span>
-            <small>Organization</small>
-            <strong>{organization?.name}</strong>
-          </span>
-          <ChevronDown />
-        </div>
-        <nav className="portal-nav" aria-label="Developer Portal">
-          {navigation.map(({ to, label, icon: Icon }) => (
+        
+        <nav className="portal-nav" aria-label="Creator Portal">
+          {navigation.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               className={({ isActive }) => (isActive ? "is-active" : "")}
             >
               <Icon />
@@ -346,10 +343,10 @@ function PortalShell(): React.ReactElement {
           ))}
         </nav>
         <div className="sidebar-help">
-          <ShieldCheck />
+          <BookOpen />
           <div>
-            <strong>Need help?</strong>
-            <Link to="/docs">Open Developer Docs</Link>
+            <strong>Integration & APIs</strong>
+            <Link to="/guides">Creator Guides</Link>
           </div>
         </div>
       </aside>
@@ -361,10 +358,10 @@ function PortalShell(): React.ReactElement {
           onClick={() => setMenuOpen(false)}
         />
       )}
-      <div className="portal-main">
+      <div className={`portal-main ${!sidebarPinned ? "is-unpinned" : ""}`}>
         <PortalHeader 
           pageName={pageName} 
-          onMenuClick={() => setMenuOpen(true)} 
+          onMenuClick={() => { if (window.innerWidth > 900) { setSidebarPinned(!sidebarPinned); } else { setMenuOpen(true); } }} 
         />
         <main className="portal-content">
           <Outlet />
@@ -374,71 +371,163 @@ function PortalShell(): React.ReactElement {
   );
 }
 
+
+const mockGames = [
+  { id: "1", name: "Neon Dash", players: "1,204", visitors: "2,500", availableBalance: "$120.00", revenue: "$342.00", status: "Active" },
+  { id: "2", name: "Space Miner", players: "840", visitors: "1,120", availableBalance: "$45.50", revenue: "$128.50", status: "Active" },
+  { id: "3", name: "Puzzle Quest", players: "0", visitors: "0", availableBalance: "$0.00", revenue: "$0.00", status: "In Review" },
+];
+
+
+function getStatusStyles(status: string) {
+  switch (status) {
+    case 'PUBLIC_ACTIVE': return { background: '#e6f6ec', color: '#1e874b', borderColor: '#d1f0db' };
+    case 'APPROVED': return { background: '#dcfce7', color: '#166534', borderColor: '#bbf7d0' };
+    case 'PENDING_REVIEW': return { background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' };
+    case 'REJECTED': return { background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' };
+    case 'DEVELOPMENT':
+    case 'PRIVATE_TESTING': return { background: '#e0e7ff', color: '#3730a3', borderColor: '#c7d2fe' };
+    case 'MAINTENANCE': return { background: '#ffedd5', color: '#9a3412', borderColor: '#fed7aa' };
+    case 'DRAFT':
+    case 'ARCHIVED':
+    default: return { background: '#f2f0f3', color: 'var(--portal-muted)', borderColor: '#e5e2e8' };
+  }
+}
+
+function formatBonus(value: number): string {
+  if (value >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (value >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return value.toFixed(2);
+}
+
 function Dashboard(): React.ReactElement {
+  const navigate = useNavigate();
   const { organization } = useAuth();
+  const [startDate, setStartDate] = useState("2026-07-24");
+  const [endDate, setEndDate] = useState("2026-08-23");
+  
+  const endDateRef = useRef<HTMLInputElement>(null);
+
 
   return (
     <div className="dashboard-page">
       <section className="dashboard-welcome">
         <div>
-          <p className="portal-eyebrow">Welcome to RandSeed</p>
-          <h1>{organization?.name}</h1>
+          <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>Dashboard</h1>
           <p>Connect, test, publish, and grow your web games from one place.</p>
         </div>
-        <Link className="primary-action" to="/games">
+        <button className="primary-action" onClick={() => {
+          const newId = "g_" + Math.floor(Math.random() * 1000);
+          navigate(`/dashboard/games/${newId}/settings`, { state: { gameName: "New Game" } });
+        }}>
           <Plus /> Create game
-        </Link>
+        </button>
       </section>
-      <section className="stat-grid" aria-label="Organization overview">
-        {dashboardStats.map((stat) => (
-          <article key={stat.label}>
-            <span>{stat.label}</span>
-            <strong>{stat.value}</strong>
-            <small>{stat.note}</small>
-          </article>
-        ))}
+      <section className="stat-grid" aria-label="Studio overview">
+        <article>
+          <span>Games</span>
+          <strong>0</strong>
+          <small>Create your first game</small>
+        </article>
+        <article>
+          <span>Players (Since Inception)</span>
+          <strong>0</strong>
+          <small>Visitors: 0</small>
+        </article>
+        <article>
+          <span>Revenue Since Inception</span>
+          <strong>$0.00</strong>
+          <small>Withdrawn: $0.00</small>
+        </article>
+        <article>
+          <span>Available balance</span>
+          <strong>$0.00</strong>
+          <small>Gcoin: 0 | Bonus: {formatBonus(0)}</small>
+        </article>
       </section>
-      <div className="dashboard-grid">
-        <section className="portal-panel next-action">
-          <div className="panel-heading">
-            <div>
-              <p className="portal-eyebrow">Next step</p>
-              <h2>Publish your first game</h2>
-            </div>
-            <Gamepad2 />
+      <section className="portal-panel games-performance" style={{ marginTop: '24px' }}>
+        <div className="panel-heading" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Games Performance</h2>
           </div>
-          <ol>
-            <li className="is-complete">
-              <span>1</span>
-              <div><strong>Create organization</strong><small>Complete</small></div>
-            </li>
-            <li>
-              <span>2</span>
-              <div><strong>Add a game</strong><small>Provide your build and store details</small></div>
-            </li>
-            <li>
-              <span>3</span>
-              <div><strong>Pass sandbox checks</strong><small>Validate integration and callbacks</small></div>
-            </li>
-          </ol>
-          <Link to="/games">Start game setup</Link>
-        </section>
-        <section className="portal-panel organization-summary">
-          <div className="panel-heading">
-            <div>
-              <p className="portal-eyebrow">Platform terms</p>
-              <h2>Organization details</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', background: '#f9f9f9', border: '1px solid var(--portal-border)', borderRadius: '6px', padding: '6px 12px' }}>
+            <span style={{ color: 'var(--portal-text)' }}>Date Range: <span style={{ color: '#8892b0' }}>(UTC)</span></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '4px', color: 'var(--portal-text)' }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '13px' }}>{startDate}</span>
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={e => {
+                    setStartDate(e.target.value);
+                    try {
+                      if (endDateRef.current) endDateRef.current.showPicker();
+                    } catch (err) {}
+                  }} 
+                  className="portal-date-hidden-input"
+                />
+              </div>
+              <span style={{ color: 'var(--portal-muted)' }}>→</span>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '13px' }}>{endDate}</span>
+                <input 
+                  type="date" 
+                  ref={endDateRef}
+                  value={endDate} 
+                  onChange={e => setEndDate(e.target.value)} 
+                  className="portal-date-hidden-input"
+                />
+              </div>
             </div>
-            <Settings />
           </div>
-          <dl>
-            <div><dt>Organization ID</dt><dd>{organization?.organizationId}</dd></div>
-            <div><dt>Level</dt><dd>{organization?.level}</dd></div>
-            <div><dt>Revenue share</dt><dd>{organization?.revenueShare}%</dd></div>
-            <div><dt>Status</dt><dd><span className="status-pill">Pending review</span></dd></div>
-          </dl>
-        </section>
-      </div>
+        </div>
+        <div className="table-responsive" style={{ overflowX: 'auto' }}>
+          <table className="portal-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Game Name</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Status</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Visitors</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Players</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Revenue</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Available Balance</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Escrowed Balance</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_GAMES.map(game => (
+                <tr key={game.id} style={{ cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => navigate(`/dashboard/games/${game.id}`)} onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'var(--portal-purple-soft)', color: 'var(--portal-purple)', display: 'grid', placeItems: 'center' }}>
+                        <Gamepad2 size={16} />
+                      </div>
+                      <strong>{game.name}</strong>
+                    </div>
+                  </td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>
+                    <span className="status-pill" style={{ ...getStatusStyles(game.status), border: '1px solid' }}>
+                      {game.status.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.visitors}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.players}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.revenue}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.availableBalance}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.escrowedBalance}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', textAlign: 'right' }}>
+                    <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--portal-muted)' }}>
+                      <ArrowRight size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
     </div>
   );
 }
@@ -451,7 +540,7 @@ function PlaceholderPage({
   return (
     <section className="placeholder-page">
       <span><Icon /></span>
-      <p className="portal-eyebrow">Developer Portal</p>
+      <p className="portal-eyebrow">Creator Portal</p>
       <h1>{title}</h1>
       <p>{description}</p>
     </section>
@@ -470,20 +559,29 @@ export default function DeveloperPortal(): React.ReactElement {
         }
       />
       <Route
+        path="/dashboard"
         element={
           <RequireOrganization>
             <PortalShell />
           </RequireOrganization>
         }
       >
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="games" element={<PlaceholderPage title="Games" description="Create and manage game integrations, versions, and releases." icon={Gamepad2} />} />
-        <Route path="sandbox" element={<PlaceholderPage title="Sandbox" description="Preview your game and validate RandSeed host events." icon={Wrench} />} />
+        <Route index element={<Dashboard />} />
+        
+        <Route path="games/:gameId" element={<GameConsole />}>
+          <Route index element={<GameOverview />} />
+          <Route path="settings" element={<GameSettings />} />
+          <Route path="deployments" element={<GameDeployments />} />
+                  </Route>
+
+                <Route path="bounties" element={<BountyHub />} />
+        <Route path="bounties/:bountyId" element={<BountyDetail />} />
         <Route path="data" element={<PlaceholderPage title="Users & Orders" description="Review anonymous player activity and order history." icon={Users} />} />
         <Route path="revenue" element={<PlaceholderPage title="Revenue" description="Track estimated revenue, ledger entries, and payouts." icon={BarChart3} />} />
-        <Route path="docs" element={<PlaceholderPage title="Developer Resources" description="Explore Developer Docs, AI Toolkit, and publishing guidance." icon={BookOpen} />} />
-        <Route path="settings" element={<PlaceholderPage title="Organization" description="Manage your public profile, security, and integrations." icon={Settings} />} />
+        <Route path="settings" element={<PlaceholderPage title="Settings" description="Manage your public profile, security, and integrations." icon={Settings} />} />
       </Route>
+      <Route path="/bounty-management" element={<RequireOrganization><BountyManagement /></RequireOrganization>} />
+      
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

@@ -39,7 +39,6 @@ export default function CreatorGuide() {
 
         <div className="guide-content">
           <section id="introduction">
-            <h1>Creator Guide</h1>
             <p className="lead">
               Welcome to the Games Creator Guide. Here you'll find everything you need to publish your web games, reach a global audience, and monetize effectively.
             </p>

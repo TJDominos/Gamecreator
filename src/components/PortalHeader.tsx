@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronDown, LogOut, Menu } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../auth/AuthContext";
@@ -12,6 +12,20 @@ export function PortalHeader({ pageName, onMenuClick }: PortalHeaderProps): Reac
   const { accountId, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [accountOpen, setAccountOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   function handleSignOut(): void {
     signOut();
@@ -28,11 +42,8 @@ export function PortalHeader({ pageName, onMenuClick }: PortalHeaderProps): Reac
       >
         <Menu />
       </button>
-      <div>
-        <small>Developer Portal</small>
-        <strong>{pageName}</strong>
-      </div>
-      <div className="portal-account">
+      
+      <div className="portal-account" ref={accountMenuRef}>
         <button
           type="button"
           onClick={() => setAccountOpen((current) => !current)}
@@ -40,14 +51,14 @@ export function PortalHeader({ pageName, onMenuClick }: PortalHeaderProps): Reac
         >
           <span>{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : "D"}</span>
           <span>
-            <strong>{profile?.username || "Developer"}</strong>
+            <strong>{profile?.username || "Creator"}</strong>
             <small>{accountId?.slice(0, 14)}</small>
           </span>
           <ChevronDown />
         </button>
         {accountOpen && (
           <div className="account-menu">
-            <button type="button" onClick={handleSignOut}>
+            <button type="button" className="text-body" onClick={handleSignOut}>
               <LogOut /> Sign out
             </button>
           </div>

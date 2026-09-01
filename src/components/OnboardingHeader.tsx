@@ -8,9 +8,9 @@ export function OnboardingHeader(): React.ReactElement {
       <Link to="/" className="portal-brand">
         <WltLogo />
         <span>RandSeed</span>
-        <b>Developers</b>
+        <b>Creators</b>
       </Link>
-      <span>Developer onboarding</span>
+      <span>Creator onboarding</span>
     </header>
   );
 }

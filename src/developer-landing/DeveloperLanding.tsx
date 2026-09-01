@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { ArrowRight,
@@ -23,16 +24,17 @@ import { ArrowRight,
   WalletCards,
   Zap,
   Target,
-Ghost, Sword, Crown } from "lucide-react";
+Ghost, Sword, Crown, Unlock } from "lucide-react";
 import Footer from "../components/Footer";
 import { WalletConnectModal } from "../components/WalletConnectModal";
 import { useAuth } from "../auth/AuthContext";
 import { GameCard } from "../components/GameCard";
 import "./DeveloperLanding.css";
 import "./VisualNovelSection.css";
+import "./MonopolySection.css";
 import { GithubLogo, CopilotLogo, ClaudeCodeLogo, CodexLogo, CursorLogo, AiStudioLogo } from "../assets/Logos";
 
-function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: { reverse?: boolean, type?: 'dark' | 'light' | 'racing' | 'dating', variant?: 'arcade' | 'rpg' | 'platform' | 'puzzle' | 'racing' | 'dating' }) {
+function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: { reverse?: boolean, type?: 'dark' | 'light' | 'racing' | 'dating' | 'monopoly' | 'rdr', variant?: 'arcade' | 'rpg' | 'platform' | 'puzzle' | 'racing' | 'dating' | 'monopoly' | 'rdr' }) {
   // Fighting / Arcade (Street Fighter inspired)
   const arcades = [
     <svg viewBox="0 0 16 16" className="marquee-pixel-icon" key="1"><path d="M3,12 h10 v2 h-10 z M2,14 h12 v2 h-12 z M7,4 h2 v8 h-2 z M6,2 h4 v2 h-4 z M11,10 h2 v2 h-2 z M13,8 h2 v2 h-2 z" fill="currentColor"/></svg>,
@@ -79,7 +81,29 @@ function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: {
     <svg viewBox="0 0 24 24" className="marquee-pixel-icon" key="4" style={{width: '28px', height: '28px'}}><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1h-4v-2h4zM9 4c.55 0 1 .45 1 1h-4c0-.55.45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z" fill="currentColor"/></svg>
   ];
 
-  const iconSet = variant === 'arcade' ? arcades : variant === 'rpg' ? rpgs : variant === 'platform' ? platforms : variant === 'racing' ? racings : variant === 'dating' ? datings : puzzles;
+  
+    const monopolys = [
+    <div className="monopoly-track-item" key="1">FREE</div>,
+    <div className="monopoly-track-item" key="2">DAILY QUESTS</div>,
+    <div className="monopoly-track-item" key="3">CHANCE</div>,
+    <div className="monopoly-track-item" key="4">LOGIN REWARDS</div>,
+    <div className="monopoly-track-item" key="5">SUBSCRIPTION</div>,
+    <div className="monopoly-track-item" key="6">MARKETING R.R.</div>,
+    <div className="monopoly-track-item" key="7">DLC DRIVE</div>,
+    <div className="monopoly-track-item" key="8">EXPANSION PK</div>,
+    <div className="monopoly-track-item" key="9">WATER WORKS</div>,
+    <div className="monopoly-track-item" key="10">SEQUEL BLVD</div>,
+    <div className="monopoly-track-item" key="11">SKIN PACK</div>,
+    <div className="monopoly-track-item" key="12">STORE FEE</div>
+  ];
+
+  
+  const rdrs = [
+    <img src="https://storage.randseed.org/Creator/reddeadbar.png" key="1" alt="RDR Separator" />
+  ];
+
+  const iconSet = variant === 'arcade' ? arcades : variant === 'rpg' ? rpgs : variant === 'platform' ? platforms : variant === 'racing' ? racings : variant === 'dating' ? datings : variant === 'monopoly' ? monopolys : variant === 'rdr' ? rdrs : puzzles;
+
   
   return (
     <div className={`game-marquee-container game-marquee-container--${type}`} aria-hidden="true">
@@ -204,7 +228,7 @@ function HeroGameDeck(): React.ReactElement {
 
 const aiIterationFeatures = [
   {
-    image: "/websitesection2.1.webp",
+    image: "https://storage.randseed.org/Creator/websitesection2.1.png",
     imagePosition: "center 20%",
     title: "Plug-and-Play AI Skills",
     text: "Effortlessly connect our SDKs and structured API specs to your choice of AI IDE, feeding standard game rules and API schemas directly into your LLM toolchain.",
@@ -217,7 +241,7 @@ const aiIterationFeatures = [
     ]
   },
   {
-    image: "/websitesection2,2new-1.webp",
+    image: "https://storage.randseed.org/Creator/section2-2.png",
     title: "Instant Preview",
     text: "Streamline your dev loop directly from GitHub to browser. Test AI-generated game code safely inside our lightweight iframe-based sandbox environment.",
     logos: [
@@ -225,27 +249,70 @@ const aiIterationFeatures = [
     ]
   },
   {
-    image: "/websitesection2.3.webp",
+    image: "https://storage.randseed.org/Creator/websitesection2.3.avif",
     title: "Real-Time Data & Tailored Analytics",
     text: "Build, customize, and export custom reporting dashboards to track player engagement, game performance metrics,—giving you and your AI agent the exact insights needed to continuously optimize game.",
   },
 ];
 
+
+const GoSvg = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <text x="50" y="20" fontFamily="sans-serif" fontSize="10" fill="#111" textAnchor="middle">COLLECT $200</text>
+    <text x="50" y="30" fontFamily="sans-serif" fontSize="10" fill="#111" textAnchor="middle">AS YOU PASS</text>
+    <text x="50" y="70" fontFamily="Arial Black, Impact, sans-serif" fontSize="42" fill="#FF0000" stroke="#111" strokeWidth="2" textAnchor="middle" letterSpacing="1">GO</text>
+    <path d="M10 85 L25 75 V80 H85 V90 H25 V95 Z" fill="#FF0000" stroke="#111" strokeWidth="2" strokeLinejoin="round"/>
+    <path d="M75 80 L80 85 L75 90 M82 80 L87 85 L82 90" stroke="#111" strokeWidth="2" fill="none" strokeLinecap="round"/>
+  </svg>
+);
+
+const TreasureBoxSvg = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <path d="M15 45 L25 15 H75 L85 45 Z" fill="#00D4FF" stroke="#111" strokeWidth="4" strokeLinejoin="round"/>
+    <path d="M22 40 L30 22 H70 L78 40 Z" fill="#fff" stroke="#111" strokeWidth="2"/>
+    <path d="M35 50 C25 50 25 30 40 30 C55 30 55 50 45 50" fill="#fff" stroke="#111" strokeWidth="3"/>
+    <path d="M35 30 L32 20 H48 L45 30" fill="#fff" stroke="#111" strokeWidth="3"/>
+    <circle cx="40" cy="30" r="3" fill="#111"/>
+    <path d="M50 50 C40 50 45 35 60 35 C75 35 70 50 60 50" fill="#fff" stroke="#111" strokeWidth="3"/>
+    <path d="M55 35 L52 25 H68 L65 35" fill="#fff" stroke="#111" strokeWidth="3"/>
+    <rect x="15" y="45" width="70" height="40" fill="#fff" stroke="#111" strokeWidth="4" strokeLinejoin="round"/>
+    <rect x="22" y="52" width="56" height="26" fill="#00D4FF" stroke="#111" strokeWidth="3"/>
+    <rect x="30" y="45" width="8" height="40" fill="#fff" stroke="#111" strokeWidth="3"/>
+    <rect x="62" y="45" width="8" height="40" fill="#fff" stroke="#111" strokeWidth="3"/>
+    <circle cx="50" cy="55" r="8" fill="#fff" stroke="#111" strokeWidth="3"/>
+    <path d="M47 55 Q50 58 53 55" stroke="#111" strokeWidth="2"/>
+  </svg>
+);
+
+const RingSvg = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <ellipse cx="50" cy="65" rx="42" ry="22" fill="#FFE600" stroke="#111" strokeWidth="4"/>
+    <ellipse cx="50" cy="63" rx="30" ry="12" fill="#fff" stroke="#111" strokeWidth="4"/>
+    <rect x="40" y="25" width="20" height="20" fill="#fff" stroke="#111" strokeWidth="4" />
+    <circle cx="50" cy="35" r="4" fill="none" stroke="#111" strokeWidth="2"/>
+    <path d="M50 27 V31 M50 39 V43 M42 35 H46 M54 35 H58 M44 29 L47 32 M56 41 L53 38 M44 41 L47 38 M56 29 L53 32" stroke="#111" strokeWidth="2"/>
+    <path d="M40 15 L35 10 M50 15 V7 M60 15 L65 10" stroke="#111" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+);
+
 const monetizationFeatures = [
   {
-    icon: WalletCards,
-    title: "In-App Purchases",
-    text: "Seamlessly integrate virtual goods, battle passes, and premium content.",
+    icon: GoSvg,
+    title: "Content & Game Unlocks",
+    text: "Paywalled levels, premium game modes, full-version access, and exclusive features",
+    color: "#e3000f",
   },
   {
-    icon: CircleDollarSign,
-    title: "Subscriptions",
-    text: "Create recurring revenue streams with VIP tiers and exclusive benefits.",
+    icon: TreasureBoxSvg,
+    title: "In-Game Purchase",
+    text: "Virtual goods, Battle passes, and Premium Packages",
+    color: "#fbee00",
   },
   {
-    icon: Gift,
+    icon: RingSvg,
     title: "Tipping & Rewards",
-    text: "Let players support you directly or earn from engagement-based rewards.",
+    text: "Direct player tips, creator support, and engagement-based incentives",
+    color: "#0072bb",
   },
 ];
 
@@ -381,13 +448,47 @@ function RacingHUD() {
 }
 
 
+
+const Dice3D = ({ color, dotColor }: { color: string, dotColor: string }) => {
+  const Dot = ({ cx, cy }: { cx: number, cy: number }) => <circle cx={cx} cy={cy} r="10" fill={dotColor} />;
+  return (
+    <div className="dice-3d">
+      <svg className="face face-front" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="20" fill={color} stroke="#111" strokeWidth="6"/>
+        <Dot cx={50} cy={50} />
+      </svg>
+      <svg className="face face-back" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="20" fill={color} stroke="#111" strokeWidth="6"/>
+        <Dot cx={30} cy={30} /><Dot cx={70} cy={70} /><Dot cx={30} cy={70} /><Dot cx={70} cy={30} /><Dot cx={30} cy={50} /><Dot cx={70} cy={50} />
+      </svg>
+      <svg className="face face-right" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="20" fill={color} stroke="#111" strokeWidth="6"/>
+        <Dot cx={30} cy={30} /><Dot cx={70} cy={70} />
+      </svg>
+      <svg className="face face-left" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="20" fill={color} stroke="#111" strokeWidth="6"/>
+        <Dot cx={30} cy={30} /><Dot cx={70} cy={70} /><Dot cx={30} cy={70} /><Dot cx={70} cy={30} /><Dot cx={50} cy={50} />
+      </svg>
+      <svg className="face face-top" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="20" fill={color} stroke="#111" strokeWidth="6"/>
+        <Dot cx={30} cy={30} /><Dot cx={70} cy={70} /><Dot cx={50} cy={50} />
+      </svg>
+      <svg className="face face-bottom" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="20" fill={color} stroke="#111" strokeWidth="6"/>
+        <Dot cx={30} cy={30} /><Dot cx={70} cy={70} /><Dot cx={30} cy={70} /><Dot cx={70} cy={30} />
+      </svg>
+    </div>
+  );
+};
+
 export default function DeveloperLanding(): React.ReactElement {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [isVnBtnActive, setIsVnBtnActive] = useState(false);
+  const { isSignedIn } = useAuth();
   const [isWalletConnectModalOpen, setIsWalletConnectModalOpen] = useState(false);
 
   const openSignInModal = () => {
-    if (user) {
+    if (isSignedIn) {
       navigate(getPortalPath(true));
     } else {
       setIsWalletConnectModalOpen(true);
@@ -409,7 +510,7 @@ export default function DeveloperLanding(): React.ReactElement {
               
               <div className="landing-hero__copy">
                 <h1>
-                  <span className="text-[32px] font-semibold text-black">Games Reflect How You See the World.</span>
+                  <span className="text-[36px] font-semibold text-black">Games Reflect How You See the World</span>
                 </h1>
                 
                 <p className="landing-hero__lede text-[24px] font-semibold text-black">
@@ -432,16 +533,16 @@ export default function DeveloperLanding(): React.ReactElement {
           </div>
           <div className="landing-container capability-strip__grid">
             <div>
-              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Full AI<br />Integration</strong>
+              <strong style={{ fontSize: '16px', fontWeight: 600 }}>End-to-End<br />AI Integration</strong>
             </div>
             <div>
-              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Instant<br />Publishing</strong>
+              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Immediate<br />Release</strong>
             </div>
             <div>
-              <strong style={{ fontSize: '16px', fontWeight: 600 }}>In-App<br />Purchase</strong>
+              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Flexible<br />Monetization</strong>
             </div>
             <div>
-              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Public Verifiable<br />Randomness</strong>
+              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Creator<br />Bounties</strong>
             </div>
           </div>
         </section>
@@ -542,7 +643,7 @@ export default function DeveloperLanding(): React.ReactElement {
             </ol>
             <div className="vn-hero-row">
               <div className="vn-character-col">
-                <img src="https://storage.randseed.org/Creator/section3.png" alt="VN Character" className="vn-character-sprite" />
+                <img src="https://storage.randseed.org/Creator/dataanything.png" alt="VN Character" className="vn-character-sprite" />
               </div>
               <div className="vn-content-col">
                 <div className="vn-heading-box">
@@ -559,75 +660,270 @@ export default function DeveloperLanding(): React.ReactElement {
                 </div>
               </div>
             </div>
-            <button
+            <motion.button
               className="vn-btn"
               type="button"
+              whileInView="active"
+              initial="inactive"
+              viewport={{ once: false, amount: 0.5 }}
+              style={{ position: 'relative', zIndex: 1 }}
+              variants={{
+                active: {
+                  scale: [1, 1, 1.05, 1.05, 1],
+                  y: [0, 0, -4, -4, 0],
+                  boxShadow: [
+                    "0 4px 15px rgba(255, 26, 140, 0.4)",
+                    "0 4px 15px rgba(255, 26, 140, 0.4)",
+                    "0 10px 25px rgba(255, 26, 140, 0.6), 0 0 20px rgba(255, 255, 255, 0.4)",
+                    "0 10px 25px rgba(255, 26, 140, 0.6), 0 0 20px rgba(255, 255, 255, 0.4)",
+                    "0 4px 15px rgba(255, 26, 140, 0.4)"
+                  ],
+                  borderColor: ["#ff1a8c", "#ff1a8c", "#ff99cc", "#ff99cc", "#ff1a8c"],
+                  transition: { duration: 4, repeat: Infinity, times: [0, 0.35, 0.45, 0.85, 1], ease: "easeInOut" }
+                },
+                inactive: {
+                  scale: 1, y: 0, boxShadow: "0 4px 15px rgba(255, 26, 140, 0.4)", borderColor: "#ff1a8c"
+                }
+              }}
             >
+              <motion.div
+                style={{
+                  position: 'absolute', inset: 0, background: 'linear-gradient(45deg, #ff1a8c, #ff4db8)', zIndex: -1, borderRadius: '27px'
+                }}
+                variants={{
+                  active: {
+                    opacity: [0, 0, 1, 1, 0],
+                    transition: { duration: 4, repeat: Infinity, times: [0, 0.35, 0.45, 0.85, 1], ease: "easeInOut" }
+                  },
+                  inactive: { opacity: 0 }
+                }}
+              />
               Your life is about to change 
               <span className="vn-btn-heart-container">
                 🤍
-                <span className="vn-bubble-heart">🤍</span>
-                <span className="vn-bubble-heart">🤍</span>
-                <span className="vn-bubble-heart">🤍</span>
-                <span className="vn-bubble-heart">🤍</span>
-                <span className="vn-bubble-heart">🤍</span>
+                <motion.span
+                  style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                  variants={{
+                    active: {
+                      opacity: [0, 0, 1, 1, 0],
+                      transition: { duration: 4, repeat: Infinity, times: [0, 0.35, 0.45, 0.85, 1], ease: "easeInOut" }
+                    },
+                    inactive: { opacity: 0 }
+                  }}
+                >
+                  <span className="vn-bubble-heart vn-continuous-bubble">🤍</span>
+                  <span className="vn-bubble-heart vn-continuous-bubble">🤍</span>
+                  <span className="vn-bubble-heart vn-continuous-bubble">🤍</span>
+                  <span className="vn-bubble-heart vn-continuous-bubble">🤍</span>
+                  <span className="vn-bubble-heart vn-continuous-bubble">🤍</span>
+                </motion.span>
               </span>
-            </button>
+            </motion.button>
           </div>
         </section>
+        <GameSeparator type="monopoly" reverse={false} variant="monopoly" />
+        {/* P4: Flexible Monetization (Monopoly Style) */}
+        <section className="monopoly-section" id="earn">
+          <motion.div 
+            className="monopoly-dice-animation"
+            whileInView="roll"
+            viewport={{ once: false, amount: 0.1 }}
+            style={{ marginTop: '-120px' }}
+          >
+            <motion.div 
+              className="monopoly-die-translator"
+              style={{ position: 'absolute', top: '20%', left: '10%', perspective: 1200 }}
+              variants={{
+                roll: { 
+                  y: [-300, 300, 150, 300, 250, 300, 300], 
+                  x: [-100, 20, 50, 40, 50, 50, 50], 
+                  opacity: [0, 1, 1, 1, 1, 1, 0],
+                  transition: { 
+                    duration: 4, 
+                    ease: "easeOut",
+                    repeat: Infinity,
+                    times: [0, 0.4, 0.6, 0.75, 0.85, 0.9, 1],
+                    repeatDelay: 1.5
+                  } 
+                }
+              }}
+            >
+              <motion.div
+                className="monopoly-die-rotator"
+                style={{ transformStyle: 'preserve-3d', width: '60px', height: '60px' }}
+                variants={{
+                  roll: {
+                    rotateX: [1080, 720, 540, 360, 380, 360, 360],
+                    rotateY: [1080, 720, 540, 360, 380, 360, 360],
+                    rotateZ: [720, 360, 180, 0, 10, 0, 0], 
+                    transition: { 
+                      duration: 4, 
+                      ease: "easeOut",
+                      repeat: Infinity,
+                      times: [0, 0.4, 0.6, 0.75, 0.85, 0.9, 1],
+                      repeatDelay: 1.5
+                    }
+                  }
+                }}
+              >
+                <Dice3D color="#fff" dotColor="#111" />
+              </motion.div>
+            </motion.div>
 
-        <GameSeparator type="light" reverse variant="rpg" />
-        {/* P4: Support various in app purchase format */}
-        <section className="landing-section landing-section--light" id="earn">
-          <div className="landing-container">
-            <div className="section-heading section-heading--center">
-              <p className="landing-eyebrow">Flexible Monetization</p>
-              <h2>
-                Support various in-app purchase formats
+            <motion.div 
+              className="monopoly-die-translator"
+              style={{ position: 'absolute', top: '25%', left: '15%', perspective: 1200 }}
+              variants={{
+                roll: { 
+                  y: [-350, 250, 80, 250, 180, 250, 250], 
+                  x: [-150, 10, -20, 10, 5, 10, 10], 
+                  opacity: [0, 1, 1, 1, 1, 1, 0],
+                  transition: { 
+                    duration: 4.5, 
+                    ease: "easeOut",
+                    repeat: Infinity,
+                    times: [0, 0.4, 0.6, 0.75, 0.85, 0.9, 1],
+                    delay: 0.1,
+                    repeatDelay: 1.1
+                  } 
+                }
+              }}
+            >
+              <motion.div
+                className="monopoly-die-rotator"
+                style={{ transformStyle: 'preserve-3d', width: '60px', height: '60px' }}
+                variants={{
+                  roll: {
+                    rotateX: [720, 360, 180, 0, 20, 0, 0],
+                    rotateY: [720, 360, 180, 0, 20, 0, 0],
+                    rotateZ: [1080, 720, 360, 0, -10, 0, 0], 
+                    transition: { 
+                      duration: 4.5, 
+                      ease: "easeOut",
+                      repeat: Infinity,
+                      times: [0, 0.4, 0.6, 0.75, 0.85, 0.9, 1],
+                      delay: 0.1,
+                      repeatDelay: 1.1
+                    }
+                  }
+                }}
+              >
+                <Dice3D color="#e3000f" dotColor="#fff" />
+              </motion.div>
+            </motion.div>
+          </motion.div>
+          <div className="landing-container monopoly-container">
+            <div className="monopoly-character-pointing">
+              <img src="https://storage.randseed.org/Creator/monopoly.png" alt="Monopoly Character" />
+            </div>
+            <div className="section-heading section-heading--center monopoly-heading">
+              <h2 className="monopoly-title">
+                Flexible Monetization
               </h2>
-              <p>
-                Maximize your revenue with built-in tools that let you monetize
-                exactly how you want—from traditional IAPs to modern creator
-                support models.
+              <p className="monopoly-subtitle">
+                Built-in tools that let you monetize exactly how you want—from traditional purchase models to modern player engagement and creator support.
               </p>
             </div>
-            <div className="feature-grid">
-              {monetizationFeatures.map(({ icon: Icon, title, text }, index) => (
-                <article className="feature-card" key={title}>
-                  <span className="feature-card__number">0{index + 1}</span>
-                  <div className="feature-card__icon">
-                    <Icon aria-hidden="true" />
-                  </div>
-                  <h3>{title}</h3>
-                  <p>{text}</p>
-                </article>
-              ))}
+            <div className="monopoly-content-wrapper">
+              <div className="monopoly-grid">
+                {monetizationFeatures.map(({ icon: Icon, title, text, color }, index) => (
+                  <article className="monopoly-card" key={title}>
+                    <div className="monopoly-card__header" style={{ backgroundColor: color }}>
+                      <h3 className="monopoly-card__title">{title}</h3>
+                    </div>
+                    <div className="monopoly-card__body">
+                      <div className="monopoly-card__icon-wrapper">
+                        <Icon aria-hidden="true" className="monopoly-card__icon" />
+                      </div>
+                      <p className="monopoly-card__text">{text}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              
             </div>
           </div>
         </section>
         
-        <GameSeparator type="dark" variant="puzzle" />
-        <section className="closing-cta" id="start">
-          <div className="closing-cta__shape closing-cta__shape--one" />
-          <div className="closing-cta__shape closing-cta__shape--two" />
-          <div className="landing-container closing-cta__inner">
-            <RandseedMark className="closing-cta__mark" />
-            <h2>Your next game deserves real players.</h2>
+        <GameSeparator type="rdr" variant="rdr" />
+        <section className="rdr-cta" id="start">
+          <div className="landing-container rdr-cta__inner">
+            <h2>Start Building<br />Next-Gen AI Games</h2>
+            <div className="rdr-cta__deco-line" />
             <p>
-              Publish on RandSeed, get feedback from the community, and unlock
-              new ways to grow and earn.
+              Step into a new frontier. Forge your legacy, harness the power of AI, and collect the rewards.
             </p>
-            <div className="landing-actions">
-              <button
-                className="button button--light"
+            <div className="landing-actions" style={{ justifyContent: 'center', position: 'relative', display: 'flex', alignItems: 'center', gap: '40px' }}>
+              <motion.img 
+                src="https://storage.randseed.org/Creator/gun-firing.png" 
+                alt="Firing Gun" 
+                className="rdr-gun-animation" 
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                whileInView="fire"
+                viewport={{ once: false, amount: 0.5 }}
+                variants={{
+                  fire: {
+                    x: [0, -15, 2, 0, 0, 0],
+                    y: [0, -5, 2, 0, 0, 0],
+                    rotate: [0, -8, 2, 0, 0, 0],
+                    filter: [
+                      "drop-shadow(2px 4px 6px rgba(0,0,0,0.5))",
+                      "drop-shadow(10px 0 15px rgba(255,140,0,0.8)) brightness(1.3)",
+                      "drop-shadow(2px 4px 6px rgba(0,0,0,0.5))",
+                      "drop-shadow(2px 4px 6px rgba(0,0,0,0.5))",
+                      "drop-shadow(2px 4px 6px rgba(0,0,0,0.5))",
+                      "drop-shadow(2px 4px 6px rgba(0,0,0,0.5))"
+                    ],
+                    transition: {
+                      duration: 1.5,
+                      ease: "easeOut",
+                      repeat: Infinity,
+                      times: [0, 0.05, 0.1, 0.2, 0.3, 1]
+                    }
+                  }
+                }}
+              />
+              <motion.button
+                className="rdr-button"
                 type="button"
-                onClick={openSignInModal}
+                onClick={() => navigate('/bounties')}
+                whileInView="fire"
+                viewport={{ once: false, amount: 0.5 }}
+                variants={{
+                  fire: {
+                    x: [0, 0, 12, -4, 0, 0],
+                    rotate: [0, 0, 1.5, -0.5, 0, 0],
+                    scale: [1, 1, 0.95, 1.02, 1, 1],
+                    transition: { duration: 1.5, ease: "easeOut", repeat: Infinity, times: [0, 0.05, 0.1, 0.2, 0.3, 1] }
+                  }
+                }}
               >
-                Submit my game <ArrowRight aria-hidden="true" />
-              </button>
+                <motion.div 
+                  className="rdr-bullet-tracer"
+                  variants={{
+                    fire: {
+                      opacity: [0, 1, 1, 0, 0, 0],
+                      x: [0, 20, 80, 90, 0, 0],
+                      scaleX: [0.5, 1, 1.5, 0, 0, 0],
+                      transition: { duration: 1.5, ease: "linear", repeat: Infinity, times: [0, 0.05, 0.08, 0.1, 0.2, 1] }
+                    }
+                  }}
+                />
+                <motion.div 
+                  className="rdr-hit-spark"
+                  variants={{
+                    fire: {
+                      opacity: [0, 0, 1, 0, 0, 0],
+                      scale: [0, 0, 1.5, 0.5, 0, 0],
+                      transition: { duration: 1.5, ease: "easeOut", repeat: Infinity, times: [0, 0.05, 0.1, 0.2, 0.3, 1] }
+                    }
+                  }}
+                />
+                Explore Bounties <ArrowRight aria-hidden="true" />
+              </motion.button>
             </div>
-            <p className="closing-cta__tagline">
-              Launch fast. Play fair. Earn together.
+            <p className="rdr-cta__tagline">
+              Outlaws & Pioneers Welcome
             </p>
           </div>
         </section>
