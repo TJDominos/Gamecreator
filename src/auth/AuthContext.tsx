@@ -17,6 +17,8 @@ const ORGANIZATIONS_KEY = "randseed_developer_organizations";
 
 export interface UserProfile extends UserProfileInfo {
   email?: string;
+  isEmailVerified?: boolean;
+  role?: "player" | "creator" | "admin"; // B-side role
   [key: string]: unknown;
 }
 
@@ -53,6 +55,7 @@ interface AuthContextValue {
   organization: DeveloperOrganization | null;
   isSignedIn: boolean;
   signIn: (accountId: string) => void;
+  mockSignIn: (role: "creator" | "admin") => void;
   signInWithSSO: () => void;
   signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile, accountId?: string) => void;
@@ -139,10 +142,26 @@ export function AuthProvider({
           // Simulated Worker Response:
           const uid = `randseed:usr_${ssoToken.substring(0, 8)}`;
           const customToken = `jwt_mock_${ssoToken}`;
+          const mockRole = ssoToken.includes("admin") ? "admin" : "creator";
+          
+          // Simulated Main Site Data Payload
+          const mockEmail = `test_${mockRole}@example.com`;
+          const mockEmailVerified = ssoToken.includes("verified");
 
           // Save the custom token for API calls
           localStorage.setItem(CUSTOM_TOKEN_KEY, customToken);
           localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
+          
+          // Mock saving profile with role
+          const profiles = readProfiles();
+          profiles[uid] = { 
+            ...profiles[uid], 
+            role: mockRole,
+            email: mockEmail,
+            isEmailVerified: mockEmailVerified
+          };
+          localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+          
           setAccountId(uid);
 
           // Clean up the URL to remove the sso_token for security and UX
@@ -178,6 +197,14 @@ export function AuthProvider({
     setAccountId(nextAccountId);
   }, []);
 
+  // [DEV ONLY]: Mock Sign In
+  const mockSignIn = useCallback((role: "creator" | "admin") => {
+    // Add "verified" to simulate an already verified user
+    const ssoToken = role === "admin" ? "mock_admin_token_verified" : "mock_creator_token_unverified";
+    // Reuse the exact same init flow from useEffect via URL simulation or manual set
+    window.location.href = `/?sso_token=${ssoToken}`;
+  }, []);
+
   // [PIPELINE B]: Redirect user to Main Site to get SSO Token
   const signInWithSSO = useCallback(() => {
     // Note: Ideally, read the main site URL from environment variables, 
@@ -188,6 +215,8 @@ export function AuthProvider({
     // Redirect to main site passing the return URI
     window.location.href = `${mainSiteUrl}?redirect_uri=${currentUrl}`;
   }, []);
+
+
 
   const signOut = useCallback(async () => {
     const client = WLAuthClient.getInstance();
@@ -273,6 +302,7 @@ export function AuthProvider({
       organization,
       isSignedIn: Boolean(accountId),
       signIn,
+      mockSignIn,
       signInWithSSO,
       signOut,
       updateProfile,
@@ -284,6 +314,7 @@ export function AuthProvider({
       profile,
       organization,
       signIn,
+      mockSignIn,
       signInWithSSO,
       signOut,
       updateProfile,

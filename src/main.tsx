@@ -8,27 +8,53 @@ import DeveloperPortal from "./pages/dashboard/DeveloperPortal";
 import CreatorGuide from "./pages/guides/CreatorGuide";
 import CreatorBounties from "./pages/bounties/CreatorBounties";
 import PublicBountyDetail from "./pages/bounties/PublicBountyDetail";
+import { VersionUpdateBanner } from "./components/VersionUpdateBanner";
 import "./index.css";
 
 function App() {
   const location = useLocation();
 
   if (location.pathname === "/") {
-    return <DeveloperLanding />;
+    return (
+      <>
+        <DeveloperLanding />
+        <VersionUpdateBanner />
+      </>
+    );
   }
 
   if (location.pathname === "/guides") {
-    return <CreatorGuide />;
+    return (
+      <>
+        <CreatorGuide />
+        <VersionUpdateBanner />
+      </>
+    );
   }
   
   if (location.pathname.startsWith("/bounties/")) {
-    return <PublicBountyDetail />;
+    return (
+      <>
+        <PublicBountyDetail />
+        <VersionUpdateBanner />
+      </>
+    );
   }
   if (location.pathname === "/bounties") {
-    return <CreatorBounties />;
+    return (
+      <>
+        <CreatorBounties />
+        <VersionUpdateBanner />
+      </>
+    );
   }
 
-  return <DeveloperPortal />;
+  return (
+    <>
+      <DeveloperPortal />
+      <VersionUpdateBanner />
+    </>
+  );
 }
 
 const rootElement = document.getElementById("root");

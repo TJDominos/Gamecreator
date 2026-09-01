@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Code, Github, Coins, Rocket } from "lucide-react";
+import { X, Code, Github, Coins, Rocket, Mail } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { useNavigate } from "react-router";
 
@@ -9,14 +9,61 @@ interface BecomeCreatorModalProps {
 }
 
 export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps): React.ReactElement | null {
-  const { accountId, saveOrganization } = useAuth();
+  const { accountId, profile, saveOrganization } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requiresEmailVerification, setRequiresEmailVerification] = useState(false);
 
   if (!isOpen) return null;
 
+  if (requiresEmailVerification) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="relative w-[92vw] sm:w-[420px] max-w-[420px] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col p-8 items-center text-center">
+          <button
+            onClick={() => {
+              setRequiresEmailVerification(false);
+              onClose();
+            }}
+            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100"
+            aria-label="Close modal"
+          >
+            <X size={20} />
+          </button>
+          
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-6 border border-blue-100">
+            <Mail size={32} />
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-3 tracking-tight">Verify Your Email</h2>
+          <p className="text-[15px] text-gray-500 mb-8 leading-relaxed">
+            To protect your creator account and receive important updates about your games and bounties, you must verify your email address on the main site.
+          </p>
+          
+          <button
+            onClick={() => {
+              // Redirect to main site for verification, passing the return URI
+              const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
+              window.location.href = `https://randseed.org/verify-email?redirect_uri=${currentUrl}`;
+            }}
+            className="w-full py-3.5 px-4 bg-blue-600 text-white text-[15px] font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm active:scale-[0.98]"
+          >
+            Verify Email on Randseed
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const handleBecomeCreator = async () => {
     if (!accountId) return;
+    
+    // Check if email is verified
+    if (profile?.isEmailVerified === false) {
+      setRequiresEmailVerification(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       saveOrganization({

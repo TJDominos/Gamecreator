@@ -114,7 +114,7 @@ const getWalletIcon = (w: any) => {
 type Step = "SELECT_WALLET" | "CONNECTING" | "PENDING" | "SUCCESS";
 
 export function WalletConnectModal({ isOpen, onClose }: WalletConnectModalProps) {
-  const { signInWithSSO, accountId } = useAuth();
+  const { signInWithSSO, mockSignIn, accountId } = useAuth();
   const [wallets, setWallets] = useState<
     {
       id: string;
@@ -417,6 +417,38 @@ export function WalletConnectModal({ isOpen, onClose }: WalletConnectModalProps)
                           Retrieve account
                         </button>
                       </div>
+                      
+                      {/* DEV ONLY MOCK LOGIN */}
+                      {process.env.NODE_ENV !== "production" && (
+                        <div className="mt-4 flex w-full gap-2 px-3">
+                          <button
+                            onClick={() => {
+                              setSelectedWallet({ name: "Creator Mock" });
+                              setStep("SUCCESS");
+                              setTimeout(() => {
+                                onClose();
+                                mockSignIn("creator");
+                              }, 500);
+                            }}
+                            className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 text-[11px] font-semibold py-2 rounded-lg transition-colors"
+                          >
+                            Mock Creator
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedWallet({ name: "Admin Mock" });
+                              setStep("SUCCESS");
+                              setTimeout(() => {
+                                onClose();
+                                mockSignIn("admin");
+                              }, 500);
+                            }}
+                            className="flex-1 bg-red-100 hover:bg-red-200 text-red-800 text-[11px] font-semibold py-2 rounded-lg transition-colors"
+                          >
+                            Mock Admin
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-row items-center justify-center gap-2 px-3 py-[4px] my-1 opacity-70">

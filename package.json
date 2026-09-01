@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build && node scripts/generate-route-html.js",
+    "dev": "node scripts/generate-version.js && vite --port=3000 --host=0.0.0.0",
+    "build": "node scripts/generate-version.js && vite build && node scripts/generate-route-html.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "postinstall": "cd vendor/RS && npm install && npm run build"
