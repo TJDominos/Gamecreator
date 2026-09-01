@@ -1,7 +1,7 @@
 import React from "react";
 import "./CreatorGuide.css";
 
-import { SiteHeader } from "./components/SiteHeader";
+import { SiteHeader } from "../../components/SiteHeader";
 
 export default function CreatorGuide() {
   return (

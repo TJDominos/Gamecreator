@@ -3,11 +3,11 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, useLocation } from "react-router";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AuthProvider } from "./auth/AuthContext";
-import DeveloperLanding from "./developer-landing/DeveloperLanding";
-import DeveloperPortal from "./developer-portal/DeveloperPortal";
-import CreatorGuide from "./CreatorGuide";
-import CreatorBounties from "./CreatorBounties";
-import PublicBountyDetail from "./PublicBountyDetail";
+import DeveloperLanding from "./pages/home/DeveloperLanding";
+import DeveloperPortal from "./pages/dashboard/DeveloperPortal";
+import CreatorGuide from "./pages/guides/CreatorGuide";
+import CreatorBounties from "./pages/bounties/CreatorBounties";
+import PublicBountyDetail from "./pages/bounties/PublicBountyDetail";
 import "./index.css";
 
 function App() {

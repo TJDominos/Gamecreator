@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Mail,
 } from "lucide-react";
+import { useAuth } from "../auth/AuthContext";
 
 interface WalletConnectModalProps {
   isOpen: boolean;
@@ -113,6 +114,7 @@ const getWalletIcon = (w: any) => {
 type Step = "SELECT_WALLET" | "CONNECTING" | "PENDING" | "SUCCESS";
 
 export function WalletConnectModal({ isOpen, onClose }: WalletConnectModalProps) {
+  const { signInWithSSO, accountId } = useAuth();
   const [wallets, setWallets] = useState<
     {
       id: string;
@@ -275,19 +277,23 @@ export function WalletConnectModal({ isOpen, onClose }: WalletConnectModalProps)
     }, 1500);
   };
 
-  const handleInternetIdentitySelect = () => {
+  const handleInternetIdentitySelect = async () => {
     setSelectedWallet({
       name: "Internet Identity",
       icon: <InternetIdentityIcon />,
     });
     setStep("CONNECTING");
-    setTimeout(() => {
+    try {
+      await signInWithSSO();
       setStep("SUCCESS");
       setTimeout(() => {
-        const generatedId = `ii-${Math.random().toString(36).substring(2, 10)}`;
-        onClose(generatedId);
+        // Will close with the global accountId generated inside AuthContext
+        onClose(); 
       }, 1500);
-    }, 1500);
+    } catch (error) {
+      console.error("II Login failed:", error);
+      setStep("SELECT_WALLET"); // fallback on error
+    }
   };
 
   useEffect(() => {

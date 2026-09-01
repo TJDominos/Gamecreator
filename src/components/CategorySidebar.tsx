@@ -1,6 +1,6 @@
 import React from 'react';
 import { Gamepad2, LayoutDashboard, Dices, Music, Puzzle, Swords, Building2, Trophy, Map, Lightbulb, Type, LayoutGrid } from 'lucide-react';
-import { MOCK_BOUNTIES } from '../developer-portal/bounties/bountyData';
+import { MOCK_BOUNTIES } from '../pages/dashboard/bounties/bountyData';
 
 export const CATEGORIES = [
   { name: 'Arcade', icon: Gamepad2 },

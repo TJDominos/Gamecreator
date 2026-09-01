@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router';
-import { SiteHeader } from './components/SiteHeader';
-import { BountyDetail } from './developer-portal/bounties/BountyDetail';
+import { SiteHeader } from '../../components/SiteHeader';
+import { BountyDetail } from '../dashboard/bounties/BountyDetail';
 
 export default function PublicBountyDetail(): React.ReactElement {
   return (

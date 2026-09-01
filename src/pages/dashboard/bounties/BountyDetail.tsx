@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { MOCK_BOUNTIES } from './bountyData';
 import { ArrowLeft, Trophy, Users, CheckCircle2, Target, ExternalLink, AlertCircle } from 'lucide-react';
 
-import { CategorySidebar } from '../../components/CategorySidebar';
+import { CategorySidebar } from '../../../components/CategorySidebar';
 
 export function BountyDetail(): React.ReactElement {
   const { bountyId } = useParams();

@@ -11,6 +11,9 @@
     "postinstall": "cd vendor/RS && npm install && npm run build"
   },
   "dependencies": {
+    "@dfinity/agent": "^3.4.3",
+    "@dfinity/identity": "^3.4.3",
+    "@dfinity/principal": "^3.4.3",
     "@icons-pack/react-simple-icons": "^13.11.1",
     "@tailwindcss/vite": "^4.1.14",
     "@tripletree/rs-design-system": "file:vendor/RS",

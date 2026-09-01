@@ -25,14 +25,14 @@ import { ArrowRight,
   Zap,
   Target,
 Ghost, Sword, Crown, Unlock } from "lucide-react";
-import Footer from "../components/Footer";
-import { WalletConnectModal } from "../components/WalletConnectModal";
-import { useAuth } from "../auth/AuthContext";
-import { GameCard } from "../components/GameCard";
+import Footer from "../../components/Footer";
+import { WalletConnectModal } from "../../components/WalletConnectModal";
+import { useAuth } from "../../auth/AuthContext";
+import { GameCard } from "../../components/GameCard";
 import "./DeveloperLanding.css";
 import "./VisualNovelSection.css";
 import "./MonopolySection.css";
-import { GithubLogo, CopilotLogo, ClaudeCodeLogo, CodexLogo, CursorLogo, AiStudioLogo } from "../assets/Logos";
+import { GithubLogo, CopilotLogo, ClaudeCodeLogo, CodexLogo, CursorLogo, AiStudioLogo } from "../../assets/Logos";
 
 function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: { reverse?: boolean, type?: 'dark' | 'light' | 'racing' | 'dating' | 'monopoly' | 'rdr', variant?: 'arcade' | 'rpg' | 'platform' | 'puzzle' | 'racing' | 'dating' | 'monopoly' | 'rdr' }) {
   // Fighting / Arcade (Street Fighter inspired)
@@ -325,7 +325,7 @@ const showcaseGames = [
   { title: "Vault 9", genre: "Adventure", creator: "Quest Labs", tone: "rose", icon: Layers3 },
 ];
 
-import { SiteHeader } from "../components/SiteHeader";
+import { SiteHeader } from "../../components/SiteHeader";
 
 
 

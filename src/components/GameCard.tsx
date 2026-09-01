@@ -1,6 +1,6 @@
 import React from "react";
 import { LucideIcon } from "lucide-react";
-import "../developer-landing/DeveloperLanding.css";
+import "../pages/home/DeveloperLanding.css";
 
 export interface GameCardProps {
   title: string;

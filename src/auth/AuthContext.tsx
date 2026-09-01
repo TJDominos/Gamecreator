@@ -1,14 +1,16 @@
 import React, {
   createContext,
-  useCallback,
   useContext,
   useEffect,
+  useCallback,
   useMemo,
   useState,
 } from "react";
 import type { UserProfileInfo } from "../types/userProfile";
+import { WLAuthClient } from "./wlAuthClient";
 
 const SESSION_KEY = "randseed_auth_session";
+const CUSTOM_TOKEN_KEY = "randseed_custom_jwt";
 const USER_PROFILE_KEY = "user_profile_data";
 const USER_PROFILES_KEY = "randseed_user_profiles";
 const ORGANIZATIONS_KEY = "randseed_developer_organizations";
@@ -51,7 +53,8 @@ interface AuthContextValue {
   organization: DeveloperOrganization | null;
   isSignedIn: boolean;
   signIn: (accountId: string) => void;
-  signOut: () => void;
+  signInWithSSO: () => void;
+  signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile, accountId?: string) => void;
   saveOrganization: (
     input: DeveloperOrganizationInput,
@@ -87,7 +90,6 @@ function readInitialProfile(): UserProfile | null {
   if (profiles[currentAccount]) {
     return profiles[currentAccount];
   }
-
   const legacyProfile = readJson<UserProfile | null>(USER_PROFILE_KEY, null);
   if (legacyProfile) {
     profiles[currentAccount] = legacyProfile;
@@ -116,6 +118,50 @@ export function AuthProvider({
       return currentAccount ? readOrganizations()[currentAccount] ?? null : null;
     });
 
+  // [PIPELINE A & INIT]: Intercept SSO Token on mount or restore session
+  useEffect(() => {
+    const initAuth = async () => {
+      // 1. Check if we are returning from Main Site with an sso_token in the URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const ssoToken = urlParams.get("sso_token");
+
+      if (ssoToken) {
+        try {
+          console.log("Intercepted SSO Token. Exchanging via Worker...");
+          // --- WORKER EXCHANGE LOGIC (Placeholder) ---
+          // const res = await fetch("https://worker.randseed.org/verifyRandseedSSO", {
+          //   method: "POST",
+          //   headers: { "Content-Type": "application/json" },
+          //   body: JSON.stringify({ sso_token: ssoToken })
+          // });
+          // const { customToken, uid } = await res.json();
+          
+          // Simulated Worker Response:
+          const uid = `randseed:usr_${ssoToken.substring(0, 8)}`;
+          const customToken = `jwt_mock_${ssoToken}`;
+
+          // Save the custom token for API calls
+          localStorage.setItem(CUSTOM_TOKEN_KEY, customToken);
+          localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
+          setAccountId(uid);
+
+          // Clean up the URL to remove the sso_token for security and UX
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        } catch (error) {
+          console.error("SSO Exchange failed", error);
+        }
+      }
+
+      // 2. Fallback: Check local storage for existing Custom Token / Session
+      const storedSession = readJson<string | null>(SESSION_KEY, null);
+      if (storedSession) {
+        setAccountId(storedSession);
+      }
+    };
+    initAuth();
+  }, []);
+
   useEffect(() => {
     setOrganization(accountId ? readOrganizations()[accountId] ?? null : null);
     const nextProfile = accountId ? readProfiles()[accountId] ?? null : null;
@@ -132,8 +178,23 @@ export function AuthProvider({
     setAccountId(nextAccountId);
   }, []);
 
-  const signOut = useCallback(() => {
+  // [PIPELINE B]: Redirect user to Main Site to get SSO Token
+  const signInWithSSO = useCallback(() => {
+    // Note: Ideally, read the main site URL from environment variables, 
+    // e.g., import.meta.env.VITE_MAIN_SITE_URL or similar.
+    const mainSiteUrl = "https://randseed.org/login"; 
+    const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
+    
+    // Redirect to main site passing the return URI
+    window.location.href = `${mainSiteUrl}?redirect_uri=${currentUrl}`;
+  }, []);
+
+  const signOut = useCallback(async () => {
+    const client = WLAuthClient.getInstance();
+    await client.logout(); // Clear local IC identity if it exists
+    
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(CUSTOM_TOKEN_KEY);
     localStorage.removeItem(USER_PROFILE_KEY);
     setAccountId(null);
     setProfile(null);
@@ -183,7 +244,6 @@ export function AuthProvider({
       ) {
         throw new Error("Complete all required organization fields.");
       }
-
       const existing = readOrganizations()[accountId];
       const nextOrganization: DeveloperOrganization = {
         ...input,
@@ -213,6 +273,7 @@ export function AuthProvider({
       organization,
       isSignedIn: Boolean(accountId),
       signIn,
+      signInWithSSO,
       signOut,
       updateProfile,
       saveOrganization,
@@ -223,6 +284,7 @@ export function AuthProvider({
       profile,
       organization,
       signIn,
+      signInWithSSO,
       signOut,
       updateProfile,
       saveOrganization,

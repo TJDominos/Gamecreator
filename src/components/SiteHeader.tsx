@@ -4,7 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { WalletConnectModal } from "./WalletConnectModal";
 import { BecomeCreatorModal } from "./BecomeCreatorModal";
 import { Menu, X } from "lucide-react";
-import "../developer-landing/DeveloperLanding.css";
+import "../pages/home/DeveloperLanding.css";
 
 function getPortalPath(hasOrganization: boolean): string {
   return hasOrganization ? "/dashboard" : "/onboarding";

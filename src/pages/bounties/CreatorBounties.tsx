@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Gamepad2, LayoutDashboard, Dices, Music, Puzzle, Swords, Building2, Trophy, Map, Lightbulb, Type, Users, LayoutGrid, CheckCircle2, Lock, Activity, Target } from 'lucide-react';
-import { MOCK_BOUNTIES } from './developer-portal/bounties/bountyData';
-import { SiteHeader } from './components/SiteHeader';
-import { CategorySidebar } from './components/CategorySidebar';
-import './CreatorGuide.css';
+import { MOCK_BOUNTIES } from '../dashboard/bounties/bountyData';
+import { SiteHeader } from '../../components/SiteHeader';
+import { CategorySidebar } from '../../components/CategorySidebar';
+import '../guides/CreatorGuide.css';
 
 const StateStyles: Record<string, { bg: string, color: string, icon: any, label: string }> = {
   OPEN: { bg: '#e0f2fe', color: '#0369a1', icon: Target, label: 'Open / Accepting Subs' },

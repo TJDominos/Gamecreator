@@ -36,10 +36,10 @@ import {
   useNavigate,
 } from "react-router";
 import { MOCK_GAMES } from "./games/gameData";
-import { useAuth } from "../auth/AuthContext";
-import { WltLogo } from "../components/WltLogo";
-import { PortalHeader } from "../components/PortalHeader";
-import { OnboardingHeader } from "../components/OnboardingHeader";
+import { useAuth } from "../../auth/AuthContext";
+import { WltLogo } from "../../components/WltLogo";
+import { PortalHeader } from "../../components/PortalHeader";
+import { OnboardingHeader } from "../../components/OnboardingHeader";
 import "./DeveloperPortal.css";
 
 const navigation = [
