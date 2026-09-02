@@ -13,8 +13,12 @@ const StateStyles: Record<BountyState, { bg: string, color: string, icon: any, l
 export function BountyHub(): React.ReactElement {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<BountyState | 'ALL'>('ALL');
+  
+  // Mocking "My Participated Bounties" for the current creator
+  // In a real application, this would fetch from /api/users/me/bounties
+  const myParticipatedBounties = MOCK_BOUNTIES.slice(0, 3); // Simulating participation in the first 3 bounties
 
-  const filtered = filter === 'ALL' ? MOCK_BOUNTIES : MOCK_BOUNTIES.filter(b => b.state === filter);
+  const filtered = filter === 'ALL' ? myParticipatedBounties : myParticipatedBounties.filter(b => b.state === filter);
   
   // Group by category
   const categories = Array.from(new Set(filtered.map(b => b.category)));
@@ -24,10 +28,10 @@ export function BountyHub(): React.ReactElement {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Target size={28} color="var(--portal-purple)" /> Creator Bounties
+            <Target size={28} color="var(--portal-purple)" /> My Bounties
           </h1>
           <p style={{ color: 'var(--portal-muted)', margin: 0, fontSize: '15px', maxWidth: '600px' }}>
-            Subscribe to active tracks and participate in 30-day traffic battles to win Bounty Prize Pools based on real player data.
+            Track the bounties you have participated in, monitor your submission status, and see your rank in active traffic battles.
           </p>
         </div>
         

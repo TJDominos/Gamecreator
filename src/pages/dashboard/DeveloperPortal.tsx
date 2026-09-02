@@ -44,7 +44,7 @@ import "./DeveloperPortal.css";
 
 const navigation = [
   { to: "/dashboard", end: true, label: "Dashboard", icon: LayoutDashboard },
-    { to: "/dashboard/bounties", label: "Creator Bounties", icon: Target },
+  { to: "/dashboard/bounties", label: "My Bounties", icon: Target },
   { to: "/dashboard/data", label: "Users & Orders", icon: Users },
   { to: "/dashboard/revenue", label: "Revenue", icon: CircleDollarSign },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -82,16 +82,7 @@ function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
   return isSignedIn ? children : <Navigate to="/" replace />;
 }
 
-function RequireOrganization({ children }: RouteGuardProps): React.ReactNode {
-  const { isSignedIn, organization } = useAuth();
-  if (!isSignedIn) {
-    return <Navigate to="/" replace />;
-  }
-  if (!organization) {
-    return <Navigate to="/onboarding" replace />;
-  }
-  return children;
-}
+
 
 function DeveloperOnboarding(): React.ReactNode {
   const { organization, profile, saveOrganization, isOrganizationNameAvailable } =
@@ -551,19 +542,11 @@ export default function DeveloperPortal(): React.ReactElement {
   return (
     <Routes>
       <Route
-        path="/onboarding"
-        element={
-          <RequireSignedIn>
-            <DeveloperOnboarding />
-          </RequireSignedIn>
-        }
-      />
-      <Route
         path="/dashboard"
         element={
-          <RequireOrganization>
+          <RequireSignedIn>
             <PortalShell />
-          </RequireOrganization>
+          </RequireSignedIn>
         }
       >
         <Route index element={<Dashboard />} />
@@ -572,15 +555,15 @@ export default function DeveloperPortal(): React.ReactElement {
           <Route index element={<GameOverview />} />
           <Route path="settings" element={<GameSettings />} />
           <Route path="deployments" element={<GameDeployments />} />
-                  </Route>
+        </Route>
 
-                <Route path="bounties" element={<BountyHub />} />
+        <Route path="bounties" element={<BountyHub />} />
         <Route path="bounties/:bountyId" element={<BountyDetail />} />
         <Route path="data" element={<PlaceholderPage title="Users & Orders" description="Review anonymous player activity and order history." icon={Users} />} />
         <Route path="revenue" element={<PlaceholderPage title="Revenue" description="Track estimated revenue, ledger entries, and payouts." icon={BarChart3} />} />
         <Route path="settings" element={<PlaceholderPage title="Settings" description="Manage your public profile, security, and integrations." icon={Settings} />} />
       </Route>
-      <Route path="/bounty-management" element={<RequireOrganization><BountyManagement /></RequireOrganization>} />
+      <Route path="/bounty-management" element={<BountyManagement />} />
       
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

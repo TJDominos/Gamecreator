@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { useAuth } from "../auth/AuthContext";
-import { WalletConnectModal } from "./WalletConnectModal";
 import { BecomeCreatorModal } from "./BecomeCreatorModal";
 import { Menu, X } from "lucide-react";
 import "../pages/home/DeveloperLanding.css";
@@ -11,35 +10,24 @@ function getPortalPath(hasOrganization: boolean): string {
 }
 
 export function SiteHeader(): React.ReactElement {
-  const { isSignedIn, organization, signIn } = useAuth();
+  const { isSignedIn, profile, signInWithSSO, mockSignIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isWalletConnectModalOpen, setWalletConnectModalOpen] = useState(false);
   const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const signInButtonRef = useRef<HTMLButtonElement>(null);
 
   function openPortal(): void {
     if (isSignedIn) {
-      if (organization) {
+      if (profile?.role === 'creator' || profile?.role === 'admin') {
         navigate("/dashboard");
       } else {
         setBecomeCreatorModalOpen(true);
       }
       return;
     }
-    setWalletConnectModalOpen(true);
-  }
-
-  function handleWalletConnectClose(verifiedId?: string): void {
-    setWalletConnectModalOpen(false);
-    if (typeof verifiedId === "string") {
-      signIn(verifiedId);
-      if (organization) {
-        navigate("/dashboard");
-      }
-    }
-    signInButtonRef.current?.focus();
+    // Direct SSO Redirect
+    signInWithSSO();
   }
 
   return (
@@ -51,7 +39,23 @@ export function SiteHeader(): React.ReactElement {
             <span className="landing-brand__text">Creator Center</span>
           </a>
           
-          <div className="landing-nav__desktop-actions">
+          <div className="landing-nav__desktop-actions flex items-center">
+            {process.env.NODE_ENV !== "production" && !isSignedIn && (
+              <div className="flex gap-2 mr-4">
+                <button
+                  onClick={() => mockSignIn("creator")}
+                  className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs rounded-md font-semibold transition-colors"
+                >
+                  Mock Creator
+                </button>
+                <button
+                  onClick={() => mockSignIn("admin")}
+                  className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 text-xs rounded-md font-semibold transition-colors"
+                >
+                  Mock Admin
+                </button>
+              </div>
+            )}
             <a 
               className={`landing-nav__guide text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/bounties") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
               href="/bounties"
@@ -70,10 +74,9 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? (organization ? "Dashboard" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "Dashboard" : "Build Game") : "Sign In"}
             </button>
           </div>
-
           <div className="landing-nav__mobile-actions">
             <button
               ref={signInButtonRef}
@@ -81,7 +84,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? (organization ? "Dashboard" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "Dashboard" : "Build Game") : "Sign In"}
             </button>
             <button 
               className="landing-nav__hamburger"
@@ -95,6 +98,12 @@ export function SiteHeader(): React.ReactElement {
 
         {isMobileMenuOpen && (
           <div className="landing-nav__mobile-menu">
+            {process.env.NODE_ENV !== "production" && !isSignedIn && (
+              <div className="flex gap-2 p-4 border-b border-gray-100">
+                <button onClick={() => mockSignIn("creator")} className="flex-1 py-2 bg-blue-100 text-blue-800 text-xs rounded font-semibold">Mock Creator</button>
+                <button onClick={() => mockSignIn("admin")} className="flex-1 py-2 bg-red-100 text-red-800 text-xs rounded font-semibold">Mock Admin</button>
+              </div>
+            )}
             <a 
               className={`landing-nav__guide-mobile text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/bounties") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
               href="/bounties"
@@ -112,10 +121,6 @@ export function SiteHeader(): React.ReactElement {
           </div>
         )}
       </header>
-      <WalletConnectModal
-        isOpen={isWalletConnectModalOpen}
-        onClose={handleWalletConnectClose}
-      />
       <BecomeCreatorModal 
         isOpen={isBecomeCreatorModalOpen}
         onClose={() => setBecomeCreatorModalOpen(false)}

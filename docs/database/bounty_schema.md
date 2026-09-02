@@ -12,43 +12,51 @@
 -- 1. 悬赏任务表 (Bounties)
 CREATE TABLE IF NOT EXISTS bounties (
     id TEXT PRIMARY KEY,                 -- 悬赏 ID (例如: bnt_xyz789)
-    game_id TEXT NOT NULL,               -- 关联的游戏 ID (外键 games.id)
     admin_id TEXT NOT NULL,              -- 发布人/审核人 ID (外键 users.principal_id, 仅限Admin)
-    title TEXT NOT NULL,                 -- 悬赏标题
-    description TEXT NOT NULL,           -- 详细描述 (Markdown)
     
-    -- 奖励配置
-    reward_amount REAL NOT NULL,         -- 奖励数量 (如 100.5)
-    reward_token TEXT NOT NULL,          -- 奖励代币符号 (如 'USDC', 'ICP', 'WL')
-    total_spots INTEGER NOT NULL,        -- 总名额上限
-    claimed_spots INTEGER DEFAULT 0,     -- 已认领/已发奖的名额
+    -- 基础信息
+    category TEXT NOT NULL,              -- 游戏分类 (全局类别，如 'RPG', 'Action')
+    title TEXT NOT NULL,                 -- 悬赏标题 (max 10 words)
+    short_description TEXT NOT NULL,     -- 简短描述 (max 50 words)
+    full_description TEXT NOT NULL,      -- 详细描述 (Markdown)
+    thumbnail_url TEXT NOT NULL,         -- 封面图链接 (适配 480x270 及 1920x1080)
     
-    -- 任务规则 (JSON 字符串，Rust 侧解析)
-    requirements_json TEXT NOT NULL,     -- {"min_level": 10, "require_twitter": true}
+    -- 奖励与名额
+    reward_amount REAL NOT NULL,         -- Bounty Pool Amount
+    reward_currency TEXT NOT NULL,       -- 货币类型 ('WLT' | 'USD')
+    max_participants INTEGER NOT NULL,   -- 最大参与人数限制
     
-    status TEXT DEFAULT 'active',        -- 状态: 'draft', 'active', 'paused', 'completed'
-    expires_at INTEGER,                  -- 截止时间 (Unix Timestamp)
+    -- 状态与时间轴
+    status TEXT DEFAULT 'open',          -- 状态: 'open', 'development', 'online', 'closed'
+    participation_end_date INTEGER,      -- 开放参与截止时间 (Open 阶段结束)
+    release_date INTEGER,                -- 开发结束/发布时间 (Development 阶段结束)
+    distribution_date INTEGER,           -- 奖金发放时间 (Online 阶段结束)
+    closed_at INTEGER,                   -- 彻底关闭时间
+    
+    -- 规则与示例 (JSON 字符串，Rust 侧解析)
+    settlement_rules TEXT NOT NULL,      -- 结算与发奖规则 (默认算法描述等)
+    game_examples_json TEXT,             -- 游戏案例参考 [{"type": "image"|"video"|"web", "url": "...", "thumbnail": "..."}]
+    
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
     FOREIGN KEY (admin_id) REFERENCES users(principal_id)
 );
 
--- 2. 悬赏认领记录表 (Bounty Claims)
--- 核心纽带：将 SSO 的用户与 Bounty 业务连接起来
-CREATE TABLE IF NOT EXISTS bounty_claims (
-    id TEXT PRIMARY KEY,                 -- 认领记录 ID
-    bounty_id TEXT NOT NULL,             -- 悬赏 ID
-    user_id TEXT NOT NULL,               -- 认领玩家 ID (通过 SSO JWT 获取的 users.principal_id)
+-- 2. 悬赏参与者/认领表 (Bounty Participants)
+CREATE TABLE IF NOT EXISTS bounty_participants (
+    id TEXT PRIMARY KEY,                 
+    bounty_id TEXT NOT NULL,             
+    user_id TEXT NOT NULL,               -- 参与者 ID (对应 users.principal_id)
     
-    status TEXT DEFAULT 'pending',       -- 状态: 'pending'(审核中), 'approved'(已批准), 'rejected'(被拒), 'paid'(已发放)
-    proof_data TEXT,                     -- 玩家提交的完成凭证 (JSON文本, 比如图片URL或游戏内截图)
-    reviewer_comment TEXT,               -- Creator 拒绝/批准时的附言
+    status TEXT DEFAULT 'subscribed',    -- 状态: 'subscribed'(已参与), 'published'(已发布作品), 'winner'(最终获奖者)
+    time_rank INTEGER,                   -- 参与的顺位排名 (Earliest at the first)
     
-    submitted_at INTEGER NOT NULL,       -- 提交时间
-    reviewed_at INTEGER,                 -- 审核时间
+    submitted_url TEXT,                  -- 开发者最终提交的游戏/作品链接
     
-    UNIQUE(bounty_id, user_id),          -- 限制: 每个玩家对同一个悬赏只能有一条活动记录
+    created_at INTEGER NOT NULL,         -- 参与时间
+    updated_at INTEGER NOT NULL,
+    
+    UNIQUE(bounty_id, user_id),
     FOREIGN KEY (bounty_id) REFERENCES bounties(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(principal_id) ON DELETE CASCADE
 );
@@ -66,31 +74,36 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Bounty {
     pub id: String,
-    pub game_id: String,
     pub admin_id: String,
+    pub category: String,
     pub title: String,
-    pub description: String,
+    pub short_description: String,
+    pub full_description: String,
+    pub thumbnail_url: String,
     pub reward_amount: f64,
-    pub reward_token: String,
-    pub total_spots: u32,
-    pub claimed_spots: u32,
-    pub requirements_json: String, // 数据库存的是字符串
+    pub reward_currency: String,
+    pub max_participants: u32,
     pub status: String,
-    pub expires_at: Option<u64>,
+    pub participation_end_date: Option<u64>,
+    pub release_date: Option<u64>,
+    pub distribution_date: Option<u64>,
+    pub closed_at: Option<u64>,
+    pub settlement_rules: String,
+    pub game_examples_json: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BountyClaim {
+pub struct BountyParticipant {
     pub id: String,
     pub bounty_id: String,
-    pub user_id: String,       // 连接到 SSO User
+    pub user_id: String,
     pub status: String,
-    pub proof_data: Option<String>,
-    pub reviewer_comment: Option<String>,
-    pub submitted_at: u64,
-    pub reviewed_at: Option<u64>,
+    pub time_rank: u32,
+    pub submitted_url: Option<String>,
+    pub created_at: u64,
+    pub updated_at: u64,
 }
 
 // ==========================
@@ -120,3 +133,59 @@ pub enum ReviewAction {
     Reject,
 }
 ```
+
+## 3. 接口定义 (API Endpoints)
+
+### 3.1 Bounty 管理 (Platform Admin)
+仅限具有 `admin` 角色的用户访问。
+
+- **`POST /api/admin/bounties`**
+  - **功能**: 创建新的 Bounty
+  - **Body**: `Bounty` 相关字段 (除去 id, created_at, updated_at, admin_id 等自动生成项)
+  - **返回**: 201 Created，包含新建的 Bounty 数据
+
+- **`PUT /api/admin/bounties/:id`**
+  - **功能**: 修改已存在的 Bounty
+  - **Body**: 允许更新的 Bounty 字段
+  - **返回**: 200 OK
+
+- **`POST /api/admin/bounties/:id/force-close`**
+  - **功能**: 提前结束 Bounty
+  - **返回**: 200 OK (状态变更为 closed, 更新 closed_at 时间)
+
+- **`GET /api/admin/bounties`**
+  - **功能**: 获取所有 Bounty 列表 (包含 participants 统计概览)
+  - **返回**: 200 OK
+
+- **`POST /api/admin/bounties/:id/participants/:user_id/mark-winner`**
+  - **功能**: 平台管理员在 online 阶段标记最终获奖者
+  - **返回**: 200 OK (参与者状态变为 winner)
+
+### 3.2 前端展示 (C 端展示)
+所有用户（包括未登录用户）均可访问。
+
+- **`GET /api/bounties`**
+  - **功能**: 获取分类聚合的 Bounty 列表
+  - **Query Params**: `?category=All` (可选，按分类过滤)
+  - **返回**: 200 OK，包含各分类下按时间降序的 Bounty 卡片数据
+
+- **`GET /api/bounties/:id`**
+  - **功能**: 获取单个 Bounty 的全量详情数据
+  - **返回**: 200 OK，包含 Bounty 基础信息及 `game_examples_json` 等详细展示数据
+
+### 3.3 Bounty Participants (C 端参与)
+仅限已登录的 Creator 访问。
+
+- **`POST /api/bounties/:id/participate`**
+  - **功能**: 报名参与 Bounty (订阅)
+  - **限制**: 不得超过 `max_participants`
+  - **返回**: 200 OK (生成一条状态为 `subscribed` 的 participant 记录，记录 `time_rank`)
+
+- **`POST /api/bounties/:id/submit`**
+  - **功能**: 参与者提交最终游戏/作品链接
+  - **Body**: `{ "submitted_url": "https://..." }`
+  - **返回**: 200 OK (状态变更为 `published`)
+
+- **`GET /api/users/me/bounties`**
+  - **功能**: 获取当前登录用户参与过的所有 Bounty 及状态
+  - **返回**: 200 OK，列表数据

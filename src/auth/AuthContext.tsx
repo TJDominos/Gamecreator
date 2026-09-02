@@ -432,7 +432,6 @@ export function AuthProvider({
     },
     [accountId, isOrganizationNameAvailable],
   );
-  );
 
   const value = useMemo<AuthContextValue>(
     () => ({

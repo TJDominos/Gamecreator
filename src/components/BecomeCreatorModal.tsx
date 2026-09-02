@@ -67,18 +67,23 @@ export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps)
 
     setIsSubmitting(true);
     try {
-      await saveOrganization({
-        name: `Studio-${accountId.substring(0, 6)}`,
-        contactEmail: profile?.email || "hello@example.com",
-        supportEmail: profile?.email || "support@example.com",
-        logo: "",
-        description: "My AI Game Studio on Randseed",
-        socialLinks: ["", ""],
-      });
+      // Mock updating user profile role to "creator" locally
+      const updatedProfile = { ...profile, role: "creator" };
+      localStorage.setItem("USER_PROFILE", JSON.stringify(updatedProfile));
+      
+      const profilesStr = localStorage.getItem("USER_PROFILES");
+      if (profilesStr) {
+        const profiles = JSON.parse(profilesStr);
+        profiles[accountId] = updatedProfile;
+        localStorage.setItem("USER_PROFILES", JSON.stringify(profiles));
+      }
+      
+      // We will also need to reload window to update AuthContext state quickly in mock
       onClose();
       navigate("/dashboard");
+      window.location.reload();
     } catch (error) {
-      console.error("Failed to auto-create organization:", error);
+      console.error("Failed to become creator:", error);
     } finally {
       setIsSubmitting(false);
     }
