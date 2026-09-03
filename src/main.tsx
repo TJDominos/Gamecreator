@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, useLocation } from "react-router";
+import { HelmetProvider } from "react-helmet-async";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AuthProvider } from "./auth/AuthContext";
 import DeveloperLanding from "./pages/home/DeveloperLanding";
@@ -61,11 +62,13 @@ const rootElement = document.getElementById("root");
 if (rootElement) {
   createRoot(rootElement).render(
     <ErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </BrowserRouter>
+      <HelmetProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </BrowserRouter>
+      </HelmetProvider>
     </ErrorBoundary>,
   );
 }

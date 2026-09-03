@@ -1,7 +1,9 @@
+import Markdown from 'react-markdown';
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { MOCK_BOUNTIES } from './bountyData';
-import { ArrowLeft, Trophy, Users, CheckCircle2, Target, ExternalLink, AlertCircle } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+import { ArrowLeft, Share2, Trophy, Users, CheckCircle2, Target, ExternalLink, AlertCircle } from 'lucide-react';
 
 import { CategorySidebar } from '../../../components/CategorySidebar';
 
@@ -14,6 +16,25 @@ export function BountyDetail(): React.ReactElement {
   if (!bounty) {
     return <div style={{ padding: '40px' }}>Bounty not found.</div>;
   }
+
+  const shareUrl = window.location.href;
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: bounty.title,
+          text: bounty.description,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.log('Share canceled or failed', err);
+      }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      alert('Link copied to clipboard!');
+    }
+  };
 
   const getStatusColor = (state: string) => {
     switch(state) {
@@ -29,6 +50,14 @@ export function BountyDetail(): React.ReactElement {
 
   return (
     <div className="max-w-[1200px] mx-auto px-6 pb-[60px]">
+      <Helmet>
+        <title>{bounty.title} - Creator Center</title>
+        <meta property="og:title" content={bounty.title} />
+        <meta property="og:description" content={bounty.description} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={shareUrl} />
+      </Helmet>
+      
       <div className="flex flex-col lg:flex-row gap-10 lg:gap-[60px] items-start">
         
         {/* Left Sidebar (Desktop) / Top Slider (Mobile) */}
@@ -67,28 +96,42 @@ export function BountyDetail(): React.ReactElement {
             
             {/* Right side: Info */}
             <div className="p-6 md:p-8 flex-1 flex flex-col justify-center min-w-0">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <span style={{ 
-                  background: statusStyle.bg, 
-                  color: statusStyle.color, 
-                  padding: '4px 12px', 
-                  borderRadius: '20px', 
-                  fontSize: '13px', 
-                  fontWeight: 600,
-                  border: `1px solid ${statusStyle.color}40`
-                }}>
-                  {bounty.state}
-                </span>
-                <span style={{ color: 'var(--portal-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Target size={14} /> {bounty.category}
-                </span>
+              <div className="flex items-center justify-between mb-4">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ 
+                    background: statusStyle.bg, 
+                    color: statusStyle.color, 
+                    padding: '4px 12px', 
+                    borderRadius: '20px', 
+                    fontSize: '13px', 
+                    fontWeight: 600,
+                    border: `1px solid ${statusStyle.color}40`
+                  }}>
+                    {bounty.state}
+                  </span>
+                  <span style={{ color: 'var(--portal-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Target size={14} /> {bounty.category}
+                  </span>
+                </div>
+                <button 
+                  onClick={handleShare}
+                  className="p-[6px] border-[1.5px] border-[var(--portal-ink)] rounded-full hover:bg-[var(--portal-border)] transition-colors text-[var(--portal-ink)]"
+                  title="Share Bounty"
+                >
+                  <Share2 size={16} strokeWidth={2} />
+                </button>
               </div>
               
-              <h1 className="mb-6 text-2xl lg:text-[28px] text-[var(--portal-ink)] leading-tight font-bold">{bounty.title}</h1>
+              <div className="mb-6">
+                <div className="text-[24px] leading-[32px] text-[var(--portal-ink)] font-bold m-0">{bounty.title}</div>
+              </div>
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div>
-                  <span className="text-[13px] text-[var(--portal-muted)] block mb-1">Bounty Pool</span>
+                  <div className="flex items-center gap-4 mb-1">
+                    <span className="text-[13px] text-[var(--portal-muted)] block">Bounty Pool</span>
+                    <span className="text-[13px] font-mono font-medium text-[var(--portal-muted)]">ID: {bounty.id}</span>
+                  </div>
                   <div className="text-2xl font-bold text-[var(--portal-ink)] flex items-center gap-2">
                     <Trophy className="w-6 h-6" color="#f59e0b" />
                     {bounty.currency === 'USD' ? '$' : ''}{bounty.prizePool.toLocaleString()} <span className="text-sm font-medium text-[var(--portal-muted)]">{bounty.currency}</span>
@@ -130,8 +173,8 @@ export function BountyDetail(): React.ReactElement {
           {/* Full Description */}
           <div className="bg-white rounded-2xl p-5 md:p-8 border border-[var(--portal-border)]">
             <h2 style={{ fontSize: '20px', margin: '0 0 20px 0', color: 'var(--portal-ink)' }}>Description</h2>
-            <div style={{ color: 'var(--portal-text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontSize: '15px' }}>
-              {bounty.fullDescription || bounty.description}
+            <div className="markdown-body" style={{ color: 'var(--portal-text)', lineHeight: 1.6, fontSize: '15px' }}>
+              <Markdown>{bounty.fullDescription || bounty.description}</Markdown>
             </div>
           </div>
 
@@ -166,14 +209,26 @@ export function BountyDetail(): React.ReactElement {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {bounty.winners.map((winner, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: '#fffcf5', border: '1px solid #fef3c7', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '16px', fontWeight: 700, color: '#d97706', width: '20px', textAlign: 'center' }}>#{idx + 1}</div>
-                      <img src={winner.creator.avatar} alt={winner.creator.name} style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eee' }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--portal-ink)' }}>{winner.gameName}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--portal-muted)' }}>by {winner.creator.name}</div>
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#fffcf5', border: '1px solid #fef3c7', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#d97706', width: '20px', textAlign: 'center' }}>#{idx + 1}</div>
+                        <img src={winner.creator.avatar} alt={winner.creator.name} style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eee' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--portal-ink)' }}>{winner.gameName}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--portal-muted)' }}>by {winner.creator.name}</div>
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#d97706' }}>{winner.prize}</div>
                       </div>
-                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#d97706' }}>{winner.prize}</div>
+                      
+                      {winner.uu && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--portal-muted)', borderTop: '1px dashed #fcd34d', paddingTop: '8px', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <span>UU: <strong style={{ color: 'var(--portal-ink)' }}>{(winner.uu / 1000).toFixed(1)}k</strong></span>
+                            <span>Score: <strong style={{ color: 'var(--portal-ink)' }}>{winner.reviewScore}</strong></span>
+                          </div>
+                          <span>Total: <strong style={{ color: 'var(--portal-ink)' }}>{winner.performanceScore?.toLocaleString()}</strong></span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -187,12 +242,26 @@ export function BountyDetail(): React.ReactElement {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {bounty.publishedGames.map((pub, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <img src={pub.creator.avatar} alt={pub.creator.name} style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eee' }} />
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--portal-ink)' }}>{pub.gameName}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--portal-muted)' }}>by {pub.creator.name}</div>
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#f8f9fa', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <img src={pub.creator.avatar} alt={pub.creator.name} style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eee' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--portal-ink)' }}>{pub.gameName}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--portal-muted)' }}>by {pub.creator.name}</div>
+                        </div>
+                        {bounty.state === 'CLOSED' && pub.prize && (
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--portal-ink)' }}>{pub.prize}</div>
+                        )}
                       </div>
+                      {bounty.state === 'CLOSED' && pub.uu && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--portal-muted)', borderTop: '1px dashed #e5e7eb', paddingTop: '8px', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <span>UU: <strong style={{ color: 'var(--portal-ink)' }}>{(pub.uu / 1000).toFixed(1)}k</strong></span>
+                            <span>Score: <strong style={{ color: 'var(--portal-ink)' }}>{pub.reviewScore}</strong></span>
+                          </div>
+                          <span>Total: <strong style={{ color: 'var(--portal-ink)' }}>{pub.performanceScore?.toLocaleString()}</strong></span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

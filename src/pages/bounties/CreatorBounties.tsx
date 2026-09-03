@@ -170,7 +170,9 @@ export default function CreatorBounties() {
                         </span>
                         <span style={{ fontSize: '13px', color: 'var(--portal-muted)', fontWeight: 500 }}>{bounty.category}</span>
                       </div>
-                      <h2 style={{ fontSize: '20px', margin: '0 0 8px' }}>{bounty.title}</h2>
+                      <h2 style={{ fontSize: '20px', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {bounty.title}
+                      </h2>
                       <p style={{ margin: 0, fontSize: '14px', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
                         {bounty.description}
                       </p>
@@ -178,7 +180,10 @@ export default function CreatorBounties() {
 
                     <div className="bounty-card-action">
                       <div style={{ marginBottom: '16px' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--portal-muted)', display: 'block', marginBottom: '4px' }}>Bounty Pool</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--portal-muted)', display: 'block' }}>Bounty Pool</span>
+                          <span style={{ fontSize: '12px', color: 'var(--portal-muted)', fontFamily: 'monospace', display: 'block' }}>ID: {bounty.id}</span>
+                        </div>
                         <span style={{ fontSize: '24px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Trophy size={20} color="#f59e0b" />
                           {bounty.currency === 'USD' ? '$' : ''}{bounty.prizePool.toLocaleString()} <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--portal-muted)' }}>{bounty.currency}</span>

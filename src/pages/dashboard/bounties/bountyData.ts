@@ -17,12 +17,19 @@ export interface GameExample {
 export interface PublishedGame {
   creator: Creator;
   gameName: string;
+  prize?: string;
+  uu?: number;
+  reviewScore?: number;
+  performanceScore?: number;
 }
 
 export interface Winner {
   creator: Creator;
   gameName: string;
   prize: string;
+  uu?: number;
+  reviewScore?: number;
+  performanceScore?: number;
 }
 
 export interface Bounty {
@@ -47,7 +54,7 @@ export interface Bounty {
   videoUrl?: string;
 }
 
-const mockParticipants: Creator[] = Array.from({ length: 30 }, (_, i) => ({
+const mockParticipants: Creator[] = Array.from({ length: 45 }, (_, i) => ({
   id: `u${i + 1}`,
   name: `Creator_${i + 1}`,
   avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=User${i + 1}`
@@ -59,14 +66,14 @@ mockParticipants[2].name = 'SarahCodes';
 mockParticipants[3].name = 'GameBuilder99';
 
 const mockPublished: PublishedGame[] = [
-  { creator: mockParticipants[0], gameName: 'Neon Rush 2026' },
-  { creator: mockParticipants[1], gameName: 'Pixel Dodger' }
+  { creator: mockParticipants[0], gameName: 'Neon Rush 2026', prize: '50,000 WLT', uu: 12500, reviewScore: 4.8, performanceScore: 60000 },
+  { creator: mockParticipants[1], gameName: 'Pixel Dodger', prize: '30,000 WLT', uu: 8400, reviewScore: 4.5, performanceScore: 37800 }
 ];
 
 const mockWinners: Winner[] = [
-  { creator: mockParticipants[0], gameName: 'Neon Rush 2026', prize: '50,000 WLT' },
-  { creator: mockParticipants[1], gameName: 'Pixel Dodger', prize: '30,000 WLT' },
-  { creator: mockParticipants[2], gameName: 'Block Breaker', prize: '20,000 WLT' }
+  { creator: mockParticipants[0], gameName: 'Neon Rush 2026', prize: '50,000 WLT', uu: 12500, reviewScore: 4.8, performanceScore: 60000 },
+  { creator: mockParticipants[1], gameName: 'Pixel Dodger', prize: '30,000 WLT', uu: 8400, reviewScore: 4.5, performanceScore: 37800 },
+  { creator: mockParticipants[2], gameName: 'Block Breaker', prize: '20,000 WLT', uu: 5200, reviewScore: 4.2, performanceScore: 21840 }
 ];
 
 const mockExamples: GameExample[] = [

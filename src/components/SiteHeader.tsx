@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate, useLocation, Link } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { BecomeCreatorModal } from "./BecomeCreatorModal";
 import { Menu, X } from "lucide-react";
@@ -34,10 +34,10 @@ export function SiteHeader(): React.ReactElement {
     <>
       <header className="landing-nav">
         <div className="landing-container landing-nav__inner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <a className="landing-brand" href="/" aria-label="Creator Center home">
+          <Link className="landing-brand" to="/" aria-label="Creator Center home">
             <img src="https://storage.randseed.org/Logo/Logo.png" alt="Creator Center Logo" className="landing-brand__mark" style={{ borderRadius: '50%' }} />
             <span className="landing-brand__text">Creator Center</span>
-          </a>
+          </Link>
           
           <div className="landing-nav__desktop-actions flex items-center">
             {process.env.NODE_ENV !== "production" && !isSignedIn && (
@@ -56,18 +56,18 @@ export function SiteHeader(): React.ReactElement {
                 </button>
               </div>
             )}
-            <a 
+            <Link 
               className={`landing-nav__guide text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/bounties") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
-              href="/bounties"
+              to="/bounties"
             >
               Creator Bounties
-            </a>
-            <a 
+            </Link>
+            <Link 
               className={`landing-nav__guide text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/guides") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
-              href="/guides"
+              to="/guides"
             >
               Creator Guide
-            </a>
+            </Link>
             <button
               ref={signInButtonRef}
               className="btn btn--solid"
@@ -104,20 +104,20 @@ export function SiteHeader(): React.ReactElement {
                 <button onClick={() => mockSignIn("admin")} className="flex-1 py-2 bg-red-100 text-red-800 text-xs rounded font-semibold">Mock Admin</button>
               </div>
             )}
-            <a 
+            <Link 
               className={`landing-nav__guide-mobile text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/bounties") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
-              href="/bounties"
+              to="/bounties"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Creator Bounties
-            </a>
-            <a 
+            </Link>
+            <Link 
               className={`landing-nav__guide-mobile text-black decoration-purple-300 decoration-2 underline-offset-4 ${location.pathname.startsWith("/guides") ? 'underline text-purple-600' : 'no-underline hover:underline hover:text-purple-300'}`} 
-              href="/guides"
+              to="/guides"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Creator Guide
-            </a>
+            </Link>
           </div>
         )}
       </header>

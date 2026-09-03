@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import { TipTapEditor } from '../../../components/TipTapEditor';
 import { Target, Plus, Search, Filter, ShieldCheck, ArrowRight, ArrowLeft, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { MOCK_BOUNTIES, Bounty, Category } from './bountyData';
+
+const countWords = (str: string) => str.trim().split(/\s+/).filter(Boolean).length;
 
 const CATEGORIES: Category[] = ['Casino', 'Puzzle', 'Card & Board', 'Simulation', 'Arcade', 'Strategy', 'Word', 'Trivia', 'Role-Playing', 'Sports', 'Music'];
 
@@ -8,6 +11,11 @@ export function BountyManagement(): React.ReactElement {
   const [bounties, setBounties] = useState<Bounty[]>(MOCK_BOUNTIES);
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'participants'>('list');
   const [selectedBounty, setSelectedBounty] = useState<Bounty | null>(null);
+  
+  const [filterState, setFilterState] = useState<'ALL' | 'OPEN' | 'RUNNING' | 'ONLINE' | 'CLOSED'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // Form State
   const [form, setForm] = useState({
@@ -62,6 +70,12 @@ export function BountyManagement(): React.ReactElement {
     setView('list');
   };
 
+  const filteredBounties = bounties.filter(b => {
+    const matchState = filterState === 'ALL' || b.state === filterState;
+    const matchSearch = b.title.toLowerCase().includes(searchQuery.toLowerCase()) || b.id.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchState && matchSearch;
+  });
+
   return (
     <div style={{ background: '#f9fafb', minHeight: '100vh', padding: '32px' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -108,7 +122,7 @@ export function BountyManagement(): React.ReactElement {
               
               <div className="field">
                 <span style={{ fontSize: '14px', fontWeight: 600 }}>Bounty Title <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Max 10 words)</small></span>
-                <input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <input type="text" value={form.title} onChange={e => { if (countWords(e.target.value) <= 10 || e.target.value.length < form.title.length) setForm({...form, title: e.target.value}) }} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
               </div>
               
               <div className="field">
@@ -118,19 +132,22 @@ export function BountyManagement(): React.ReactElement {
                 </select>
               </div>
 
-              <div className="field--wide" style={{ gridColumn: 'span 2' }}>
+              <div className="field field--wide" style={{ gridColumn: 'span 2' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600 }}>Short Description <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Max 50 words)</small></span>
-                <textarea rows={2} value={form.shortDesc} onChange={e => setForm({...form, shortDesc: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }}></textarea>
+                <textarea rows={2} value={form.shortDesc} onChange={e => { if (countWords(e.target.value) <= 50 || e.target.value.length < form.shortDesc.length) setForm({...form, shortDesc: e.target.value}) }} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }}></textarea>
               </div>
 
-              <div className="field--wide" style={{ gridColumn: 'span 2' }}>
+              <div className="field field--wide" style={{ gridColumn: 'span 2' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600 }}>Thumbnail URL <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Supports .png, .jpg, .webp, .mp4 | 480x270 or 1920x1080)</small></span>
                 <input type="url" placeholder="https://" value={form.thumbnailUrl} onChange={e => setForm({...form, thumbnailUrl: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
               </div>
 
-              <div className="field--wide" style={{ gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Full Description (Markdown)</span>
-                <textarea rows={6} value={form.fullDesc} onChange={e => setForm({...form, fullDesc: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px', fontFamily: 'monospace' }}></textarea>
+              <div className="field field--wide" style={{ gridColumn: 'span 2' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600 }}>Full Description</span>
+                <TipTapEditor 
+                  value={form.fullDesc} 
+                  onChange={(val) => setForm({...form, fullDesc: val})} 
+                />
               </div>
 
               <div className="field">
@@ -236,7 +253,7 @@ export function BountyManagement(): React.ReactElement {
 
         {view === 'participants' && selectedBounty && (
           <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '32px', marginBottom: '32px' }}>
-            <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--portal-muted)', marginBottom: '24px', padding: 0 }}>
+            <button onClick={() => { setView('list'); setCurrentPage(1); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--portal-muted)', marginBottom: '24px', padding: 0 }}>
               <ArrowLeft size={16} /> Back to List
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -249,34 +266,53 @@ export function BountyManagement(): React.ReactElement {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr>
-                  <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Time Rank</th>
+                  <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Joined At</th>
                   <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Creator</th>
                   <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Status</th>
-                  <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Submission Link</th>
+                  <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Score</th>
+                  <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Bounty Amount</th>
+                  <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Game ID</th>
                   <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--portal-border)', color: 'var(--portal-muted)', fontSize: '13px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {selectedBounty.participants?.slice(0, 10).map((p, index) => {
+                {(selectedBounty.participants?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) || []).map((p, index) => {
+                   const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
                    const isWinner = selectedBounty.winners?.find(w => w.creator.id === p.id);
                    const isPublished = selectedBounty.publishedGames?.find(pub => pub.creator.id === p.id);
                    let status = 'Subscribed';
                    let statusColor = '#6b7280';
                    let statusBg = '#f3f4f6';
+                   let score = '-';
+                   let amount = '-';
+                   let gameId = '-';
                    
                    if (isWinner) {
                      status = 'Winner';
                      statusColor = '#9a3412';
                      statusBg = '#ffedd5';
+                     score = '85%';
+                     amount = selectedBounty.currency === 'USD' ? '$15,000' : '50,000 WLT';
+                     gameId = 'game_001_v3';
                    } else if (isPublished) {
                      status = 'Published';
                      statusColor = '#1e874b';
                      statusBg = '#e6f6ec';
+                     score = '62%';
+                     amount = selectedBounty.currency === 'USD' ? '$2,500' : '10,000 WLT';
+                     gameId = 'game_014_v1';
                    }
+
+                   // Generate a mock join date based on index
+                   const joinDate = new Date(Date.now() - (absoluteIndex * 86400000) - (absoluteIndex * 3600000));
+                   const joinDateString = joinDate.toLocaleDateString() + ' ' + joinDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
                    return (
                     <tr key={p.id} style={{ borderBottom: '1px solid var(--portal-border)' }}>
-                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600 }}>#{index + 1}</td>
+                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600 }}>
+                        <div style={{ color: 'var(--portal-ink)' }}>#{absoluteIndex + 1}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--portal-muted)', fontWeight: 400 }}>{joinDateString}</div>
+                      </td>
                       <td style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <img src={p.avatar} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#e5e7eb' }} />
@@ -288,8 +324,14 @@ export function BountyManagement(): React.ReactElement {
                           {status}
                         </span>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '14px' }}>
-                        {isPublished ? <a href="#" style={{ color: 'var(--portal-purple)', textDecoration: 'none' }}>View Game</a> : '-'}
+                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600 }}>
+                        {score}
+                      </td>
+                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600, color: isWinner ? '#9a3412' : (isPublished ? '#1e874b' : 'inherit') }}>
+                        {amount}
+                      </td>
+                      <td style={{ padding: '16px', fontSize: '13px', fontFamily: 'monospace' }}>
+                        {gameId !== '-' ? <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'var(--portal-purple)', textDecoration: 'none' }}>{gameId}</a> : '-'}
                       </td>
                       <td style={{ padding: '16px' }}>
                         {status === 'Published' && selectedBounty.state === 'ONLINE' && (
@@ -303,16 +345,62 @@ export function BountyManagement(): React.ReactElement {
                 })}
               </tbody>
             </table>
+            
+            {/* Pagination Controls */}
+            {selectedBounty.participants && Math.ceil(selectedBounty.participants.length / itemsPerPage) > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--portal-border)', background: currentPage === 1 ? '#f9fafb' : '#fff', color: currentPage === 1 ? 'var(--portal-muted)' : 'var(--portal-ink)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600 }}
+                >
+                  Previous
+                </button>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--portal-muted)' }}>
+                  Page {currentPage} of {Math.ceil(selectedBounty.participants.length / itemsPerPage)}
+                </span>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(selectedBounty.participants.length / itemsPerPage), p + 1))}
+                  disabled={currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--portal-border)', background: currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage) ? '#f9fafb' : '#fff', color: currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage) ? 'var(--portal-muted)' : 'var(--portal-ink)', cursor: currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage) ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600 }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Table */}
         {view === 'list' && (
           <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '16px' }}>All Bounties</h3>
-              <div style={{ display: 'flex', gap: '8px', color: 'var(--portal-muted)' }}>
-                <Filter size={18} /> <Search size={18} />
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Search size={16} color="var(--portal-muted)" style={{ position: 'absolute', left: '10px' }} />
+                  <input 
+                    type="text" 
+                    placeholder="Search ID or Title..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ padding: '8px 12px 8px 32px', border: '1px solid var(--portal-border)', borderRadius: '8px', fontSize: '13px', width: '200px' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '4px' }}>
+                  <Filter size={16} color="var(--portal-muted)" style={{ margin: '0 4px' }} />
+                  <select 
+                    value={filterState} 
+                    onChange={(e) => setFilterState(e.target.value as any)}
+                    style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 500, outline: 'none' }}
+                  >
+                    <option value="ALL">All States</option>
+                    <option value="OPEN">Open</option>
+                    <option value="RUNNING">Development</option>
+                    <option value="ONLINE">Online</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                </div>
               </div>
             </div>
             
@@ -328,45 +416,53 @@ export function BountyManagement(): React.ReactElement {
                 </tr>
               </thead>
               <tbody>
-                {bounties.map(b => (
-                  <tr key={b.id} style={{ borderBottom: '1px solid var(--portal-border)' }}>
-                    <td style={{ padding: '16px 24px' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 600 }}>{b.title}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--portal-muted)', fontFamily: 'monospace' }}>{b.id}</div>
-                    </td>
-                    <td style={{ padding: '16px 24px', fontSize: '13px' }}>
-                      {b.category}
-                    </td>
-                    <td style={{ padding: '16px 24px' }}>
-                      <span style={{ 
-                        fontSize: '12px', 
-                        fontWeight: 600, 
-                        padding: '4px 8px', 
-                        borderRadius: '6px',
-                        background: b.state === 'OPEN' ? '#e6f6ec' : b.state === 'RUNNING' ? '#e0e7ff' : b.state === 'ONLINE' ? '#fff1d9' : '#f2f0f3',
-                        color: b.state === 'OPEN' ? '#1e874b' : b.state === 'RUNNING' ? '#4f46e5' : b.state === 'ONLINE' ? '#8a5314' : '#6b7280'
-                      }}>
-                        {b.state}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 500 }}>
-                      {b.currency === 'USD' ? '$' : ''}{b.prizePool.toLocaleString()} {b.currency}
-                    </td>
-                    <td style={{ padding: '16px 24px', fontSize: '13px' }}>
-                      {b.subscriptions} / 100
-                    </td>
-                    <td style={{ padding: '16px 24px' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => handleEdit(b)} style={{ padding: '6px 12px', background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                          Edit
-                        </button>
-                        <button onClick={() => { setSelectedBounty(b); setView('participants'); }} style={{ padding: '6px 12px', background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                          View Participants
-                        </button>
-                      </div>
+                {filteredBounties.length > 0 ? (
+                  filteredBounties.map(b => (
+                    <tr key={b.id} style={{ borderBottom: '1px solid var(--portal-border)' }}>
+                      <td style={{ padding: '16px 24px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 600 }}>{b.title}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--portal-muted)', fontFamily: 'monospace' }}>{b.id}</div>
+                      </td>
+                      <td style={{ padding: '16px 24px', fontSize: '13px' }}>
+                        {b.category}
+                      </td>
+                      <td style={{ padding: '16px 24px' }}>
+                        <span style={{ 
+                          fontSize: '12px', 
+                          fontWeight: 600, 
+                          padding: '4px 8px', 
+                          borderRadius: '6px',
+                          background: b.state === 'OPEN' ? '#e6f6ec' : b.state === 'RUNNING' ? '#e0e7ff' : b.state === 'ONLINE' ? '#fff1d9' : '#f2f0f3',
+                          color: b.state === 'OPEN' ? '#1e874b' : b.state === 'RUNNING' ? '#4f46e5' : b.state === 'ONLINE' ? '#8a5314' : '#6b7280'
+                        }}>
+                          {b.state}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 500 }}>
+                        {b.currency === 'USD' ? '$' : ''}{b.prizePool.toLocaleString()} {b.currency}
+                      </td>
+                      <td style={{ padding: '16px 24px', fontSize: '13px' }}>
+                        {b.subscriptions} / 100
+                      </td>
+                      <td style={{ padding: '16px 24px' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => handleEdit(b)} style={{ padding: '6px 12px', background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                            Edit
+                          </button>
+                          <button onClick={() => { setSelectedBounty(b); setView('participants'); setCurrentPage(1); }} style={{ padding: '6px 12px', background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                            View Participants
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--portal-muted)', fontSize: '14px' }}>
+                      No bounties found matching your search and filter criteria.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

@@ -27,7 +27,7 @@ export function BountyHub(): React.ReactElement {
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h1 style={{ fontSize: '24px', lineHeight: '30px', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Target size={28} color="var(--portal-purple)" /> My Bounties
           </h1>
           <p style={{ color: 'var(--portal-muted)', margin: 0, fontSize: '15px', maxWidth: '600px' }}>
@@ -107,7 +107,9 @@ export function BountyHub(): React.ReactElement {
                           <SIcon size={14} /> {s.label}
                         </span>
                       </div>
-                      <h3 style={{ fontSize: '18px', margin: '0 0 8px' }}>{bounty.title}</h3>
+                      <h3 style={{ fontSize: '18px', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {bounty.title}
+                      </h3>
                       <p style={{ margin: 0, fontSize: '14px', color: 'var(--portal-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {bounty.description}
                       </p>
@@ -122,7 +124,10 @@ export function BountyHub(): React.ReactElement {
 
                     <div style={{ borderLeft: '1px solid var(--portal-border)', paddingLeft: '24px', minWidth: '180px' }}>
                       <div style={{ marginBottom: '16px' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--portal-muted)', display: 'block', marginBottom: '4px' }}>Prize Pool</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--portal-muted)', display: 'block' }}>Prize Pool</span>
+                          <span style={{ fontSize: '12px', color: 'var(--portal-muted)', fontFamily: 'monospace', display: 'block' }}>ID: {bounty.id}</span>
+                        </div>
                         <span style={{ fontSize: '24px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Trophy size={20} color="#f59e0b" />
                           {bounty.currency === 'USD' ? '$' : ''}{bounty.prizePool.toLocaleString()} <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--portal-muted)' }}>{bounty.currency}</span>

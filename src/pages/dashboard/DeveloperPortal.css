@@ -969,3 +969,100 @@
 .portal-menu-button:active {
   transform: scale(0.95);
 }
+
+/* TipTap Editor Styles */
+.tiptap-editor-content .ProseMirror {
+  outline: none;
+}
+.tiptap-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+.tiptap-editor-content .ProseMirror p {
+  margin: 0.5em 0;
+}
+.tiptap-editor-content .ProseMirror h1,
+.tiptap-editor-content .ProseMirror h2,
+.tiptap-editor-content .ProseMirror h3 {
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+}
+.tiptap-editor-content .ProseMirror ul,
+.tiptap-editor-content .ProseMirror ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.tiptap-editor-content .ProseMirror blockquote {
+  border-left: 3px solid #dcd7e0;
+  padding-left: 1em;
+  margin-left: 0;
+  color: #6b7280;
+}
+.tiptap-editor-content .ProseMirror pre {
+  background: #fbfafc;
+  color: #1f2937;
+  padding: 0.75em 1em;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+}
+.tiptap-editor-content .ProseMirror code {
+  background: #fbfafc;
+  color: #1f2937;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+  border: 1px solid #e5e7eb;
+}
+
+/* Markdown Body Styles */
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  color: var(--portal-ink);
+}
+.markdown-body p {
+  margin-bottom: 1em;
+}
+.markdown-body ul, .markdown-body ol {
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+.markdown-body li {
+  margin-bottom: 0.25em;
+}
+.markdown-body blockquote {
+  border-left: 3px solid #dcd7e0;
+  padding-left: 1em;
+  color: #6b7280;
+  margin-left: 0;
+  margin-bottom: 1em;
+}
+.markdown-body pre {
+  background: #fbfafc;
+  padding: 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 1em;
+}
+.markdown-body code {
+  font-family: monospace;
+  background: #fbfafc;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.9em;
+}
+.markdown-body pre code {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
