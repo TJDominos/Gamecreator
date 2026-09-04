@@ -30,29 +30,3 @@
     "CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org,https://creator.randseed.org,https://test.randseed.org,https://randseed.org"
   }
 }
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "randseed-gamecreator-worker",
-	"main": "worker/src/index.ts",
-	"compatibility_date": "2026-07-19",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"observability": {
-		"enabled": true
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "gamecreator-d1",
-			"database_id": "320c8dd3-7348-4675-9f3d-e384e1713f63",
-			"remote": true
-		}
-	],
-	"vars": {
-		"JWT_SECRET": "randseed-dev-jwt-secret-replace-in-production",
-		"MAIN_SITE_URL": "https://test.randseed.org",
-		"GITHUB_APP_SLUG": "randseed-game-engine",
-		"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
-		"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://test.randseed.org,https://randseed.org"
-	}
-}
