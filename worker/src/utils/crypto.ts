@@ -1,6 +1,5 @@
 import type { JwtPayload, UserRole } from "../types";
 
-const DEFAULT_SECRET = "randseed-dev-jwt-secret-replace-in-production";
 const TOKEN_EXPIRY_SECONDS = 7 * 24 * 3600; // 7 days
 
 function base64UrlEncode(bytes: Uint8Array): string {
@@ -44,7 +43,7 @@ async function getHmacKey(secret: string): Promise<CryptoKey> {
 
 export async function signJwt(
   payload: Omit<JwtPayload, "iat" | "exp">,
-  secret: string = DEFAULT_SECRET,
+  secret: string,
   expiresInSeconds: number = TOKEN_EXPIRY_SECONDS,
 ): Promise<string> {
   const header = { alg: "HS256", typ: "JWT" };
@@ -72,7 +71,7 @@ export async function signJwt(
 
 export async function verifyJwt(
   token: string,
-  secret: string = DEFAULT_SECRET,
+  secret: string,
 ): Promise<JwtPayload | null> {
   try {
     const parts = token.split(".");
