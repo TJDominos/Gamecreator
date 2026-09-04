@@ -43,3 +43,16 @@ Auth and organization data are stored in `localStorage` (mock wallet sign-in), s
 ## Deploy
 
 Vercel SPA rewrites are configured in `vercel.json`.
+
+The Worker JWT key is a Wrangler secret, not a value in `wrangler.jsonc`:
+
+```bash
+npx wrangler secret put JWT_SECRET
+npx wrangler deploy
+```
+
+Run the command for each Wrangler environment that needs its own key. For local Worker development, put a random value in the ignored `.dev.vars` file:
+
+```bash
+printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 32)" > .dev.vars
+```

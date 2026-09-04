@@ -18,7 +18,6 @@
 		}
 	],
 	"vars": {
-		"JWT_SECRET": "randseed-dev-jwt-secret-replace-in-production",
 		"MAIN_SITE_URL": "https://test.randseed.org",
 		"GITHUB_APP_SLUG": "randseed-game-engine",
 		"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
