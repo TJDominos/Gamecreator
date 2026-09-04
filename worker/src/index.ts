@@ -45,13 +45,13 @@ export default {
       if (ghRes) return ghRes;
 
       // 3. Fallback to Frontend static assets (Vite React SPA)
-if (
-  env.ASSETS &&
-  (request.method === "GET" || request.method === "HEAD") &&
-  !(url.pathname === "/api" || url.pathname.startsWith("/api/"))
-) {
-  return await env.ASSETS.fetch(request);
-}
+      if (
+        env.ASSETS &&
+        (request.method === "GET" || request.method === "HEAD") &&
+        !(url.pathname === "/api" || url.pathname.startsWith("/api/"))
+      ) {
+        return await env.ASSETS.fetch(request);
+      }
 
       // 4. Fallback 404 for unmatched API routes
       return errorResponse(`Route not found: ${request.method} ${url.pathname}`, 404, "NOT_FOUND", request, env);
