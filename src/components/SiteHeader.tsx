@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { BecomeCreatorModal } from "./BecomeCreatorModal";
+import { WalletConnectModal } from "./WalletConnectModal";
 import { Menu, X } from "lucide-react";
 import "../pages/home/DeveloperLanding.css";
 
@@ -14,6 +15,7 @@ export function SiteHeader(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
   const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const signInButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -26,8 +28,7 @@ export function SiteHeader(): React.ReactElement {
       }
       return;
     }
-    // Direct SSO Redirect
-    signInWithSSO();
+    setIsWalletModalOpen(true);
   }
 
   return (
@@ -74,7 +75,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "Dashboard" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
             </button>
           </div>
           <div className="landing-nav__mobile-actions">
@@ -84,7 +85,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "Dashboard" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
             </button>
             <button 
               className="landing-nav__hamburger"
@@ -124,6 +125,10 @@ export function SiteHeader(): React.ReactElement {
       <BecomeCreatorModal 
         isOpen={isBecomeCreatorModalOpen}
         onClose={() => setBecomeCreatorModalOpen(false)}
+      />
+      <WalletConnectModal 
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
       />
     </>
   );

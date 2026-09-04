@@ -1,24 +1,28 @@
 import React, { useState } from "react";
-import { Github, CheckCircle2, Lock, Trash2, Archive, AlertTriangle } from "lucide-react";
-import { useOutletContext, useNavigate } from "react-router";
+import { Github, CheckCircle2, Lock, Trash2, Archive, AlertTriangle, Sliders } from "lucide-react";
+import { useOutletContext, useNavigate, useParams } from "react-router";
 import { GameStatus } from "./GameConsole";
+import { getGameById } from "./gameData";
+import { GitHubSyncCard } from "./GitHubSyncCard";
 
 export function GameSettings(): React.ReactElement {
   const { status, setStatus } = useOutletContext<{ status: GameStatus, setStatus: (s: GameStatus) => void }>();
+  const { gameId } = useParams();
   const navigate = useNavigate();
-  const [connected, setConnected] = useState(false);
+  const game = getGameById(gameId || 'g_101');
+  const [showAdvancedBuild, setShowAdvancedBuild] = useState(false);
 
   const isPipelineLocked = ['PENDING_REVIEW', 'APPROVED', 'PUBLIC_ACTIVE', 'MAINTENANCE', 'ARCHIVED'].includes(status);
   const canHardDelete = ['DRAFT', 'DEVELOPMENT'].includes(status);
   const canArchive = ['PRIVATE_TESTING', 'REJECTED', 'APPROVED', 'MAINTENANCE'].includes(status);
 
   return (
-    <div style={{ maxWidth: '700px' }}>
+    <div style={{ maxWidth: '720px' }}>
       
       <h2 style={{ fontSize: '20px', marginBottom: '8px' }}>CI/CD & Repository</h2>
 
       <p style={{ color: 'var(--portal-muted)', fontSize: '14px', marginBottom: '24px' }}>
-        Connect your GitHub repository to enable automatic Sandbox deployments and version management.
+        Connect and manage the Git repository linked with this game for automatic Sandbox deployments and version control.
       </p>
 
       {isPipelineLocked && (
@@ -27,35 +31,45 @@ export function GameSettings(): React.ReactElement {
         </div>
       )}
 
-      <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '24px', opacity: isPipelineLocked ? 0.7 : 1, pointerEvents: isPipelineLocked ? 'none' : 'auto' }}>
-        {!connected ? (
-          <div style={{ textAlign: 'center', padding: '32px 0' }}>
-            <Github size={48} style={{ margin: '0 auto 16px', color: 'var(--portal-ink)' }} />
-            <h3 style={{ margin: '0 0 8px', fontSize: '18px' }}>Connect GitHub Repository</h3>
-            <p style={{ color: 'var(--portal-muted)', fontSize: '13px', maxWidth: '400px', margin: '0 auto 24px' }}>
-              We strongly recommend authorizing <strong>only select repositories</strong> specific to this game.
-            </p>
-            <button className="primary-action" onClick={() => setConnected(true)}>
-              Authorize GitHub App
-            </button>
-          </div>
-        ) : (
-          <div className="onboarding-form">
-            <div className="field--wide" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#167c73', background: '#e1f4f1', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-              <CheckCircle2 size={18} />
-              <span style={{ fontSize: '13px', fontWeight: 600 }}>Connected to RandSeedStudio/neon-dash-client</span>
-            </div>
+      {/* Primary GitHub Sync & CI/CD Card matching design reference */}
+      <GitHubSyncCard 
+        gameId={gameId || 'g_101'} 
+        gameName={game?.name || 'Neon Dash'}
+        initialRepoInfo={game?.repoInfo}
+        isLocked={isPipelineLocked}
+      />
 
+      {/* Advanced Build & Monorepo Configuration */}
+      <div style={{ marginTop: '24px', background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '16px', padding: '24px' }}>
+        <div 
+          onClick={() => setShowAdvancedBuild(!showAdvancedBuild)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Sliders size={18} color="var(--portal-purple)" />
+            <div>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Advanced Build Settings</h3>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--portal-muted)' }}>Node runtime, monorepo subfolder, and artifact outputs.</p>
+            </div>
+          </div>
+          <span style={{ fontSize: '13px', color: 'var(--portal-purple)', fontWeight: 600 }}>
+            {showAdvancedBuild ? 'Hide' : 'Configure'} &rarr;
+          </span>
+        </div>
+
+        {showAdvancedBuild && (
+          <div className="onboarding-form" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0edf4' }}>
             <div className="field">
               <span>Sandbox Listening Branch</span>
-              <input type="text" defaultValue="main" disabled={isPipelineLocked} />
-              <small>This branch will automatically deploy to Sandbox on push.</small>
+              <input type="text" defaultValue={game?.repoInfo?.branch || "main"} disabled={isPipelineLocked} />
+              <small>This branch triggers automatic deployment to the Sandbox on push.</small>
             </div>
             
             <div className="field">
               <span>Node.js Version</span>
               <select disabled={isPipelineLocked} style={{ width: '100%', padding: '11px 12px', background: isPipelineLocked ? '#f2f0f3' : '#fbfafc', border: '1px solid #dcd7e0', borderRadius: '9px', fontSize: '12px' }}>
-                <option>20.x (Recommended)</option>
+                <option>20.x (LTS - Recommended)</option>
+                <option>22.x (Current)</option>
                 <option>18.x</option>
               </select>
             </div>
@@ -63,7 +77,7 @@ export function GameSettings(): React.ReactElement {
             <div className="field">
               <span>Monorepo Root Directory</span>
               <input type="text" defaultValue="./" disabled={isPipelineLocked} />
-              <small>If your game is in a subfolder (e.g. packages/client).</small>
+              <small>If your game is inside a package subdirectory (e.g. packages/client).</small>
             </div>
 
             <div className="field">
@@ -74,6 +88,7 @@ export function GameSettings(): React.ReactElement {
             <div className="field--wide">
               <span>Output Directory</span>
               <input type="text" defaultValue="dist" disabled={isPipelineLocked} />
+              <small>Directory uploaded to the Sandbox runner (e.g. dist, build, out).</small>
             </div>
 
             <div className="onboarding-actions" style={{ marginTop: '24px' }}>
@@ -141,3 +156,4 @@ export function GameSettings(): React.ReactElement {
     </div>
   );
 }
+

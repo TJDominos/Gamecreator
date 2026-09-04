@@ -1,0 +1,6 @@
+{
+  "name": "Randseed Developers",
+  "description": "Build Next-Gen AI Games. Launch faster, connect with players, and let real-time feedback shape your next hit.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

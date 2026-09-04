@@ -8,11 +8,13 @@
     "build": "node scripts/generate-version.js && vite build && node scripts/generate-route-html.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "postinstall": "cd vendor/RS && npm install && npm run build",
+    "postinstall": "cd vendor/RS && node style-dictionary.config.js && node scripts/build-css.js",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",
     "d1:migrate:local": "wrangler d1 execute gamecreator-d1 --local --file=./migrations/0001_init.sql",
-    "d1:migrate:remote": "wrangler d1 execute gamecreator-d1 --remote --file=./migrations/0001_init.sql"
+    "d1:migrate:remote": "wrangler d1 execute gamecreator-d1 --remote --file=./migrations/0001_init.sql",
+    "d1:migrate:github:local": "wrangler d1 execute gamecreator-d1 --local --file=./migrations/0002_github_sync.sql",
+    "d1:migrate:github:remote": "wrangler d1 execute gamecreator-d1 --remote --file=./migrations/0002_github_sync.sql"
   },
   "dependencies": {
     "@dfinity/agent": "^3.4.3",
@@ -40,10 +42,12 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260904.1",
     "@types/node": "^22.14.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "tailwindcss": "^4.1.14",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "wrangler": "^4.129.0"
   }
 }

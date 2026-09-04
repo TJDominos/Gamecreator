@@ -1,7 +1,8 @@
 import Markdown from 'react-markdown';
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { MOCK_BOUNTIES } from './bountyData';
+import { MOCK_BOUNTIES, getBountyScores } from './bountyData';
+import { useBountySubscriptions } from './useBountySubscriptions';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Share2, Trophy, Users, CheckCircle2, Target, ExternalLink, AlertCircle } from 'lucide-react';
 
@@ -11,11 +12,14 @@ export function BountyDetail(): React.ReactElement {
   const { bountyId } = useParams();
   const navigate = useNavigate();
   const bounty = MOCK_BOUNTIES.find(b => b.id === bountyId);
-  const [isParticipated, setIsParticipated] = useState(false);
+  const { isSubscribed, subscribe } = useBountySubscriptions();
 
   if (!bounty) {
     return <div style={{ padding: '40px' }}>Bounty not found.</div>;
   }
+
+  const isParticipated = isSubscribed(bounty.id);
+  const scores = getBountyScores(bounty);
 
   const shareUrl = window.location.href;
 
@@ -136,33 +140,67 @@ export function BountyDetail(): React.ReactElement {
                     <Trophy className="w-6 h-6" color="#f59e0b" />
                     {bounty.currency === 'USD' ? '$' : ''}{bounty.prizePool.toLocaleString()} <span className="text-sm font-medium text-[var(--portal-muted)]">{bounty.currency}</span>
                   </div>
+
+                  {(bounty.state === 'ONLINE' || bounty.state === 'CLOSED') && (
+                    <div className="flex items-center gap-6 mt-3 pt-3 border-t border-slate-100">
+                      <div>
+                        <span className="text-[11px] text-[var(--portal-muted)] block">Total Bounty Score</span>
+                        <strong className="text-[14px] text-[var(--portal-purple)] font-semibold">{scores.totalScore}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-[var(--portal-muted)] block">My Game Score</span>
+                        <strong className="text-[14px] text-emerald-600 font-semibold">{scores.myScore}</strong>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
-                <button 
-                  onClick={() => setIsParticipated(!isParticipated)}
-                  className="w-full sm:w-auto justify-center"
-                  style={{
-                    padding: '12px 24px',
-                    borderRadius: '30px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    border: isParticipated ? '1px solid var(--portal-border)' : 'none',
-                    background: isParticipated ? '#f8f9fa' : 'var(--portal-purple)',
-                    color: isParticipated ? 'var(--portal-muted)' : '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.2s',
-                    boxShadow: isParticipated ? 'none' : '0 4px 12px rgba(97, 54, 154, 0.3)'
-                  }}
-                >
-                  {isParticipated ? (
-                    <><CheckCircle2 size={18} /> Participated</>
-                  ) : (
-                    'Participate Now'
-                  )}
-                </button>
+                {isParticipated ? (
+                  <button 
+                    disabled
+                    className="w-full sm:w-auto justify-center"
+                    style={{
+                      padding: '12px 28px',
+                      borderRadius: '30px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      border: '1px solid #a7f3d0',
+                      background: '#ecfdf5',
+                      color: '#047857',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'default',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                    }}
+                    title="You are participating in this bounty"
+                  >
+                    <CheckCircle2 size={18} color="#059669" />
+                    Subscribed
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => subscribe(bounty.id)}
+                    className="w-full sm:w-auto justify-center"
+                    style={{
+                      padding: '12px 28px',
+                      borderRadius: '30px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'var(--portal-purple)',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 12px rgba(97, 54, 154, 0.3)'
+                    }}
+                  >
+                    Participate Now
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -268,21 +306,33 @@ export function BountyDetail(): React.ReactElement {
               </div>
             )}
 
-            {bounty.participants && (
-              <div>
-                <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={18} color="var(--portal-muted)" /> Subscribed ({bounty.participants.length})
-                </h3>
-                <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
-                  {bounty.participants.map((creator, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <img src={creator.avatar} alt={creator.name} className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
-                      <span className="text-[13px] font-medium text-[var(--portal-ink)] truncate">{creator.name}</span>
-                    </div>
-                  ))}
+            {bounty.participants && (() => {
+              const myParticipant = { id: 'me', name: 'AlexTheDev (You)', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AlexTheDev' };
+              const participantList = isParticipated
+                ? [myParticipant, ...bounty.participants.filter(p => p.name !== 'AlexTheDev' && p.id !== 'me')]
+                : bounty.participants.filter(p => p.name !== 'AlexTheDev' && p.id !== 'me');
+
+              return (
+                <div>
+                  <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={18} color="var(--portal-muted)" /> Subscribed ({participantList.length})
+                  </h3>
+                  <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
+                    {participantList.map((creator, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <img src={creator.avatar} alt={creator.name} className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
+                        <span className="text-[13px] font-medium text-[var(--portal-ink)] truncate flex-1">{creator.name}</span>
+                        {creator.id === 'me' && (
+                          <span className="text-[10px] font-semibold bg-purple-50 text-[var(--portal-purple)] px-1.5 py-0.5 rounded border border-purple-200">
+                            You
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
           </div>
         </div>

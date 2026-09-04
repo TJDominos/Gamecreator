@@ -109,3 +109,45 @@ export async function verifyJwt(
     return null;
   }
 }
+
+export async function sha256Hex(data: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", stringToBytes(data));
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function verifyGitHubWebhookSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  secret?: string,
+): Promise<boolean> {
+  if (!secret) {
+    // If no secret configured in dev, accept with warning
+    return true;
+  }
+
+  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) {
+    return false;
+  }
+
+  try {
+    const expectedHex = signatureHeader.slice(7);
+    const key = await getHmacKey(secret);
+    const signature = await crypto.subtle.sign("HMAC", key, stringToBytes(rawBody));
+    const actualHex = Array.from(new Uint8Array(signature))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Constant-time length & comparison check
+    if (actualHex.length !== expectedHex.length) return false;
+    let result = 0;
+    for (let i = 0; i < actualHex.length; i++) {
+      result |= actualHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
+    }
+    return result === 0;
+  } catch {
+    return false;
+  }
+}

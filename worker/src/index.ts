@@ -4,6 +4,7 @@ import type { Env } from "./types";
 import { errorResponse, handleOptionsRequest, jsonResponse } from "./utils/response";
 import { handleAuthRoutes } from "./routes/auth";
 import { handleOrganizationRoutes } from "./routes/organizations";
+import { handleGitHubRoutes } from "./routes/github";
 
 export default {
   async fetch(
@@ -33,12 +34,15 @@ export default {
         );
       }
 
-      // 2. Dispatch to modular route handlers (SSO & Developer Organizations only)
+      // 2. Dispatch to modular route handlers
       const authRes = await handleAuthRoutes(request, env);
       if (authRes) return authRes;
 
       const orgRes = await handleOrganizationRoutes(request, env);
       if (orgRes) return orgRes;
+
+      const ghRes = await handleGitHubRoutes(request, env);
+      if (ghRes) return ghRes;
 
       // 3. Fallback 404
       return errorResponse(`Route not found: ${request.method} ${url.pathname}`, 404, "NOT_FOUND", request, env);

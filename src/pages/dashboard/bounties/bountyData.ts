@@ -52,6 +52,10 @@ export interface Bounty {
   publishedGames?: PublishedGame[];
   winners?: Winner[];
   videoUrl?: string;
+
+  totalScore?: number;
+  myGameName?: string;
+  myGameScore?: number;
 }
 
 const mockParticipants: Creator[] = Array.from({ length: 45 }, (_, i) => ({
@@ -141,7 +145,10 @@ export const MOCK_BOUNTIES: Bounty[] = [
     fullDescription: fullDesc,
     examples: mockExamples,
     participants: mockParticipants,
-    publishedGames: mockPublished
+    publishedGames: mockPublished,
+    totalScore: 97800,
+    myGameName: 'Neon Rush 2026',
+    myGameScore: 60000
   },
   {
     id: "bty_004",
@@ -160,6 +167,97 @@ export const MOCK_BOUNTIES: Bounty[] = [
     examples: mockExamples,
     participants: mockParticipants,
     publishedGames: mockPublished,
-    winners: mockWinners
+    winners: mockWinners,
+    totalScore: 119640,
+    myGameName: 'Neon Rush 2026',
+    myGameScore: 60000
+  },
+  {
+    id: "bty_005",
+    title: "Cyberpunk Roguelike Battle",
+    description: "Build a high-intensity roguelike deckbuilder with fast-paced tactical battles.",
+    state: "ONLINE",
+    category: "Role-Playing",
+    prizePool: 50000,
+    currency: 'WLT',
+    tags: ["#RoguelikeBattle"],
+    subscriptions: 18,
+    onlineGames: 3,
+    deadline: "2026-06-01T00:00:00Z",
+    battleEnd: "2026-09-25T00:00:00Z",
+    fullDescription: fullDesc,
+    examples: mockExamples,
+    participants: mockParticipants,
+    publishedGames: [
+      { creator: mockParticipants[1], gameName: 'Cyber Rogue', prize: '25,000 WLT', uu: 9100, reviewScore: 4.6, performanceScore: 41860 }
+    ],
+    totalScore: 41860
+    // Note: myGameScore is intentionally undefined so it displays "-"
   }
 ];
+
+export interface BountyScores {
+  totalScore: string;
+  myScore: string;
+  myGameName?: string;
+}
+
+/**
+ * Calculates current total bounty scores and my game score.
+ * Rules:
+ * - Only available on ONLINE and CLOSED states.
+ * - If the bounty or the user's game has no scores, "-" is returned.
+ */
+export function getBountyScores(bounty: Bounty, currentUserName?: string): BountyScores {
+  // If not online and not closed, scores do not apply yet
+  if (bounty.state !== 'ONLINE' && bounty.state !== 'CLOSED') {
+    return {
+      totalScore: '-',
+      myScore: '-',
+      myGameName: undefined
+    };
+  }
+
+  // 1. Calculate total bounty score
+  let totalScoreNum = 0;
+  if (typeof bounty.totalScore === 'number' && bounty.totalScore > 0) {
+    totalScoreNum = bounty.totalScore;
+  } else {
+    const list = bounty.state === 'CLOSED'
+      ? (bounty.winners && bounty.winners.length > 0 ? bounty.winners : bounty.publishedGames || [])
+      : (bounty.publishedGames || []);
+    totalScoreNum = list.reduce((sum, item) => sum + (item.performanceScore || 0), 0);
+  }
+
+  // 2. Calculate my game score
+  let myScoreNum: number | undefined = bounty.myGameScore;
+  let myGameName = bounty.myGameName;
+
+  if (myScoreNum === undefined) {
+    const allGames = [...(bounty.publishedGames || []), ...(bounty.winners || [])];
+    const match = allGames.find(g =>
+      g.creator.name === 'AlexTheDev' ||
+      (currentUserName && g.creator.name.toLowerCase() === currentUserName.toLowerCase())
+    );
+    if (match && typeof match.performanceScore === 'number' && match.performanceScore > 0) {
+      myScoreNum = match.performanceScore;
+      myGameName = match.gameName;
+    }
+  }
+
+  return {
+    totalScore: totalScoreNum > 0 ? totalScoreNum.toLocaleString() : '-',
+    myScore: myScoreNum !== undefined && myScoreNum > 0 ? myScoreNum.toLocaleString() : '-',
+    myGameName: myScoreNum !== undefined && myScoreNum > 0 ? myGameName : undefined
+  };
+}
+
+/**
+ * Checks whether a creator can unsubscribe from a bounty.
+ * Creators can only unsubscribe on bounties with open status ('OPEN') and development stages ('RUNNING').
+ * Once a bounty reaches 'ONLINE' (Traffic Battle) or 'CLOSED' (Settled), unsubscription is locked.
+ */
+export function canUnsubscribeFromBounty(state: BountyState): boolean {
+  return state === 'OPEN' || state === 'RUNNING';
+}
+

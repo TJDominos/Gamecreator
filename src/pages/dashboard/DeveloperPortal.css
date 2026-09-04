@@ -170,16 +170,25 @@
 
 .sidebar-help {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   padding: 13px;
-  gap: 10px;
+  gap: 12px;
   color: rgba(255, 255, 255, 0.6);
   border-top: 1px solid rgba(255, 255, 255, 0.09);
 }
 
-.sidebar-help > svg {
+.sidebar-help-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sidebar-help-icon {
   width: 19px;
+  height: 19px;
+  margin-top: 1px;
   color: #65c8bf;
+  flex-shrink: 0;
 }
 
 .sidebar-help strong,
@@ -191,6 +200,35 @@
 .sidebar-help a {
   margin-top: 2px;
   color: #cba8f3;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.sidebar-help a:hover {
+  color: #e0d0fa;
+}
+
+.sidebar-help a.sidebar-support-link {
+  display: flex;
+  align-items: center;
+  margin-top: 0;
+  color: #cba8f3;
+  font-size: 11px;
+  word-break: break-all;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.sidebar-help a.sidebar-support-link .sidebar-help-icon {
+  margin-top: 0;
+}
+
+.sidebar-help a.sidebar-support-link:hover {
+  color: #e0d0fa;
+}
+
+.sidebar-help a.sidebar-support-link:hover .sidebar-help-icon {
+  color: #7ce5dc;
 }
 
 .portal-main {

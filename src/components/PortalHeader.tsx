@@ -9,7 +9,7 @@ export interface PortalHeaderProps {
 }
 
 export function PortalHeader({ pageName, onMenuClick }: PortalHeaderProps): React.ReactElement {
-  const { accountId, profile, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [accountOpen, setAccountOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -52,7 +52,6 @@ export function PortalHeader({ pageName, onMenuClick }: PortalHeaderProps): Reac
           <span>{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" /> : "D"}</span>
           <span>
             <strong>{profile?.username || "Creator"}</strong>
-            <small>{accountId?.slice(0, 14)}</small>
           </span>
           <ChevronDown />
         </button>

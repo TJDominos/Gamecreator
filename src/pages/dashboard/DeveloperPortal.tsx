@@ -14,6 +14,7 @@ import {
   ChevronDown,
   CircleDollarSign,
   Gamepad2,
+  Headset,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -43,7 +44,7 @@ import { OnboardingHeader } from "../../components/OnboardingHeader";
 import "./DeveloperPortal.css";
 
 const navigation = [
-  { to: "/dashboard", end: true, label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", end: true, label: "My Games", icon: Gamepad2 },
   { to: "/dashboard/bounties", label: "My Bounties", icon: Target },
   { to: "/dashboard/data", label: "Users & Orders", icon: Users },
   { to: "/dashboard/revenue", label: "Revenue", icon: CircleDollarSign },
@@ -334,11 +335,21 @@ function PortalShell(): React.ReactElement {
           ))}
         </nav>
         <div className="sidebar-help">
-          <BookOpen />
-          <div>
-            <strong>Integration & APIs</strong>
-            <Link to="/guides">Creator Guides</Link>
+          <div className="sidebar-help-row">
+            <BookOpen className="sidebar-help-icon" />
+            <div>
+              <strong>Integration & APIs</strong>
+              <Link to="/guides">Creator Guides</Link>
+            </div>
           </div>
+          <a
+            href="mailto:Support@randseed.org"
+            className="sidebar-help-row sidebar-support-link"
+            title="Email Creator Support"
+          >
+            <Headset className="sidebar-help-icon" />
+            <span>Support@randseed.org</span>
+          </a>
         </div>
       </aside>
       {menuOpen && (
@@ -404,7 +415,7 @@ function Dashboard(): React.ReactElement {
     <div className="dashboard-page">
       <section className="dashboard-welcome">
         <div>
-          <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>Dashboard</h1>
+          <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>My Games</h1>
           <p>Connect, test, publish, and grow your web games from one place.</p>
         </div>
         <button className="primary-action" onClick={() => {

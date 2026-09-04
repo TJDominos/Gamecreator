@@ -22,7 +22,11 @@ export function TipTapEditor({ value, onChange, placeholder }: TipTapEditorProps
     ],
     content: value,
     onUpdate: ({ editor }) => {
-      onChange(editor.storage.markdown.getMarkdown());
+      const storage = editor.storage as any;
+      const md = typeof storage.markdown?.getMarkdown === 'function' 
+        ? storage.markdown.getMarkdown() 
+        : editor.getText();
+      onChange(md);
     },
   });
 

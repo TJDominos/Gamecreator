@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { GitCommit, ExternalLink, ShieldCheck, Globe, Clock, Rocket, Settings2 } from "lucide-react";
-import { useOutletContext } from "react-router";
+import { GitCommit, ExternalLink, ShieldCheck, Globe, Clock, Rocket, Settings2, Github, Play } from "lucide-react";
+import { useOutletContext, useParams, Link } from "react-router";
 import { GameStatus, StatusLabels } from "./GameConsole";
+import { getGameById } from "./gameData";
 
 const MOCK_DEPLOYMENTS = [
   { id: "dep_003", commit: "a4f29cb", message: "Fix collision bugs", date: "2 mins ago", status: "Sandbox", rating: "4.8" },
@@ -12,6 +13,9 @@ const MOCK_DEPLOYMENTS = [
 export function GameDeployments(): React.ReactElement {
   const [privateLinkModal, setPrivateLinkModal] = useState<string | null>(null);
   const { status, setStatus } = useOutletContext<{ status: GameStatus, setStatus: (s: GameStatus) => void }>();
+  const { gameId } = useParams();
+  const game = getGameById(gameId || 'g_101');
+  const repoInfo = game?.repoInfo;
 
   return (
     <div>
@@ -34,6 +38,31 @@ export function GameDeployments(): React.ReactElement {
           ))}
         </select>
       </div>
+
+      {/* Connected GitHub & Sandbox Quick Bar */}
+      {repoInfo && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '14px 18px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Github size={18} color="#111827" />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{repoInfo.repository}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 8px', background: '#f3f4f6', borderRadius: '10px', fontSize: '12px', color: '#4b5563' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6' }} />
+              {repoInfo.branch}
+            </span>
+            <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 500, background: '#ecfdf5', padding: '2px 8px', borderRadius: '10px' }}>
+              Automatic GitHub Actions sync active
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Link to={`/dashboard/games/${gameId}/settings`} style={{ fontSize: '13px', color: 'var(--portal-purple)', textDecoration: 'none', fontWeight: 500 }}>
+              Sync Settings &rarr;
+            </Link>
+            <a href={`https://randseed.org/sandbox/${gameId}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#111827', color: '#fff', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
+              <Play size={12} fill="#fff" /> Sandbox Link
+            </a>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>

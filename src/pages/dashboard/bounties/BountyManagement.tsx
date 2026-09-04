@@ -31,7 +31,7 @@ export function BountyManagement(): React.ReactElement {
     releaseDate: '',
     distributionDate: '',
     settlementRules: 'Default Distribution Algorithm',
-    examples: [{ type: 'image', url: '', thumbnail: '' }]
+    examples: [{ type: 'image', name: '', url: '', thumbnail: '' }] as { type: string; name?: string; url: string; thumbnail: string; }[]
   });
 
   const handleEdit = (b: Bounty) => {

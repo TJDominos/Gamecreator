@@ -26,6 +26,7 @@ import { ArrowRight,
   Target,
 Ghost, Sword, Crown, Unlock } from "lucide-react";
 import Footer from "../../components/Footer";
+import { SiteHeader } from "../../components/SiteHeader";
 import { WalletConnectModal } from "../../components/WalletConnectModal";
 import { useAuth } from "../../auth/AuthContext";
 import { GameCard } from "../../components/GameCard";
@@ -325,10 +326,6 @@ const showcaseGames = [
   { title: "Vault 9", genre: "Adventure", creator: "Quest Labs", tone: "rose", icon: Layers3 },
 ];
 
-import { SiteHeader } from "../../components/SiteHeader";
-
-
-
 function TachometerWidget() {
   const [rpm, setRpm] = React.useState(0);
   
@@ -484,7 +481,7 @@ const Dice3D = ({ color, dotColor }: { color: string, dotColor: string }) => {
 export default function DeveloperLanding(): React.ReactElement {
   const navigate = useNavigate();
   const [isVnBtnActive, setIsVnBtnActive] = useState(false);
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, signIn } = useAuth();
   const [isWalletConnectModalOpen, setIsWalletConnectModalOpen] = useState(false);
 
   const openSignInModal = () => {
@@ -495,8 +492,11 @@ export default function DeveloperLanding(): React.ReactElement {
     }
   };
 
-  const handleWalletConnectClose = () => {
+  const handleWalletConnectClose = (verifiedId?: string) => {
     setIsWalletConnectModalOpen(false);
+    if (verifiedId) {
+      signIn(verifiedId);
+    }
   };
 
   return (

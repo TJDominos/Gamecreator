@@ -1,7 +1,7 @@
 import React from "react";
-import { NavLink, Outlet, useParams, useLocation } from "react-router";
-import { ArrowLeft, LayoutDashboard, Rocket, MessageSquare, Settings, Edit2, Check, Lock } from "lucide-react";
-import { Link } from "react-router";
+import { NavLink, Outlet, useParams, useLocation, Link } from "react-router";
+import { ArrowLeft, LayoutDashboard, Rocket, Settings, Edit2, Check, Lock, Github, CheckCircle2 } from "lucide-react";
+import { getGameById } from "./gameData";
 
 export type GameStatus = 'DRAFT' | 'DEVELOPMENT' | 'PRIVATE_TESTING' | 'PENDING_REVIEW' | 'REJECTED' | 'APPROVED' | 'PUBLIC_ACTIVE' | 'MAINTENANCE' | 'ARCHIVED';
 
@@ -20,12 +20,14 @@ export const StatusLabels: Record<GameStatus, string> = {
 export function GameConsole(): React.ReactElement {
   const { gameId } = useParams();
   const location = useLocation();
-  const initialName = location.state?.gameName || (gameId === "g_101" ? "Neon Dash" : gameId === "g_102" ? "Space Miner" : "New Game");
+  const game = getGameById(gameId || 'g_101');
+  const repoInfo = game?.repoInfo;
+  const initialName = location.state?.gameName || (game ? game.name : "New Game");
   
   const [gameName, setGameName] = React.useState(initialName);
   const [isEditing, setIsEditing] = React.useState(false);
   const [tempName, setTempName] = React.useState(initialName);
-  const [status, setStatus] = React.useState<GameStatus>('DEVELOPMENT');
+  const [status, setStatus] = React.useState<GameStatus>(game?.status || 'DEVELOPMENT');
 
   const isMetaLocked = ['PENDING_REVIEW', 'APPROVED', 'PUBLIC_ACTIVE', 'MAINTENANCE', 'ARCHIVED'].includes(status);
 
@@ -44,40 +46,98 @@ export function GameConsole(): React.ReactElement {
         <Link to="/dashboard/games" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--portal-muted)', textDecoration: 'none', marginBottom: '16px' }}>
           <ArrowLeft size={16} /> Back to Games
         </Link>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {isEditing ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  value={tempName} 
-                  onChange={(e) => setTempName(e.target.value)} 
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                  style={{ fontSize: '28px', fontWeight: 700, padding: '4px 8px', border: '2px solid var(--portal-purple)', borderRadius: '8px', outline: 'none', background: '#fff', width: '250px' }} 
-                />
-                <button onClick={handleSaveName} style={{ background: 'var(--portal-purple)', color: '#fff', border: 'none', borderRadius: '8px', width: '36px', height: '36px', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
-                  <Check size={18} />
-                </button>
-              </div>
-            ) : (
-              <h1 style={{ fontSize: '28px', margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {gameName}
-                {isMetaLocked ? (
-                  <div title="Name editing is locked in current status" style={{ color: '#e53e3e', display: 'grid', placeItems: 'center', padding: '4px' }}>
-                    <Lock size={16} />
-                  </div>
-                ) : (
-                  <button onClick={() => setIsEditing(true)} style={{ background: 'transparent', border: 'none', color: 'var(--portal-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: '4px' }}>
-                    <Edit2 size={16} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {isEditing ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input 
+                    type="text" 
+                    value={tempName} 
+                    onChange={(e) => setTempName(e.target.value)} 
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                    style={{ fontSize: '28px', fontWeight: 700, padding: '4px 8px', border: '2px solid var(--portal-purple)', borderRadius: '8px', outline: 'none', background: '#fff', width: '250px' }} 
+                  />
+                  <button onClick={handleSaveName} style={{ background: 'var(--portal-purple)', color: '#fff', border: 'none', borderRadius: '8px', width: '36px', height: '36px', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+                    <Check size={18} />
                   </button>
-                )}
-              </h1>
+                </div>
+              ) : (
+                <h1 style={{ fontSize: '28px', margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {gameName}
+                  {isMetaLocked ? (
+                    <div title="Name editing is locked in current status" style={{ color: '#e53e3e', display: 'grid', placeItems: 'center', padding: '4px' }}>
+                      <Lock size={16} />
+                    </div>
+                  ) : (
+                    <button onClick={() => setIsEditing(true)} style={{ background: 'transparent', border: 'none', color: 'var(--portal-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: '4px' }}>
+                      <Edit2 size={16} />
+                    </button>
+                  )}
+                </h1>
+              )}
+              <span className="status-pill" style={{ background: '#f2f0f3', color: 'var(--portal-ink)', border: '1px solid #e5e2e8', fontWeight: 600 }}>
+                {StatusLabels[status]}
+              </span>
+            </div>
+
+            {/* Connected Git repo information bar */}
+            {repoInfo && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', fontSize: '13px', flexWrap: 'wrap' }}>
+                <a 
+                  href={`https://github.com/${repoInfo.repository}`} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#111827', fontWeight: 600, textDecoration: 'none' }}
+                  title="Open connected repository on GitHub"
+                >
+                  <Github size={15} />
+                  <span>{repoInfo.repository}</span>
+                </a>
+
+                <span 
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px', 
+                    padding: '2px 8px', 
+                    background: '#f3f4f6', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px', 
+                    fontSize: '12px', 
+                    color: '#374151',
+                    fontWeight: 500 
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6' }} />
+                  {repoInfo.branch}
+                </span>
+
+                <Link
+                  to={`/dashboard/games/${gameId}/settings`}
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px', 
+                    color: '#16a34a', 
+                    fontSize: '12px', 
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    background: '#ecfdf5',
+                    border: '1px solid #d1fae5',
+                    padding: '2px 8px',
+                    borderRadius: '12px'
+                  }}
+                  title="GitHub & Sandbox are in sync. Click to view Sync settings"
+                >
+                  <CheckCircle2 size={13} />
+                  <span>In sync · {repoInfo.lastCommitSha}</span>
+                </Link>
+              </div>
             )}
-            <span className="status-pill" style={{ background: '#f2f0f3', color: 'var(--portal-ink)', border: '1px solid #e5e2e8', fontWeight: 600 }}>
-              {StatusLabels[status]}
-            </span>
           </div>
+
           <a href={`https://randseed.org/sandbox/${gameId}`} target="_blank" rel="noreferrer" className="primary-action" style={{ textDecoration: 'none' }}>
             Open Sandbox
           </a>

@@ -270,6 +270,28 @@ export function AuthProvider({
 
   const signIn = useCallback((nextAccountId: string) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(nextAccountId));
+    const profiles = readProfiles();
+    if (!profiles[nextAccountId]) {
+      const defaultProfile: UserProfile = {
+        avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${nextAccountId}`,
+        username: nextAccountId.startsWith("0x")
+          ? `${nextAccountId.substring(0, 6)}...${nextAccountId.substring(nextAccountId.length - 4)}`
+          : nextAccountId,
+        isVerified: true,
+        hasStake: false,
+        lastActive: "Just now",
+        bio: "",
+        location: "",
+        joinedDate: new Date().toISOString().split("T")[0],
+        role: "creator",
+        email: nextAccountId.includes("@") ? nextAccountId : `${nextAccountId.substring(0, 8)}@web3.user`,
+        isEmailVerified: true,
+      };
+      profiles[nextAccountId] = defaultProfile;
+      localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+      localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(defaultProfile));
+      setProfile(defaultProfile);
+    }
     setAccountId(nextAccountId);
   }, []);
 

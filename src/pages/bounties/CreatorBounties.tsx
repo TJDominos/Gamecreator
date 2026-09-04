@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Gamepad2, LayoutDashboard, Dices, Music, Puzzle, Swords, Building2, Trophy, Map, Lightbulb, Type, Users, LayoutGrid, CheckCircle2, Lock, Activity, Target } from 'lucide-react';
 import { MOCK_BOUNTIES } from '../dashboard/bounties/bountyData';
+import { useBountySubscriptions } from '../dashboard/bounties/useBountySubscriptions';
 import { SiteHeader } from '../../components/SiteHeader';
 import { CategorySidebar } from '../../components/CategorySidebar';
 import '../guides/CreatorGuide.css';
@@ -18,6 +19,7 @@ export default function CreatorBounties() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState<string>(searchParams.get('category') || 'All');
   const [activeStatus, setActiveStatus] = useState<string>('All');
+  const { isSubscribed, subscribe } = useBountySubscriptions();
   
   useEffect(() => {
     const categoryQuery = searchParams.get('category');
@@ -147,6 +149,7 @@ export default function CreatorBounties() {
                 const s = StateStyles[bounty.state];
                 const SIcon = s.icon;
                 const isOpen = bounty.state === 'OPEN';
+                const isSub = isSubscribed(bounty.id);
 
                 return (
                   <div 
@@ -164,11 +167,16 @@ export default function CreatorBounties() {
                     </div>
                     
                     <div className="bounty-card-content">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
                         <span style={{ background: s.bg, color: s.color, padding: '4px 10px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <SIcon size={14} /> {s.label}
                         </span>
                         <span style={{ fontSize: '13px', color: 'var(--portal-muted)', fontWeight: 500 }}>{bounty.category}</span>
+                        {isSub && (
+                          <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle2 size={12} /> Subscribed
+                          </span>
+                        )}
                       </div>
                       <h2 style={{ fontSize: '20px', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {bounty.title}
@@ -198,26 +206,59 @@ export default function CreatorBounties() {
                         {renderTimeStatus(bounty)}
                       </div>
 
-                      <button
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          borderRadius: '8px',
-                          border: 'none',
-                          fontSize: '14px',
-                          fontWeight: 600,
-                          cursor: isOpen ? 'pointer' : 'not-allowed',
-                          background: isOpen ? 'var(--portal-ink)' : '#f2f0f3',
-                          color: isOpen ? '#fff' : '#a1a1aa',
-                          transition: 'background-color 0.2s',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/bounties/${bounty.id}`);
-                        }}
-                      >
-                        Participate Now
-                      </button>
+                      {isSub ? (
+                        <button
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid #a7f3d0',
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            background: '#ecfdf5',
+                            color: '#047857',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            transition: 'all 0.2s',
+                          }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            navigate(`/bounties/${bounty.id}`);
+                          }}
+                          title="You are subscribed. Click to view details"
+                        >
+                          <CheckCircle2 size={16} /> Subscribed
+                        </button>
+                      ) : (
+                        <button
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            background: isOpen ? 'var(--portal-purple)' : 'var(--portal-ink)',
+                            color: '#fff',
+                            transition: 'all 0.2s',
+                            boxShadow: isOpen ? '0 4px 12px rgba(97, 54, 154, 0.25)' : 'none',
+                          }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (isOpen) {
+                              subscribe(bounty.id);
+                            } else {
+                              navigate(`/bounties/${bounty.id}`);
+                            }
+                          }}
+                        >
+                          {isOpen ? 'Participate Now' : 'View Details'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
