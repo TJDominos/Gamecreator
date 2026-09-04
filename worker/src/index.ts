@@ -44,7 +44,12 @@ export default {
       const ghRes = await handleGitHubRoutes(request, env);
       if (ghRes) return ghRes;
 
-      // 3. Fallback 404
+      // 3. Fallback to Frontend static assets (Vite React SPA)
+      if (env.ASSETS && !url.pathname.startsWith("/api/")) {
+        return await env.ASSETS.fetch(request);
+      }
+
+      // 4. Fallback 404 for unmatched API routes
       return errorResponse(`Route not found: ${request.method} ${url.pathname}`, 404, "NOT_FOUND", request, env);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Internal Server Error";
