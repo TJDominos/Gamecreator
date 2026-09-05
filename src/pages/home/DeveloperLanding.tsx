@@ -27,7 +27,6 @@ import { ArrowRight,
 Ghost, Sword, Crown, Unlock } from "lucide-react";
 import Footer from "../../components/Footer";
 import { SiteHeader } from "../../components/SiteHeader";
-import { WalletConnectModal } from "../../components/WalletConnectModal";
 import { useAuth } from "../../auth/AuthContext";
 import { GameCard } from "../../components/GameCard";
 import "./DeveloperLanding.css";
@@ -481,21 +480,21 @@ const Dice3D = ({ color, dotColor }: { color: string, dotColor: string }) => {
 export default function DeveloperLanding(): React.ReactElement {
   const navigate = useNavigate();
   const [isVnBtnActive, setIsVnBtnActive] = useState(false);
-  const { isSignedIn, signIn } = useAuth();
-  const [isWalletConnectModalOpen, setIsWalletConnectModalOpen] = useState(false);
+  const { isSignedIn, signIn, signInWithSSO } = useAuth();
+  
+  useEffect(() => {
+    // If not signed in and no sso_token in URL (handled by AuthContext),
+    // automatically redirect to main site login
+    if (!isSignedIn && !window.location.search.includes("sso_token")) {
+      signInWithSSO();
+    }
+  }, [isSignedIn, signInWithSSO]);
 
   const openSignInModal = () => {
     if (isSignedIn) {
       navigate(getPortalPath(true));
     } else {
-      setIsWalletConnectModalOpen(true);
-    }
-  };
-
-  const handleWalletConnectClose = (verifiedId?: string) => {
-    setIsWalletConnectModalOpen(false);
-    if (verifiedId) {
-      signIn(verifiedId);
+      signInWithSSO();
     }
   };
 
@@ -930,11 +929,6 @@ export default function DeveloperLanding(): React.ReactElement {
       </main>
 
       <Footer />
-
-      <WalletConnectModal
-        isOpen={isWalletConnectModalOpen}
-        onClose={handleWalletConnectClose}
-      />
     </div>
   );
 }

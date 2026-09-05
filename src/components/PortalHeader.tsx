@@ -33,7 +33,7 @@ export function PortalHeader({ pageName, onMenuClick }: PortalHeaderProps): Reac
   }
 
   return (
-    <header className="portal-topbar">
+    <header className="portal-topbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <button
           className="portal-menu-button"

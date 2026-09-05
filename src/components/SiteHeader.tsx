@@ -2,7 +2,6 @@ import React, { useRef, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { BecomeCreatorModal } from "./BecomeCreatorModal";
-import { WalletConnectModal } from "./WalletConnectModal";
 import { Menu, X } from "lucide-react";
 import "../pages/home/DeveloperLanding.css";
 
@@ -11,11 +10,10 @@ function getPortalPath(hasOrganization: boolean): string {
 }
 
 export function SiteHeader(): React.ReactElement {
-  const { isSignedIn, profile, signInWithSSO, mockSignIn } = useAuth();
+  const { isSignedIn, profile, signInWithSSO } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
-  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const signInButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -28,7 +26,7 @@ export function SiteHeader(): React.ReactElement {
       }
       return;
     }
-    setIsWalletModalOpen(true);
+    signInWithSSO();
   }
 
   return (
@@ -103,10 +101,6 @@ export function SiteHeader(): React.ReactElement {
       <BecomeCreatorModal 
         isOpen={isBecomeCreatorModalOpen}
         onClose={() => setBecomeCreatorModalOpen(false)}
-      />
-      <WalletConnectModal 
-        isOpen={isWalletModalOpen}
-        onClose={() => setIsWalletModalOpen(false)}
       />
     </>
   );
