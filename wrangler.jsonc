@@ -14,6 +14,12 @@
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application"
 	},
+	"routes": [
+		{
+			"pattern": "devcreator.randseed.org",
+			"custom_domain": true
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -24,7 +30,7 @@
 	],
 	"vars": {
 		"MAIN_SITE_URL": "https://devcreator.randseed.org",
-		"GITHUB_APP_SLUG": "randseed-game-engine",
+		"GITHUB_APP_SLUG": "RDcreatordev",
 		"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
 		"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org,https://creator.randseed.org,https://test.randseed.org,https://randseed.org"
 	}

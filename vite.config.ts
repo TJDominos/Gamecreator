@@ -174,6 +174,88 @@ function mockApiPlugin(): Plugin {
           );
         }
 
+        if (pathname === "/api/github/install" && method === "GET") {
+          res.statusCode = 200;
+          return res.end(
+            JSON.stringify({
+              success: true,
+              app_slug: "RDcreatordev",
+              install_url: "https://github.com/apps/RDcreatordev/installations/new",
+            }),
+          );
+        }
+
+        const repoMatch = pathname.match(/^\/api\/games\/([^/]+)\/repo(\/.*)?$/);
+        if (repoMatch) {
+          const gameId = decodeURIComponent(repoMatch[1]);
+          const sub = repoMatch[2] || "";
+
+          if (method === "GET" && sub === "") {
+            res.statusCode = 200;
+            return res.end(
+              JSON.stringify({
+                success: true,
+                repo_info: {
+                  repository: "TJDominos/Gamecreator",
+                  branch: "main",
+                  lastCommitSha: "a4f29cb",
+                  lastCommitMessage: "Fix collision bugs and particle effects",
+                  lastSyncedAt: "2 mins ago",
+                  isSynced: true,
+                  syncMethod: "github_action",
+                  sandboxUrl: `https://randseed.org/sandbox/${gameId}`,
+                },
+              }),
+            );
+          }
+
+          if (method === "POST" && sub === "/link") {
+            const body = await getBody();
+            res.statusCode = 200;
+            return res.end(
+              JSON.stringify({
+                success: true,
+                message: "Repository successfully linked via RDcreatordev!",
+                binding: {
+                  game_id: gameId,
+                  repository: body?.repository || "TJDominos/Gamecreator",
+                  branch: body?.branch || "main",
+                  sandbox_url: `https://randseed.org/sandbox/${gameId}`,
+                  api_token: `rs_live_${Math.random().toString(36).substring(2)}`,
+                },
+              }),
+            );
+          }
+
+          if (method === "POST" && sub === "/unlink") {
+            res.statusCode = 200;
+            return res.end(
+              JSON.stringify({
+                success: true,
+                message: `Repository unlinked from game ${gameId}`,
+              }),
+            );
+          }
+        }
+
+        const syncMatch = pathname.match(/^\/api\/games\/([^/]+)\/sync-status$/);
+        if (syncMatch && method === "GET") {
+          const gameId = decodeURIComponent(syncMatch[1]);
+          res.statusCode = 200;
+          return res.end(
+            JSON.stringify({
+              success: true,
+              game_id: gameId,
+              is_synced: true,
+              last_synced_at: new Date().toISOString(),
+              latest_commit: "c8e170f",
+              commit_message: "Update player physics and sandbox camera boundaries",
+              sandbox_url: `https://randseed.org/sandbox/${gameId}`,
+              message: "GitHub (RDcreatordev) & RandSeed Sandbox are currently in sync",
+            }),
+          );
+        }
+
         // Generic fallback for any other API route
         res.statusCode = 200;
         return res.end(JSON.stringify({ success: true }));

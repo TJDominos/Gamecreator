@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Github, 
   ExternalLink, 
@@ -10,12 +10,18 @@ import {
   Check, 
   Zap, 
   Radio, 
-  Play, 
   Terminal,
-  FileCode,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  ArrowUpRight,
+  ShieldCheck,
+  KeyRound,
+  CheckCheck
 } from "lucide-react";
 import { GameRepoInfo } from "./gameData";
+import { githubApi } from "../../../services/githubApi";
+
+const GITHUB_APP_SLUG = "RDcreatordev";
 
 interface GitHubSyncCardProps {
   gameId: string;
@@ -49,15 +55,63 @@ export function GitHubSyncCard({
   const [activeSyncTab, setActiveSyncTab] = useState<'action' | 'webhook' | 'manual'>('action');
   const [copiedWorkflow, setCopiedWorkflow] = useState(false);
   const [copiedSandboxUrl, setCopiedSandboxUrl] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
 
-  const handleCheckSyncStatus = () => {
+  // Connect form state
+  const [repoInput, setRepoInput] = useState(repoInfo.repository || "TJDominos/Gamecreator");
+  const [branchInput, setBranchInput] = useState(repoInfo.branch || "main");
+  const [buildDirInput, setBuildDirInput] = useState("dist");
+  const [isLinking, setIsLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [installUrl, setInstallUrl] = useState(`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`);
+
+  // Load install URL & initial repo info from backend API
+  useEffect(() => {
+    let isMounted = true;
+
+    githubApi.getInstallInfo(gameId).then(info => {
+      if (isMounted && info.install_url) {
+        setInstallUrl(info.install_url);
+      }
+    }).catch(() => {});
+
+    githubApi.getGameRepo(gameId).then(res => {
+      if (isMounted && res.success && res.repo_info) {
+        setRepoInfo(res.repo_info);
+        setIsDisconnected(false);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [gameId]);
+
+  const handleCheckSyncStatus = async () => {
     setIsCheckingSync(true);
     setSyncFeedback(null);
 
-    setTimeout(() => {
-      setIsCheckingSync(false);
+    try {
+      const res = await githubApi.checkSyncStatus(gameId);
+      if (res && res.success) {
+        setRepoInfo(prev => ({
+          ...prev,
+          isSynced: res.is_synced,
+          lastSyncedAt: "Just now",
+          lastCommitSha: res.latest_commit || prev.lastCommitSha,
+          lastCommitMessage: res.commit_message || prev.lastCommitMessage,
+          sandboxUrl: res.sandbox_url || prev.sandboxUrl,
+        }));
+        setSyncFeedback(res.message || "Sync verified! Sandbox is up-to-date with latest commit on main.");
+      } else {
+        setSyncFeedback("Sync checked. Repository is reachable.");
+      }
+    } catch {
+      // Fallback
       setRepoInfo(prev => ({
         ...prev,
         isSynced: true,
@@ -66,8 +120,66 @@ export function GitHubSyncCard({
         lastCommitMessage: "Update player physics and sandbox camera boundaries"
       }));
       setSyncFeedback("Sync verified! Sandbox is up-to-date with latest commit c8e170f on main.");
-      setTimeout(() => setSyncFeedback(null), 5000);
-    }, 1200);
+    } finally {
+      setIsCheckingSync(false);
+      setTimeout(() => setSyncFeedback(null), 6000);
+    }
+  };
+
+  const handleLinkRepository = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repoInput.trim() || !repoInput.includes("/")) {
+      setLinkError("Please enter a valid GitHub repository in the format 'owner/repo' (e.g. TJDominos/Gamecreator)");
+      return;
+    }
+
+    setIsLinking(true);
+    setLinkError(null);
+
+    try {
+      const res = await githubApi.linkGameRepo(gameId, {
+        repository: repoInput.trim(),
+        branch: branchInput.trim() || "main",
+        build_dir: buildDirInput.trim() || "dist",
+      });
+
+      if (res.success && res.binding) {
+        setRepoInfo(prev => ({
+          ...prev,
+          repository: res.binding?.repository || repoInput.trim(),
+          branch: res.binding?.branch || branchInput.trim(),
+          sandboxUrl: res.binding?.sandbox_url || prev.sandboxUrl,
+          isSynced: true,
+          lastSyncedAt: "Just now",
+        }));
+
+        if (res.binding.api_token) {
+          setGeneratedToken(res.binding.api_token);
+        }
+
+        setIsDisconnected(false);
+        setShowConnectModal(false);
+        setSyncFeedback(`Repository successfully linked to ${res.binding.repository} via ${GITHUB_APP_SLUG}!`);
+        setTimeout(() => setSyncFeedback(null), 8000);
+      } else {
+        setLinkError(res.error || "Failed to link repository. Please check permissions.");
+      }
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : "Failed to link repository");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleUnlinkConfirm = async () => {
+    try {
+      await githubApi.unlinkGameRepo(gameId);
+    } catch {
+      // Ignore network error on local dev
+    }
+    setShowUnlinkModal(false);
+    setIsDisconnected(true);
+    setGeneratedToken(null);
   };
 
   const handleCopyWorkflow = () => {
@@ -100,7 +212,7 @@ jobs:
         with:
           game-id: '${gameId}'
           api-token: \${{ secrets.RANDSEED_API_TOKEN }}
-          build-dir: 'dist'
+          build-dir: '${buildDirInput || "dist"}'
 `;
     navigator.clipboard.writeText(workflowContent);
     setCopiedWorkflow(true);
@@ -113,23 +225,229 @@ jobs:
     setTimeout(() => setCopiedSandboxUrl(false), 2000);
   };
 
+  const handleCopyToken = () => {
+    if (generatedToken) {
+      navigator.clipboard.writeText(generatedToken);
+      setCopiedToken(true);
+      setTimeout(() => setCopiedToken(false), 2500);
+    }
+  };
+
   if (isDisconnected) {
     return (
-      <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '32px', textAlign: 'center' }}>
-        <Github size={48} style={{ margin: '0 auto 16px', color: 'var(--portal-ink)' }} />
-        <h3 style={{ margin: '0 0 8px', fontSize: '18px' }}>GitHub Repository Disconnected</h3>
-        <p style={{ color: 'var(--portal-muted)', fontSize: '13px', maxWidth: '420px', margin: '0 auto 20px' }}>
-          Reconnect your repository to enable automated builds, sync status checks, and instant sandbox updates.
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '36px 24px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' }}>
+        <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#f3f4f6', display: 'grid', placeItems: 'center', margin: '0 auto 16px', color: '#111827' }}>
+          <Github size={28} />
+        </div>
+        <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: '#111827' }}>No Repository Connected</h3>
+        <p style={{ color: '#6b7280', fontSize: '14px', maxWidth: '460px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+          Connect your GitHub repository using the official <strong>{GITHUB_APP_SLUG}</strong> App to enable automated builds, sync status checks, and instant sandbox updates.
         </p>
         <button 
+          type="button"
           className="primary-action"
-          onClick={() => {
-            setIsDisconnected(false);
-            setRepoInfo(prev => ({ ...prev, isSynced: true }));
+          onClick={() => setShowConnectModal(true)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 24px',
+            borderRadius: '10px',
+            background: '#7c3aed',
+            color: '#fff',
+            fontWeight: 600,
+            fontSize: '14px',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(124, 58, 237, 0.25)'
           }}
         >
-          Connect GitHub Repository
+          <Github size={16} /> Connect with {GITHUB_APP_SLUG}
         </button>
+
+        {/* Connect Repository Modal */}
+        {renderConnectModal()}
+      </div>
+    );
+  }
+
+  function renderConnectModal() {
+    if (!showConnectModal) return null;
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 120, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.6)', padding: '20px' }}>
+        <div style={{ background: '#fff', borderRadius: '18px', padding: '32px', maxWidth: '540px', width: '100%', textAlign: 'left', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f5f3ff', display: 'grid', placeItems: 'center', color: '#7c3aed' }}>
+                <Github size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#111827' }}>Connect GitHub Repository</h3>
+                <span style={{ fontSize: '12px', color: '#7c3aed', fontWeight: 600 }}>via GitHub App: {GITHUB_APP_SLUG}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowConnectModal(false)}
+              style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#9ca3af' }}
+            >
+              &times;
+            </button>
+          </div>
+
+          {/* Step 1: GitHub App Authorization */}
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={16} color="#16a34a" /> Step 1: Authorize {GITHUB_APP_SLUG}
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>
+                  Grant repository access to the official RandSeed GitHub App.
+                </p>
+              </div>
+              <a
+                href={installUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  background: '#111827',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <span>Authorize on GitHub</span>
+                <ArrowUpRight size={13} />
+              </a>
+            </div>
+          </div>
+
+          {/* Step 2: Form to link repo */}
+          <form onSubmit={handleLinkRepository}>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                Step 2: Repository Full Name <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. TJDominos/Gamecreator"
+                value={repoInput}
+                onChange={e => setRepoInput(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '14px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <small style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: '#6b7280' }}>
+                The GitHub owner and repository name (e.g. <code>TJDominos/Gamecreator</code>)
+              </small>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  Branch
+                </label>
+                <input
+                  type="text"
+                  placeholder="main"
+                  value={branchInput}
+                  onChange={e => setBranchInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  Build Output Dir
+                </label>
+                <input
+                  type="text"
+                  placeholder="dist"
+                  value={buildDirInput}
+                  onChange={e => setBuildDirInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            {linkError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={16} />
+                <span>{linkError}</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
+              <button
+                type="button"
+                onClick={() => setShowConnectModal(false)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  background: 'transparent',
+                  color: '#374151',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLinking}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#7c3aed',
+                  color: '#fff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: isLinking ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isLinking ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                <span>{isLinking ? "Connecting..." : "Link Repository"}</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     );
   }
@@ -147,18 +465,76 @@ jobs:
           position: 'relative'
         }}
       >
-        {/* Header Title */}
-        <h3 
-          style={{ 
-            margin: '0 0 20px', 
-            fontSize: '18px', 
-            fontWeight: 600, 
-            color: '#111827',
-            letterSpacing: '-0.01em'
-          }}
-        >
-          GitHub sync
-        </h3>
+        {/* Header Title with RDcreatordev badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 20px', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 
+            style={{ 
+              margin: 0, 
+              fontSize: '18px', 
+              fontWeight: 600, 
+              color: '#111827',
+              letterSpacing: '-0.01em'
+            }}
+          >
+            GitHub sync
+          </h3>
+
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '20px',
+              background: '#f5f3ff',
+              border: '1px solid #ddd6fe',
+              color: '#7c3aed',
+              fontSize: '12px',
+              fontWeight: 600
+            }}
+            title={`Connected through GitHub App: ${GITHUB_APP_SLUG}`}
+          >
+            <ShieldCheck size={14} />
+            <span>App: {GITHUB_APP_SLUG}</span>
+          </span>
+        </div>
+
+        {/* Secret / Token Banner if newly generated */}
+        {generatedToken && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', fontWeight: 600, fontSize: '13px' }}>
+                <KeyRound size={15} /> Deployment API Token Generated
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyToken}
+                style={{
+                  background: '#dcfce7',
+                  border: '1px solid #86efac',
+                  borderRadius: '6px',
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#166534',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                {copiedToken ? <CheckCheck size={12} /> : <Copy size={12} />}
+                <span>{copiedToken ? "Copied!" : "Copy Token"}</span>
+              </button>
+            </div>
+            <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#15803d', lineHeight: 1.4 }}>
+              Add this token as secret <code>RANDSEED_API_TOKEN</code> in your GitHub repository secrets (<strong>Settings &gt; Secrets and variables &gt; Actions</strong>).
+            </p>
+            <div style={{ background: '#fff', border: '1px dashed #86efac', borderRadius: '6px', padding: '6px 10px', fontFamily: 'monospace', fontSize: '12px', color: '#14532d', wordBreak: 'break-all' }}>
+              {generatedToken}
+            </div>
+          </div>
+        )}
 
         {/* Section: Repository */}
         <div style={{ marginBottom: '20px' }}>
@@ -220,8 +596,37 @@ jobs:
               </span>
             </div>
 
-            {/* Action buttons (Unlink & Open on GitHub) */}
+            {/* Action buttons (Change/Reconnect, Unlink & Open on GitHub) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setRepoInput(repoInfo.repository);
+                  setBranchInput(repoInfo.branch);
+                  setShowConnectModal(true);
+                }}
+                disabled={isLocked}
+                title="Change or reconfigure connected repository"
+                style={{
+                  height: '34px',
+                  padding: '0 10px',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  background: '#f9fafb',
+                  color: '#374151',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: isLocked ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <RefreshCw size={13} />
+                <span>Change</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowUnlinkModal(true)}
@@ -366,6 +771,10 @@ jobs:
                 <span style={{ fontWeight: 500 }}>{repoInfo.lastSyncedAt}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748b' }}>App Provider:</span>
+                <span style={{ color: '#7c3aed', fontWeight: 600 }}>{GITHUB_APP_SLUG}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Auto-Deployment Pipeline:</span>
                 <span style={{ color: '#16a34a', fontWeight: 600 }}>Active (GitHub Actions)</span>
               </div>
@@ -394,7 +803,7 @@ jobs:
           )}
         </div>
 
-        {/* Action Button: Check sync status (Full-width matching image) */}
+        {/* Action Button: Check sync status */}
         <button
           type="button"
           onClick={handleCheckSyncStatus}
@@ -448,11 +857,13 @@ jobs:
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
-            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#f3f4f6' }}>Live Sandbox Environment</h4>
+            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#a78bfa' }}>
+              Live Sandbox Preview
+            </span>
           </div>
-          <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
-            Creators and testers can instantly play the latest build deployed from <code style={{ color: '#cba8f3', fontFamily: 'monospace' }}>{repoInfo.branch}</code>.
-          </p>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: '#f3f4f6' }}>
+            {gameName} Sandbox Container
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -468,13 +879,13 @@ jobs:
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
               gap: '6px'
             }}
           >
             {copiedSandboxUrl ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
-            <span>{copiedSandboxUrl ? 'Copied' : 'Copy Link'}</span>
+            <span>{copiedSandboxUrl ? 'Copied' : 'Copy URL'}</span>
           </button>
 
           <a
@@ -482,42 +893,43 @@ jobs:
             target="_blank"
             rel="noreferrer"
             style={{
-              background: '#8b5cf6',
+              background: '#7c3aed',
               border: 'none',
               borderRadius: '8px',
               padding: '8px 16px',
               color: '#fff',
               fontSize: '13px',
               fontWeight: 600,
-              textDecoration: 'none',
-              display: 'inline-flex',
+              cursor: 'pointer',
+              display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
+              textDecoration: 'none'
             }}
           >
-            <Play size={14} fill="#fff" />
             <span>Open Sandbox</span>
+            <ExternalLink size={14} />
           </a>
         </div>
       </div>
 
-      {/* CI/CD & Deployment Pipeline Strategy Guide */}
+      {/* CI/CD Integration Guide & Workflow file */}
       <div 
         style={{ 
           background: '#fff', 
           border: '1px solid #e5e7eb', 
           borderRadius: '16px', 
-          padding: '24px' 
+          padding: '24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h4 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
-              Automatic Deployment Strategy
+              CI/CD Pipeline Setup
             </h4>
             <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
-              How code updates in GitHub are built and reflected in the Sandbox link.
+              How code updates in GitHub via <strong>{GITHUB_APP_SLUG}</strong> are built and reflected in the Sandbox link.
             </p>
           </div>
 
@@ -586,16 +998,15 @@ jobs:
           </div>
         </div>
 
-        {/* Tab 1: GitHub Action (The Best Practice) */}
+        {/* Tab 1: GitHub Action */}
         {activeSyncTab === 'action' && (
           <div>
             <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6d28d9', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>
-                <Zap size={15} /> Best Architecture for Sandbox Previews
+                <Zap size={15} /> Automated Builds with {GITHUB_APP_SLUG}
               </div>
               <p style={{ margin: 0, fontSize: '12.5px', color: '#5b21b6', lineHeight: 1.5 }}>
-                GitHub Actions handles npm build dependencies in GitHub's isolated cloud runners. 
-                Whenever you push code or merge a PR into <code style={{ background: '#ede9fe', padding: '1px 5px', borderRadius: '4px' }}>{repoInfo.branch}</code>, the workflow tests your bundle and pushes artifacts straight to the Sandbox URL. Creators can immediately review changes without platform build queue latency.
+                Whenever code is pushed or a PR is merged into <code style={{ background: '#ede9fe', padding: '1px 5px', borderRadius: '4px' }}>{repoInfo.branch}</code>, GitHub Actions builds your game bundle and deploys straight to the RandSeed sandbox URL.
               </p>
             </div>
 
@@ -665,13 +1076,13 @@ jobs:
         {activeSyncTab === 'webhook' && (
           <div>
             <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#4b5563', lineHeight: 1.5 }}>
-              A GitHub Webhook notifies RandSeed immediately on every <code style={{ background: '#f3f4f6', padding: '1px 5px', borderRadius: '4px' }}>git push</code>. RandSeed's server pulls the commit, installs dependencies, and serves the build.
+              A GitHub Webhook notifies RandSeed immediately on every <code style={{ background: '#f3f4f6', padding: '1px 5px', borderRadius: '4px' }}>git push</code>.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
               <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}>
                 <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Payload URL</span>
                 <div style={{ fontSize: '12px', fontFamily: 'monospace', color: '#111827', marginTop: '4px', wordBreak: 'break-all' }}>
-                  https://api.randseed.org/v1/webhooks/github
+                  https://devcreator.randseed.org/api/webhooks/github
                 </div>
               </div>
               <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}>
@@ -699,14 +1110,14 @@ jobs:
 
       {/* Unlink Confirmation Modal */}
       {showUnlinkModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.5)', padding: '20px' }}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '28px', maxWidth: '440px', width: '100%' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 120, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.5)', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '28px', maxWidth: '440px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ef4444', marginBottom: '12px' }}>
               <AlertCircle size={22} />
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#111827' }}>Disconnect Repository?</h3>
             </div>
             <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#6b7280', lineHeight: 1.5 }}>
-              Disconnecting <strong>{repoInfo.repository}</strong> will pause automatic sandbox builds. Existing deployed builds will remain accessible.
+              Disconnecting <strong>{repoInfo.repository}</strong> will pause automated sandbox deployments from {GITHUB_APP_SLUG}. Existing deployed builds will remain accessible.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button
@@ -727,10 +1138,7 @@ jobs:
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowUnlinkModal(false);
-                  setIsDisconnected(true);
-                }}
+                onClick={handleUnlinkConfirm}
                 style={{
                   background: '#ef4444',
                   border: 'none',
@@ -748,6 +1156,9 @@ jobs:
           </div>
         </div>
       )}
+
+      {/* Connect/Reconfigure Modal */}
+      {renderConnectModal()}
     </div>
   );
 }

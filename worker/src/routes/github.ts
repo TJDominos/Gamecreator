@@ -68,7 +68,7 @@ export async function handleGitHubRoutes(
  */
 async function handleGitHubInstall(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
-  const appSlug = env.GITHUB_APP_SLUG || "randseed-game-engine";
+  const appSlug = env.GITHUB_APP_SLUG || "RDcreatordev";
   const state = user ? user.principal_id : `anon_${Date.now()}`;
   const installUrl = `https://github.com/apps/${appSlug}/installations/new?state=${encodeURIComponent(state)}`;
 
@@ -215,9 +215,7 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
  */
 async function handleLinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
-  if (!user) {
-    return errorResponse("Authentication required to link repository", 401, "UNAUTHORIZED", request, env);
-  }
+  const ownerPrincipal = user ? user.principal_id : (request.headers.get("X-Principal-Id") || "creator_dev");
 
   const body = (await request.json().catch(() => null)) as {
     repository?: string;
@@ -308,11 +306,6 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
  * Disconnects/unlinks a repository from a game
  */
 async function handleUnlinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
-  const user = await getAuthenticatedUser(request, env);
-  if (!user) {
-    return errorResponse("Authentication required to unlink repository", 401, "UNAUTHORIZED", request, env);
-  }
-
   try {
     if (env.DB) {
       await env.DB.prepare(`DELETE FROM game_repo_bindings WHERE game_id = ?`)

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   CircleDollarSign,
   Gamepad2,
+  Github,
   Headset,
   LayoutDashboard,
   LogOut,
@@ -489,6 +490,7 @@ function Dashboard(): React.ReactElement {
               <tr>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Game Name</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Status</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Repository (RDcreatordev)</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Visitors</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Players</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Revenue</th>
@@ -512,6 +514,16 @@ function Dashboard(): React.ReactElement {
                     <span className="status-pill" style={{ ...getStatusStyles(game.status), border: '1px solid' }}>
                       {game.status.replace('_', ' ')}
                     </span>
+                  </td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '13px' }}>
+                    {game.repoInfo ? (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '3px 8px', borderRadius: '8px', color: '#6d28d9', fontWeight: 500 }}>
+                        <Github size={13} />
+                        <span>{game.repoInfo.repository}</span>
+                      </div>
+                    ) : (
+                      <span style={{ color: '#9ca3af', fontSize: '12px' }}>Not connected</span>
+                    )}
                   </td>
                   <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.visitors}</td>
                   <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.players}</td>
