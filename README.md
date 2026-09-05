@@ -44,6 +44,16 @@ Auth and organization data are stored in `localStorage` (mock wallet sign-in), s
 
 Vercel SPA rewrites are configured in `vercel.json`.
 
+Production deploys run automatically from the `main` branch through
+`.github/workflows/deploy.yml`. Add these repository secrets before the first
+push:
+
+- `CLOUDFLARE_API_TOKEN` - API token with Workers Scripts edit permission and
+	access to the `gamecreator-d1` database
+- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID that owns the Worker
+
+The workflow can also be started manually from the GitHub Actions tab.
+
 The Worker JWT key is a Wrangler secret, not a value in `wrangler.jsonc`:
 
 ```bash
