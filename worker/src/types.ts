@@ -5,6 +5,7 @@ export type UserRole = "player" | "creator" | "admin";
 export interface Env {
   DB: D1Database;
   JWT_SECRET: string;
+  RANDSEED_PUBLIC_KEY?: string;
   MAIN_SITE_URL?: string;
   CORS_ORIGINS?: string;
   GITHUB_APP_ID?: string;

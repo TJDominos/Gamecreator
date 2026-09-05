@@ -1,5 +1,5 @@
 import type { DeveloperOrganizationRow, Env, UserRole, UserRow } from "../types";
-import { signJwt } from "../utils/crypto";
+import { signJwt, verifySsoSignature } from "../utils/crypto";
 import { errorResponse, jsonResponse } from "../utils/response";
 import { getAuthenticatedUser } from "../middleware/auth";
 
@@ -87,11 +87,66 @@ async function handleSsoExchange(
     } else {
       // Real SSO Token Exchange (Base64 / Token / Worker Exchange)
       try {
-        // If sso_token is structured payload or standard token
         const rawToken = sso_token.trim();
-        principalId = `randseed:usr_${rawToken.substring(0, 12)}`;
-        email = `user_${rawToken.substring(0, 6)}@randseed.org`;
-        isEmailVerified = true;
+        // Support JSON base64 encoded structure: { payload: { principal_id, email, is_email_verified, timestamp, nonce }, signature }
+        let parsed: any;
+        try {
+          parsed = JSON.parse(atob(rawToken));
+        } catch {
+          parsed = JSON.parse(rawToken);
+        }
+
+        if (parsed && parsed.payload && parsed.signature) {
+          const payload = parsed.payload;
+          const signature = parsed.signature;
+          const payloadTimestamp = Number(payload.timestamp || 0);
+
+          // 60-second expiration check
+          if (Math.abs(now - payloadTimestamp) > 60 * 1000) {
+            return errorResponse("SSO Token has expired", 401, "TOKEN_EXPIRED", request, env);
+          }
+
+          // Anti-replay check with used_sso_nonces
+          if (payload.nonce) {
+            const existingNonce = await env.DB.prepare(
+              "SELECT nonce FROM used_sso_nonces WHERE nonce = ?"
+            )
+              .bind(payload.nonce)
+              .first();
+
+            if (existingNonce) {
+              return errorResponse("SSO Token has already been used", 409, "TOKEN_REPLAYED", request, env);
+            }
+          }
+
+          // Verify signature if public key is configured
+          if (env.RANDSEED_PUBLIC_KEY) {
+            const payloadString = typeof parsed.payload === "string" ? parsed.payload : JSON.stringify(parsed.payload);
+            const isValid = await verifySsoSignature(payloadString, signature, env.RANDSEED_PUBLIC_KEY);
+            if (!isValid) {
+              return errorResponse("Invalid SSO signature", 401, "INVALID_SIGNATURE", request, env);
+            }
+          }
+
+          // Record consumed nonce into D1
+          if (payload.nonce) {
+            await env.DB.prepare(
+              "INSERT INTO used_sso_nonces (nonce, principal_id, expires_at, created_at) VALUES (?, ?, ?, ?)"
+            )
+              .bind(payload.nonce, payload.principal_id, now + 120_000, now)
+              .run();
+          }
+
+          principalId = payload.principal_id;
+          email = payload.email || null;
+          isEmailVerified = Boolean(payload.is_email_verified);
+          initialRole = "creator";
+        } else {
+          // Fallback simple token
+          principalId = `randseed:usr_${rawToken.substring(0, 12)}`;
+          email = `user_${rawToken.substring(0, 6)}@randseed.org`;
+          isEmailVerified = true;
+        }
       } catch (e) {
         return errorResponse("Invalid SSO token format", 401, "INVALID_SSO_TOKEN", request, env);
       }

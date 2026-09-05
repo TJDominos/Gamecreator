@@ -150,3 +150,38 @@ export async function verifyGitHubWebhookSignature(
     return false;
   }
 }
+
+export async function verifySsoSignature(
+  payloadString: string,
+  signatureBase64: string,
+  publicKeyPem: string
+): Promise<boolean> {
+  try {
+    const cleanPem = publicKeyPem
+      .replace(/-----BEGIN [A-Z0-9_-]+ PUBLIC KEY-----/g, "")
+      .replace(/-----END [A-Z0-9_-]+ PUBLIC KEY-----/g, "")
+      .replace(/\s+/g, "");
+    const keyBytes = base64UrlDecode(cleanPem);
+
+    const cryptoKey = await crypto.subtle.importKey(
+      "spki",
+      keyBytes,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["verify"]
+    );
+
+    const signature = base64UrlDecode(signatureBase64);
+    const dataBytes = stringToBytes(payloadString);
+
+    return await crypto.subtle.verify(
+      { name: "ECDSA", hash: { name: "SHA-256" } },
+      cryptoKey,
+      signature,
+      dataBytes
+    );
+  } catch (err) {
+    console.error("SSO verification error:", err);
+    return false;
+  }
+}
