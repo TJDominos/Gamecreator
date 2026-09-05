@@ -48,12 +48,28 @@ function mockApiPlugin(): Plugin {
         if (pathname === "/api/auth/sso" && method === "POST") {
           const body = await getBody();
           const ssoToken = body?.sso_token || "mock_token";
-          const role = ssoToken.includes("admin")
-            ? "admin"
-            : ssoToken.includes("creator")
-            ? "creator"
-            : "player";
-          const uid = `randseed:usr_${role}`;
+          let role = "creator";
+          let uid = "randseed:usr_creator";
+          let email = "creator@randseed.org";
+          let isEmailVerified = true;
+
+          try {
+            const decoded = JSON.parse(Buffer.from(ssoToken, "base64").toString("utf-8"));
+            if (decoded && decoded.payload) {
+              uid = decoded.payload.principal_id || uid;
+              email = decoded.payload.email || email;
+              isEmailVerified = decoded.payload.is_email_verified ?? true;
+            }
+          } catch {
+            role = ssoToken.includes("admin")
+              ? "admin"
+              : ssoToken.includes("creator")
+              ? "creator"
+              : "player";
+            uid = `randseed:usr_${role}`;
+            email = `${role}@randseed.org`;
+          }
+
           res.statusCode = 200;
           return res.end(
             JSON.stringify({
@@ -64,9 +80,9 @@ function mockApiPlugin(): Plugin {
               user: {
                 principal_id: uid,
                 role,
-                email: `${role}@randseed.org`,
-                isEmailVerified: true,
-                devNotificationEmail: `${role}@randseed.org`,
+                email,
+                isEmailVerified,
+                devNotificationEmail: email,
                 tosAcceptedVersion: "1.0",
                 kycStatus: "verified",
                 createdAt: Date.now(),

@@ -410,10 +410,15 @@ export function AuthProvider({
 
   // [PIPELINE B]: Redirect user to Main Site to get SSO Token
   const signInWithSSO = useCallback(() => {
+    const isLocalhost =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
     const mainSiteUrl =
       import.meta.env.VITE_WL_LOGIN_URL ||
       (import.meta.env.VITE_MAIN_SITE_URL
         ? `${import.meta.env.VITE_MAIN_SITE_URL}/login`
+        : isLocalhost
+        ? `${window.location.protocol}//${window.location.hostname}:3001/login`
         : "https://test.randseed.org/login");
 
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
