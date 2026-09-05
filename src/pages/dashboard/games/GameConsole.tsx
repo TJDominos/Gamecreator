@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, Outlet, useParams, useLocation, Link } from "react-router";
-import { ArrowLeft, LayoutDashboard, Rocket, Settings, Edit2, Check, Lock, Github, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, Rocket, Settings, Edit2, Check, Lock, Github, CheckCircle2, ExternalLink, Copy } from "lucide-react";
 import { getGameById } from "./gameData";
 
 export type GameStatus = 'DRAFT' | 'DEVELOPMENT' | 'PRIVATE_TESTING' | 'PENDING_REVIEW' | 'REJECTED' | 'APPROVED' | 'PUBLIC_ACTIVE' | 'MAINTENANCE' | 'ARCHIVED';
@@ -30,6 +30,14 @@ export function GameConsole(): React.ReactElement {
   const [status, setStatus] = React.useState<GameStatus>(game?.status || 'DEVELOPMENT');
 
   const isMetaLocked = ['PENDING_REVIEW', 'APPROVED', 'PUBLIC_ACTIVE', 'MAINTENANCE', 'ARCHIVED'].includes(status);
+  const [copiedUrl, setCopiedUrl] = React.useState(false);
+  const sandboxUrl = repoInfo?.sandboxUrl || `https://randseed.org/sandbox/${gameId || 'g_101'}`;
+
+  const handleCopySandboxUrl = () => {
+    navigator.clipboard.writeText(sandboxUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
 
   const handleSaveName = () => {
     if (tempName.trim()) {
@@ -138,9 +146,62 @@ export function GameConsole(): React.ReactElement {
             )}
           </div>
 
-          <a href={`https://randseed.org/sandbox/${gameId}`} target="_blank" rel="noreferrer" className="primary-action" style={{ textDecoration: 'none' }}>
-            Open Sandbox
-          </a>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+            <a 
+              href={sandboxUrl} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="primary-action" 
+              style={{ 
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>Open Sandbox</span>
+              <ExternalLink size={14} />
+            </a>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <a
+                href={sandboxUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--portal-muted)',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '2px',
+                  fontFamily: 'monospace',
+                  letterSpacing: '-0.01em',
+                  transition: 'color 0.15s ease'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--portal-purple)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--portal-muted)')}
+                title={sandboxUrl}
+              >
+                {sandboxUrl}
+              </a>
+              <button
+                type="button"
+                onClick={handleCopySandboxUrl}
+                title={copiedUrl ? "Copied!" : "Copy Sandbox URL"}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '2px 4px',
+                  cursor: 'pointer',
+                  color: copiedUrl ? '#16a34a' : 'var(--portal-muted)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  borderRadius: '4px'
+                }}
+              >
+                {copiedUrl ? <Check size={12} /> : <Copy size={12} />}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

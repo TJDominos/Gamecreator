@@ -778,6 +778,22 @@ jobs:
                 <span style={{ color: '#64748b' }}>Auto-Deployment Pipeline:</span>
                 <span style={{ color: '#16a34a', fontWeight: 600 }}>Active (GitHub Actions)</span>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748b' }}>Sandbox URL:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <a href={repoInfo.sandboxUrl} target="_blank" rel="noreferrer" style={{ color: '#7c3aed', fontFamily: 'monospace', textDecoration: 'underline' }}>
+                    {repoInfo.sandboxUrl}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handleCopySandboxUrl}
+                    title="Copy sandbox URL"
+                    style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: copiedSandboxUrl ? '#16a34a' : '#64748b', display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    {copiedSandboxUrl ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -838,79 +854,6 @@ jobs:
           <RefreshCw size={15} className={isCheckingSync ? 'animate-spin' : ''} />
           <span>{isCheckingSync ? 'Checking sync with GitHub...' : 'Check sync status'}</span>
         </button>
-      </div>
-
-      {/* Live Sandbox Quick Access Bar */}
-      <div 
-        style={{ 
-          background: 'linear-gradient(135deg, #2b1f3d 0%, #171124 100%)', 
-          borderRadius: '16px', 
-          padding: '20px 24px', 
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '16px'
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
-            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#a78bfa' }}>
-              Live Sandbox Preview
-            </span>
-          </div>
-          <div style={{ fontSize: '15px', fontWeight: 600, color: '#f3f4f6' }}>
-            {gameName} Sandbox Container
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            type="button"
-            onClick={handleCopySandboxUrl}
-            style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '8px',
-              padding: '8px 14px',
-              color: '#fff',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {copiedSandboxUrl ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
-            <span>{copiedSandboxUrl ? 'Copied' : 'Copy URL'}</span>
-          </button>
-
-          <a
-            href={repoInfo.sandboxUrl}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              background: '#7c3aed',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '8px 16px',
-              color: '#fff',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              textDecoration: 'none'
-            }}
-          >
-            <span>Open Sandbox</span>
-            <ExternalLink size={14} />
-          </a>
-        </div>
       </div>
 
       {/* CI/CD Integration Guide & Workflow file */}

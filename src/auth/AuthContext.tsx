@@ -9,6 +9,13 @@ import React, {
 import type { UserProfileInfo } from "../types/userProfile";
 import { WLAuthClient } from "./wlAuthClient";
 import { authApi } from "../services/authApi";
+import {
+  UserRole,
+  Permission,
+  ROLE_PERMISSIONS,
+  DEFAULT_PERSONAS,
+  hasPermission as checkPermission,
+} from "./permissionSystem";
 
 const SESSION_KEY = "randseed_auth_session";
 const CUSTOM_TOKEN_KEY = "randseed_custom_jwt";
@@ -55,6 +62,16 @@ interface AuthContextValue {
   profile: UserProfile | null;
   organization: DeveloperOrganization | null;
   isSignedIn: boolean;
+  role: UserRole;
+  permissions: Permission[];
+  hasPermission: (permission: Permission) => boolean;
+  switchRole: (role: UserRole) => void;
+  isCreator: boolean;
+  isAdmin: boolean;
+  isPlayer: boolean;
+  upgradeToCreator: (
+    customOrg?: Partial<DeveloperOrganizationInput>,
+  ) => Promise<DeveloperOrganization>;
   signIn: (accountId: string) => void;
   mockSignIn: (role: "creator" | "admin" | "player") => void;
   signInWithSSO: () => void;
@@ -85,8 +102,25 @@ function readProfiles(): Record<string, UserProfile> {
   return readJson<Record<string, UserProfile>>(USER_PROFILES_KEY, {});
 }
 
+function getInitialAccount(): string | null {
+  if (typeof window !== "undefined" && localStorage.getItem("randseed_signed_out") === "true") {
+    return null;
+  }
+  const storedAccount = readJson<string | null>(SESSION_KEY, null);
+  if (storedAccount) {
+    return storedAccount;
+  }
+  // Online / preview default: initialize with creator persona so verification works immediately
+  const defaultPersona = DEFAULT_PERSONAS.creator;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(defaultPersona.id));
+  return defaultPersona.id;
+}
+
 function readInitialProfile(): UserProfile | null {
-  const currentAccount = readJson<string | null>(SESSION_KEY, null);
+  if (typeof window !== "undefined" && localStorage.getItem("randseed_signed_out") === "true") {
+    return null;
+  }
+  const currentAccount = getInitialAccount();
   if (!currentAccount) {
     return null;
   }
@@ -98,8 +132,35 @@ function readInitialProfile(): UserProfile | null {
   if (legacyProfile) {
     profiles[currentAccount] = legacyProfile;
     localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+    return legacyProfile;
   }
-  return legacyProfile;
+
+  // Pre-seed default creator profile if fresh session
+  const defaultPersona = DEFAULT_PERSONAS.creator;
+  const initialProfile: UserProfile = {
+    avatarUrl: defaultPersona.avatarUrl,
+    username: defaultPersona.username,
+    isVerified: true,
+    hasStake: true,
+    lastActive: "Just now",
+    bio: defaultPersona.bio,
+    location: "Global",
+    joinedDate: "2026-01-01",
+    role: "creator",
+    email: defaultPersona.email,
+    isEmailVerified: true,
+  };
+  profiles[defaultPersona.id] = initialProfile;
+  localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+  localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(initialProfile));
+
+  if (defaultPersona.organization) {
+    const orgs = readOrganizations();
+    orgs[defaultPersona.id] = defaultPersona.organization;
+    localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
+  }
+
+  return initialProfile;
 }
 
 function createOrganizationId(): string {
@@ -112,14 +173,18 @@ export function AuthProvider({
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
-  const [accountId, setAccountId] = useState<string | null>(() =>
-    readJson<string | null>(SESSION_KEY, null),
-  );
+  const [accountId, setAccountId] = useState<string | null>(getInitialAccount);
   const [profile, setProfile] = useState<UserProfile | null>(readInitialProfile);
   const [organization, setOrganization] =
     useState<DeveloperOrganization | null>(() => {
-      const currentAccount = readJson<string | null>(SESSION_KEY, null);
-      return currentAccount ? readOrganizations()[currentAccount] ?? null : null;
+      const currentAccount = getInitialAccount();
+      if (!currentAccount) return null;
+      const orgs = readOrganizations();
+      if (orgs[currentAccount]) return orgs[currentAccount];
+      if (currentAccount === DEFAULT_PERSONAS.creator.id) {
+        return DEFAULT_PERSONAS.creator.organization;
+      }
+      return null;
     });
 
   // [PIPELINE A & INIT]: Intercept SSO Token on mount or restore session
@@ -359,6 +424,7 @@ export function AuthProvider({
     const client = WLAuthClient.getInstance();
     await client.logout(); // Clear local IC identity if it exists
 
+    localStorage.setItem("randseed_signed_out", "true");
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(CUSTOM_TOKEN_KEY);
     localStorage.removeItem(USER_PROFILE_KEY);
@@ -366,6 +432,97 @@ export function AuthProvider({
     setProfile(null);
     setOrganization(null);
   }, []);
+
+  const switchRole = useCallback((targetRole: UserRole) => {
+    localStorage.removeItem("randseed_signed_out");
+    const targetPersona = DEFAULT_PERSONAS[targetRole];
+    const newProfile: UserProfile = {
+      avatarUrl: targetPersona.avatarUrl,
+      username: targetPersona.username,
+      isVerified: targetPersona.isEmailVerified,
+      hasStake: true,
+      lastActive: "Just now",
+      bio: targetPersona.bio,
+      location: "Global",
+      joinedDate: "2026-01-01",
+      role: targetRole,
+      email: targetPersona.email,
+      isEmailVerified: targetPersona.isEmailVerified,
+    };
+
+    localStorage.setItem(SESSION_KEY, JSON.stringify(targetPersona.id));
+    localStorage.setItem(CUSTOM_TOKEN_KEY, `jwt_local_${targetRole}`);
+
+    const profiles = readProfiles();
+    profiles[targetPersona.id] = newProfile;
+    localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(newProfile));
+
+    const orgs = readOrganizations();
+    if (targetPersona.organization) {
+      orgs[targetPersona.id] = targetPersona.organization;
+      localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
+      setOrganization(targetPersona.organization);
+    } else {
+      setOrganization(null);
+    }
+
+    setAccountId(targetPersona.id);
+    setProfile(newProfile);
+  }, []);
+
+  const upgradeToCreator = useCallback(
+    async (customOrg?: Partial<DeveloperOrganizationInput>) => {
+      const currentAcc = accountId || DEFAULT_PERSONAS.creator.id;
+      const orgName = customOrg?.name || `${profile?.username || "Developer"}'s Studio`;
+      
+      const newOrg: DeveloperOrganization = {
+        accountId: currentAcc,
+        name: orgName,
+        contactEmail: customOrg?.contactEmail || profile?.email || "creator@randseed.org",
+        supportEmail: customOrg?.supportEmail || profile?.email || "support@randseed.org",
+        logo: customOrg?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(orgName)}`,
+        description: customOrg?.description || "Game creator studio on RandSeed platform.",
+        socialLinks: customOrg?.socialLinks || ["https://randseed.org", ""],
+        organizationId: createOrganizationId(),
+        level: "Creator",
+        revenueShare: 70,
+        platformAccount: `platform_${currentAcc.replace(/[^a-zA-Z0-9]/g, "").slice(-10)}`,
+        status: "approved",
+        createdAt: new Date().toISOString(),
+      };
+
+      const orgs = readOrganizations();
+      orgs[currentAcc] = newOrg;
+      localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
+      setOrganization(newOrg);
+
+      const updatedProfile: UserProfile = {
+        avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentAcc}`,
+        username: profile?.username || "Creator",
+        isVerified: true,
+        hasStake: true,
+        lastActive: "Just now",
+        bio: profile?.bio || "",
+        location: profile?.location || "Global",
+        joinedDate: profile?.joinedDate || new Date().toISOString().split("T")[0],
+        role: "creator",
+        email: profile?.email || "creator@randseed.org",
+        isEmailVerified: true,
+      };
+
+      const profiles = readProfiles();
+      profiles[currentAcc] = updatedProfile;
+      localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+      localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updatedProfile));
+      setProfile(updatedProfile);
+      setAccountId(currentAcc);
+      localStorage.removeItem("randseed_signed_out");
+
+      return newOrg;
+    },
+    [accountId, profile],
+  );
 
   const updateProfile = useCallback(
     (nextProfile: UserProfile, profileAccountId?: string) => {
@@ -455,12 +612,27 @@ export function AuthProvider({
     [accountId, isOrganizationNameAvailable],
   );
 
+  const currentRole: UserRole = (profile?.role as UserRole) || (accountId ? "creator" : "player");
+  const permissions = useMemo(() => ROLE_PERMISSIONS[currentRole] || [], [currentRole]);
+  const hasPermission = useCallback(
+    (perm: Permission) => checkPermission(currentRole, perm),
+    [currentRole],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       accountId,
       profile,
       organization,
       isSignedIn: Boolean(accountId),
+      role: currentRole,
+      permissions,
+      hasPermission,
+      switchRole,
+      isCreator: currentRole === "creator",
+      isAdmin: currentRole === "admin",
+      isPlayer: currentRole === "player",
+      upgradeToCreator,
       signIn,
       mockSignIn,
       signInWithSSO,
@@ -473,6 +645,11 @@ export function AuthProvider({
       accountId,
       profile,
       organization,
+      currentRole,
+      permissions,
+      hasPermission,
+      switchRole,
+      upgradeToCreator,
       signIn,
       mockSignIn,
       signInWithSSO,

@@ -38,6 +38,7 @@ import {
   useNavigate,
 } from "react-router";
 import { MOCK_GAMES } from "./games/gameData";
+import { DashboardAccessGate } from "./DashboardAccessGate";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
 import { PortalHeader } from "../../components/PortalHeader";
@@ -80,8 +81,19 @@ interface PlaceholderPageProps {
 }
 
 function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
-  const { isSignedIn } = useAuth();
-  return isSignedIn ? children : <Navigate to="/" replace />;
+  const { isSignedIn, hasPermission } = useAuth();
+  if (!isSignedIn || !hasPermission("dashboard:access")) {
+    return <DashboardAccessGate />;
+  }
+  return children;
+}
+
+function RequireAdmin({ children }: RouteGuardProps): React.ReactNode {
+  const { isSignedIn, hasPermission } = useAuth();
+  if (!isSignedIn || !hasPermission("bounty:manage")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
 }
 
 
@@ -285,7 +297,7 @@ function DeveloperOnboarding(): React.ReactNode {
 }
 
 function PortalShell(): React.ReactElement {
-  const { accountId, organization, profile, signOut } = useAuth();
+  const { accountId, organization, profile, role, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -294,8 +306,21 @@ function PortalShell(): React.ReactElement {
 
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
+  const navItems = React.useMemo(() => {
+    const items = [...navigation];
+    if (role === "admin") {
+      items.splice(2, 0, {
+        to: "/bounty-management",
+        end: false,
+        label: "Bounty Review (Admin)",
+        icon: ShieldCheck,
+      });
+    }
+    return items;
+  }, [role]);
+
   const pageName =
-    navigation.find((item) => location.pathname.startsWith(item.to))?.label ??
+    navItems.find((item) => location.pathname.startsWith(item.to))?.label ??
     "Creator Portal";
 
   function handleSignOut(): void {
@@ -323,7 +348,7 @@ function PortalShell(): React.ReactElement {
         </div>
         
         <nav className="portal-nav" aria-label="Creator Portal">
-          {navigation.map(({ to, label, icon: Icon, end }) => (
+          {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -586,7 +611,14 @@ export default function DeveloperPortal(): React.ReactElement {
         <Route path="revenue" element={<PlaceholderPage title="Revenue" description="Track estimated revenue, ledger entries, and payouts." icon={BarChart3} />} />
         <Route path="settings" element={<PlaceholderPage title="Settings" description="Manage your public profile, security, and integrations." icon={Settings} />} />
       </Route>
-      <Route path="/bounty-management" element={<BountyManagement />} />
+      <Route
+        path="/bounty-management"
+        element={
+          <RequireAdmin>
+            <BountyManagement />
+          </RequireAdmin>
+        }
+      />
       
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

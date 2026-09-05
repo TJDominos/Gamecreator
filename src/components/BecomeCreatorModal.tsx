@@ -9,7 +9,7 @@ interface BecomeCreatorModalProps {
 }
 
 export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps): React.ReactElement | null {
-  const { accountId, profile, saveOrganization } = useAuth();
+  const { accountId, profile, upgradeToCreator } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requiresEmailVerification, setRequiresEmailVerification] = useState(false);
@@ -57,9 +57,7 @@ export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps)
   }
 
   const handleBecomeCreator = async () => {
-    if (!accountId) return;
-    
-    // Check if email is verified
+    // Check if email is verified (guard against explicit false)
     if (profile?.isEmailVerified === false) {
       setRequiresEmailVerification(true);
       return;
@@ -67,21 +65,9 @@ export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps)
 
     setIsSubmitting(true);
     try {
-      // Mock updating user profile role to "creator" locally
-      const updatedProfile = { ...profile, role: "creator" };
-      localStorage.setItem("USER_PROFILE", JSON.stringify(updatedProfile));
-      
-      const profilesStr = localStorage.getItem("USER_PROFILES");
-      if (profilesStr) {
-        const profiles = JSON.parse(profilesStr);
-        profiles[accountId] = updatedProfile;
-        localStorage.setItem("USER_PROFILES", JSON.stringify(profiles));
-      }
-      
-      // We will also need to reload window to update AuthContext state quickly in mock
+      await upgradeToCreator();
       onClose();
       navigate("/dashboard");
-      window.location.reload();
     } catch (error) {
       console.error("Failed to become creator:", error);
     } finally {
