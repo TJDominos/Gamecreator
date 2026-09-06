@@ -15,7 +15,7 @@ interface MockLoginPayload {
 }
 
 interface UpdateProfilePayload {
-  dev_notification_email?: string;
+  email?: string;
   tos_accepted_version?: string;
   kyc_status?: string;
 }
@@ -166,9 +166,9 @@ async function handleSsoExchange(
       userRole = existingUser.role || initialRole;
       await env.DB.prepare(
         `UPDATE users 
-         SET last_portal_login_at = ?, 
+         SET last_login_at = ?, 
              email = COALESCE(?, email), 
-             is_email_verified = COALESCE(?, is_email_verified),
+             email_verified = COALESCE(?, email_verified),
              updated_at = ?
          WHERE principal_id = ?`,
       )
@@ -178,8 +178,8 @@ async function handleSsoExchange(
       // Insert new Shadow User into D1
       await env.DB.prepare(
         `INSERT INTO users (
-           principal_id, role, email, is_email_verified, 
-           last_portal_login_at, created_at, updated_at
+           principal_id, role, email, email_verified, 
+           last_login_at, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
@@ -279,11 +279,10 @@ async function handleGetMe(
         principal_id: user.principal_id,
         role: user.role,
         email: user.email,
-        isEmailVerified: user.is_email_verified === 1,
-        devNotificationEmail: user.dev_notification_email,
+        isEmailVerified: user.email_verified === 1,
         tosAcceptedVersion: user.tos_accepted_version,
         kycStatus: user.kyc_status,
-        lastPortalLoginAt: user.last_portal_login_at,
+        lastLoginAt: user.last_login_at,
         createdAt: user.created_at,
       },
       organization: organization ?? null,
@@ -308,12 +307,12 @@ async function handleMockLogin(
 
     await env.DB.prepare(
       `INSERT INTO users (
-         principal_id, role, email, is_email_verified, 
-         last_portal_login_at, created_at, updated_at
+         principal_id, role, email, email_verified, 
+         last_login_at, created_at, updated_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(principal_id) DO UPDATE SET 
          role = excluded.role,
-         last_portal_login_at = excluded.last_portal_login_at,
+         last_login_at = excluded.last_login_at,
          updated_at = excluded.updated_at`,
     )
       .bind(
@@ -385,14 +384,14 @@ async function handleUpdateProfile(
   const now = Date.now();
   await env.DB.prepare(
     `UPDATE users 
-     SET dev_notification_email = COALESCE(?, dev_notification_email),
+     SET email = COALESCE(?, email),
          tos_accepted_version = COALESCE(?, tos_accepted_version),
          kyc_status = COALESCE(?, kyc_status),
          updated_at = ?
      WHERE principal_id = ?`,
   )
     .bind(
-      body.dev_notification_email ?? null,
+      body.email ?? null,
       body.tos_accepted_version ?? null,
       body.kyc_status ?? null,
       now,

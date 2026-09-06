@@ -103,10 +103,18 @@ function readProfiles(): Record<string, UserProfile> {
 }
 
 function getInitialAccount(): string | null {
+  const token = typeof window !== "undefined" ? localStorage.getItem(CUSTOM_TOKEN_KEY) : null;
+  if (!token) {
+    return null;
+  }
   return readJson<string | null>(SESSION_KEY, null);
 }
 
 function readInitialProfile(): UserProfile | null {
+  const token = typeof window !== "undefined" ? localStorage.getItem(CUSTOM_TOKEN_KEY) : null;
+  if (!token) {
+    return null;
+  }
   const currentAccount = getInitialAccount();
   if (!currentAccount) {
     return null;
@@ -114,12 +122,6 @@ function readInitialProfile(): UserProfile | null {
   const profiles = readProfiles();
   if (profiles[currentAccount]) {
     return profiles[currentAccount];
-  }
-  const legacyProfile = readJson<UserProfile | null>(USER_PROFILE_KEY, null);
-  if (legacyProfile) {
-    profiles[currentAccount] = legacyProfile;
-    localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-    return legacyProfile;
   }
   return null;
 }
@@ -249,6 +251,8 @@ export function AuthProvider({
       if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoToken) {
         console.log("Received SSO Token from popup message", event.origin);
         void processSsoToken(event.data.ssoToken);
+      } else if (event.data && event.data.type === "RANDSEED_SSO_CANCEL") {
+        console.log("SSO login cancelled by user in popup");
       }
     };
 
@@ -267,10 +271,11 @@ export function AuthProvider({
 
       // 2. Fallback: Check local storage for existing Custom Token / Session
       const storedSession = readJson<string | null>(SESSION_KEY, null);
-      if (storedSession) {
+      const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
+
+      if (storedSession && token) {
         setAccountId(storedSession);
-        const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
-        if (token && !token.startsWith("jwt_mock_")) {
+        if (!token.startsWith("jwt_mock_")) {
           authApi.getMe()
             .then((meRes) => {
               if (meRes && meRes.user) {
@@ -291,10 +296,21 @@ export function AuthProvider({
                 if (meRes.organization) {
                   setOrganization(meRes.organization);
                 }
+              } else {
+                void signOut();
               }
             })
-            .catch(() => {});
+            .catch(() => {
+              void signOut();
+            });
         }
+      } else if (!token) {
+        // Clear any orphan session keys
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(USER_PROFILE_KEY);
+        setAccountId(null);
+        setProfile(null);
+        setOrganization(null);
       }
     };
 
@@ -481,7 +497,10 @@ export function AuthProvider({
 
   const upgradeToCreator = useCallback(
     async (customOrg?: Partial<DeveloperOrganizationInput>) => {
-      const currentAcc = accountId || DEFAULT_PERSONAS.creator.id;
+      const currentAcc = accountId;
+      if (!currentAcc) {
+        throw new Error("You must sign in before upgrading to creator.");
+      }
       const orgName = customOrg?.name || `${profile?.username || "Developer"}'s Studio`;
       
       const newOrg: DeveloperOrganization = {

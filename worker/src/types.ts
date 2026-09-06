@@ -24,7 +24,7 @@ export interface GithubInstallationRow {
   account_login: string;
   account_type: string;
   owner_principal: string;
-  permissions_json: string | null;
+  permissions: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -32,9 +32,9 @@ export interface GithubInstallationRow {
 export interface GameRepoBindingRow {
   game_id: string;
   installation_id: number;
-  repo_name: string;
+  repo_full_name: string;
   default_branch: string;
-  api_token_hash: string;
+  sync_token_hash: string;
   sync_method: string;
   sync_status: string;
   last_synced_commit: string | null;
@@ -54,19 +54,18 @@ export interface GameDeploymentRow {
   branch: string;
   status: string;
   sandbox_url: string | null;
-  deployer: string;
+  trigger_type: string;
   created_at: number;
 }
 
 export interface UserRow {
   principal_id: string;
   role: UserRole;
-  dev_notification_email: string | null;
   email: string | null;
-  is_email_verified: number; // 0 or 1
+  email_verified: number; // 0 or 1
   tos_accepted_version: string | null;
   kyc_status: string;
-  last_portal_login_at: number | null;
+  last_login_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -79,7 +78,7 @@ export interface DeveloperOrganizationRow {
   support_email: string | null;
   logo: string | null;
   description: string | null;
-  social_links_json: string | null;
+  social_links: string | null;
   status: string;
   level: string;
   revenue_share: number;

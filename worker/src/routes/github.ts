@@ -107,7 +107,7 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
       const ownerPrincipal = state.startsWith("anon_") ? "unknown" : state;
 
       await env.DB.prepare(
-        `INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions_json, created_at, updated_at)
+        `INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(installation_id) DO UPDATE SET
            updated_at = excluded.updated_at`,
@@ -163,7 +163,7 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
           {
             success: true,
             repo_info: {
-              repository: binding.repo_name,
+              repository: binding.repo_full_name,
               branch: binding.default_branch,
               lastCommitSha: binding.last_synced_commit || "init",
               lastCommitMessage: binding.last_commit_message || "Ready for deployments",
@@ -244,14 +244,14 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
     if (env.DB) {
       await env.DB.prepare(
         `INSERT INTO game_repo_bindings (
-           game_id, installation_id, repo_name, default_branch, api_token_hash,
+           game_id, installation_id, repo_full_name, default_branch, sync_token_hash,
            sync_method, sync_status, last_synced_commit, last_commit_message,
            last_synced_at, sandbox_url, build_dir, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(game_id) DO UPDATE SET
-           repo_name = excluded.repo_name,
+           repo_full_name = excluded.repo_full_name,
            default_branch = excluded.default_branch,
-           api_token_hash = excluded.api_token_hash,
+           sync_token_hash = excluded.sync_token_hash,
            build_dir = excluded.build_dir,
            updated_at = excluded.updated_at`,
       )
@@ -399,7 +399,7 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
                last_synced_at = ?,
                sync_status = 'synced',
                updated_at = ?
-           WHERE repo_name = ? AND default_branch = ?`,
+           WHERE repo_full_name = ? AND default_branch = ?`,
         )
           .bind(commitSha, commitMessage, now, now, repoFullName, branch)
           .run();
@@ -423,7 +423,7 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
            SET sync_status = ?,
                last_synced_at = ?,
                updated_at = ?
-           WHERE repo_name = ?`,
+           WHERE repo_full_name = ?`,
         )
           .bind(syncStatus, now, now, repoFullName)
           .run();
@@ -471,7 +471,7 @@ async function handleSandboxDeploy(request: Request, env: Env): Promise<Response
     if (env.DB) {
       // Record deployment
       await env.DB.prepare(
-        `INSERT INTO game_deployments (id, game_id, commit_sha, commit_message, branch, status, sandbox_url, deployer, created_at)
+        `INSERT INTO game_deployments (id, game_id, commit_sha, commit_message, branch, status, sandbox_url, trigger_type, created_at)
          VALUES (?, ?, ?, ?, ?, 'deployed', ?, 'github_action', ?)`,
       )
         .bind(deploymentId, gameId, commitSha, commitMessage, branch, sandboxUrl, now)

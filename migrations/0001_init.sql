@@ -6,12 +6,11 @@
 CREATE TABLE IF NOT EXISTS users (
     principal_id TEXT PRIMARY KEY,       -- 核心锚点: 对应主站的 Internet Computer Principal
     role TEXT DEFAULT 'player',          -- 门户专属角色: 'player', 'creator', 'admin'
-    dev_notification_email TEXT,         -- 开发者接收审核邮件的专属邮箱(可选)
     email TEXT,                          -- 从主站同步过来的邮箱
-    is_email_verified INTEGER DEFAULT 0, -- 是否在主站已验证 (0: 否, 1: 是)
+    email_verified INTEGER DEFAULT 0,    -- 是否在主站已验证 (0: 否, 1: 是)
     tos_accepted_version TEXT,           -- 签署的《创作者协议》版本号 (如 'v1.2')
     kyc_status TEXT DEFAULT 'unverified',-- 开发者认证状态: 'unverified', 'individual', 'company'
-    last_portal_login_at INTEGER,        -- 最近一次登录 Creator 控制台的时间 (毫秒时间戳)
+    last_login_at INTEGER,               -- 最近一次登录 Creator 控制台的时间 (毫秒时间戳)
     created_at INTEGER NOT NULL,         -- 首次在开发者门户登录的时间 (毫秒时间戳)
     updated_at INTEGER NOT NULL          -- 更新时间 (毫秒时间戳)
 );
@@ -25,7 +24,7 @@ CREATE TABLE IF NOT EXISTS developer_organizations (
     support_email TEXT,                  -- 支持邮箱
     logo TEXT,                           -- 组织 Logo
     description TEXT,                    -- 组织简介
-    social_links_json TEXT,              -- 社交链接 JSON 数组
+    social_links TEXT,                   -- 社交链接 JSON 数组
     status TEXT DEFAULT 'pending_review',-- 审核状态: 'pending_review', 'approved', 'rejected'
     level TEXT DEFAULT 'Starter',        -- 组织等级
     revenue_share REAL DEFAULT 0.7,      -- 收益分成比例 (如 0.7 表示 70%)

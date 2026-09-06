@@ -93,6 +93,12 @@ function mockApiPlugin(): Plugin {
         }
 
         if (pathname === "/api/auth/me" && method === "GET") {
+          const authHeader = req.headers["authorization"] || "";
+          if (!authHeader.startsWith("Bearer ") || authHeader.includes("undefined") || authHeader.includes("null")) {
+            res.statusCode = 401;
+            return res.end(JSON.stringify({ success: false, error: "Unauthorized" }));
+          }
+
           res.statusCode = 200;
           return res.end(
             JSON.stringify({
@@ -102,9 +108,9 @@ function mockApiPlugin(): Plugin {
                 role: "creator",
                 email: "creator@randseed.org",
                 isEmailVerified: true,
-                devNotificationEmail: "creator@randseed.org",
                 tosAcceptedVersion: "1.0",
                 kycStatus: "verified",
+                lastLoginAt: Date.now(),
                 createdAt: Date.now(),
               },
               organization: null,

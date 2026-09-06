@@ -5,7 +5,7 @@ import { WltLogo } from "../../components/WltLogo";
 import { useNavigate, Link } from "react-router";
 
 export function DashboardAccessGate(): React.ReactElement {
-  const { switchRole, upgradeToCreator, profile } = useAuth();
+  const { switchRole, upgradeToCreator, profile, signInWithSSO } = useAuth();
   const navigate = useNavigate();
 
   const handleEnterAsCreator = () => {
@@ -53,11 +53,66 @@ export function DashboardAccessGate(): React.ReactElement {
         <h1 style={{ fontSize: "24px", fontWeight: 700, color: "#17151d", margin: "0 0 8px" }}>
           Developer Dashboard Access
         </h1>
-        <p style={{ fontSize: "14px", color: "#64748b", margin: "0 0 28px", lineHeight: "1.5" }}>
-          The local Role-Based Access Control (RBAC) system is active. Select your persona to enter and verify the main creator workflows.
+        <p style={{ fontSize: "14px", color: "#64748b", margin: "0 0 24px", lineHeight: "1.5" }}>
+          Please sign in with your RandSeed account to access your games and studio management.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "28px", textAlign: "left" }}>
+          {/* Real SSO Sign In */}
+          <button
+            type="button"
+            onClick={signInWithSSO}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "16px",
+              borderRadius: "14px",
+              border: "2px solid #7c3aed",
+              background: "#7c3aed",
+              color: "#ffffff",
+              cursor: "pointer",
+              transition: "transform 0.15s ease, box-shadow 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 6px 16px rgba(124, 58, 237, 0.25)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "none";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "10px",
+                  background: "rgba(255, 255, 255, 0.2)",
+                  color: "#fff",
+                  display: "grid",
+                  placeItems: "center",
+                }}
+              >
+                <Rocket size={22} />
+              </div>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: "#ffffff" }}>
+                  Sign in with RandSeed Account
+                </div>
+                <div style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.8)" }}>
+                  Use Passkey, Web3 Wallet, or Email via secure SSO
+                </div>
+              </div>
+            </div>
+            <ArrowRight size={20} color="#ffffff" />
+          </button>
+
+          <div style={{ textAlign: "center", margin: "8px 0 4px", fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>
+            ── OR TEST WITH LOCAL PERSONA ──
+          </div>
+
           {/* Creator Option */}
           <button
             type="button"
@@ -66,9 +121,9 @@ export function DashboardAccessGate(): React.ReactElement {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "16px",
+              padding: "14px 16px",
               borderRadius: "14px",
-              border: "2px solid #7c3aed",
+              border: "1px solid #e2e8f0",
               background: "#faf5ff",
               cursor: "pointer",
               transition: "transform 0.15s ease, box-shadow 0.15s ease",

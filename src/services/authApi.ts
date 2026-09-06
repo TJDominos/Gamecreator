@@ -11,10 +11,9 @@ export interface SsoExchangeResponse {
     role: "player" | "creator" | "admin";
     email: string | null;
     isEmailVerified: boolean;
-    devNotificationEmail?: string | null;
     tosAcceptedVersion?: string | null;
     kycStatus?: string;
-    lastPortalLoginAt?: number;
+    lastLoginAt?: number;
     createdAt?: number;
   };
   organization: DeveloperOrganization | null;
@@ -27,10 +26,9 @@ export interface MeResponse {
     role: "player" | "creator" | "admin";
     email: string | null;
     isEmailVerified: boolean;
-    devNotificationEmail?: string | null;
     tosAcceptedVersion?: string | null;
     kycStatus?: string;
-    lastPortalLoginAt?: number;
+    lastLoginAt?: number;
     createdAt?: number;
   };
   organization: DeveloperOrganization | null;

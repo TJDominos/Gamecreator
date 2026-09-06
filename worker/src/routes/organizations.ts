@@ -107,7 +107,7 @@ async function handleCreateOrganization(
   await env.DB.prepare(
     `INSERT INTO developer_organizations (
        id, owner_principal, name, contact_email, support_email,
-       logo, description, social_links_json, status, level,
+       logo, description, social_links, status, level,
        revenue_share, platform_account, created_at, updated_at
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', 'L1', 0.8, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET 
@@ -116,7 +116,7 @@ async function handleCreateOrganization(
        support_email = excluded.support_email,
        logo = excluded.logo,
        description = excluded.description,
-       social_links_json = excluded.social_links_json,
+       social_links = excluded.social_links,
        updated_at = excluded.updated_at`,
   )
     .bind(
