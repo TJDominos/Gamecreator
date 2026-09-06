@@ -43,7 +43,7 @@ export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps)
           <button
             onClick={() => {
               // Redirect to main site for verification, passing the return URI
-              const mainSiteUrl = import.meta.env.VITE_MAIN_SITE_URL || "https://test.randseed.org";
+              const mainSiteUrl = import.meta.env.VITE_MAIN_SITE_URL || "https://dev.randseed.org";
               const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
               window.location.href = `${mainSiteUrl}/verify-email?redirect_uri=${currentUrl}`;
             }}
