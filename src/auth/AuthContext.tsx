@@ -73,7 +73,6 @@ interface AuthContextValue {
     customOrg?: Partial<DeveloperOrganizationInput>,
   ) => Promise<DeveloperOrganization>;
   signIn: (accountId: string) => void;
-  mockSignIn: (role: "creator" | "admin" | "player") => void;
   signInWithSSO: () => void;
   signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile, accountId?: string) => void;
@@ -102,30 +101,6 @@ function readProfiles(): Record<string, UserProfile> {
   return readJson<Record<string, UserProfile>>(USER_PROFILES_KEY, {});
 }
 
-function getInitialAccount(): string | null {
-  const token = typeof window !== "undefined" ? localStorage.getItem(CUSTOM_TOKEN_KEY) : null;
-  if (!token) {
-    return null;
-  }
-  return readJson<string | null>(SESSION_KEY, null);
-}
-
-function readInitialProfile(): UserProfile | null {
-  const token = typeof window !== "undefined" ? localStorage.getItem(CUSTOM_TOKEN_KEY) : null;
-  if (!token) {
-    return null;
-  }
-  const currentAccount = getInitialAccount();
-  if (!currentAccount) {
-    return null;
-  }
-  const profiles = readProfiles();
-  if (profiles[currentAccount]) {
-    return profiles[currentAccount];
-  }
-  return null;
-}
-
 function createOrganizationId(): string {
   const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
   return `RS-ORG-${suffix}`;
@@ -136,21 +111,14 @@ export function AuthProvider({
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
-  const [accountId, setAccountId] = useState<string | null>(getInitialAccount);
-  const [profile, setProfile] = useState<UserProfile | null>(readInitialProfile);
-  const [organization, setOrganization] =
-    useState<DeveloperOrganization | null>(() => {
-      const currentAccount = getInitialAccount();
-      if (!currentAccount) return null;
-      const orgs = readOrganizations();
-      return orgs[currentAccount] ?? null;
-    });
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [organization, setOrganization] = useState<DeveloperOrganization | null>(null);
 
   const processSsoToken = useCallback(async (ssoToken: string) => {
     try {
       console.log("Processing SSO Token via Cloudflare Worker/Mock...");
 
-      let exchangeSuccess = false;
       try {
         const ssoRes = await authApi.verifySSO(ssoToken);
         if (ssoRes && ssoRes.token) {
@@ -188,57 +156,10 @@ export function AuthProvider({
             setOrganization(ssoRes.organization);
           }
 
-          exchangeSuccess = true;
+          return;
         }
       } catch (apiErr) {
-        console.warn("Worker API unreachable, using client-side mock exchange fallback", apiErr);
-      }
-
-      if (!exchangeSuccess) {
-        let uid = `randseed:usr_${ssoToken.substring(0, 8)}`;
-        let mockRole: "player" | "creator" | "admin" = "creator";
-        let mockEmail = "creator@randseed.org";
-        let mockEmailVerified = true;
-
-        try {
-          const decoded = JSON.parse(atob(ssoToken));
-          if (decoded && decoded.payload) {
-            uid = decoded.payload.principal_id || uid;
-            mockEmail = decoded.payload.email || mockEmail;
-            mockEmailVerified = decoded.payload.is_email_verified ?? true;
-          }
-        } catch {
-          mockRole = ssoToken.includes("admin") ? "admin" : ssoToken.includes("creator") ? "creator" : "player";
-          mockEmail = `test_${mockRole}@example.com`;
-          mockEmailVerified = ssoToken.includes("verified");
-        }
-
-        const customToken = `jwt_mock_${ssoToken}`;
-        localStorage.removeItem("randseed_signed_out");
-        localStorage.setItem(CUSTOM_TOKEN_KEY, customToken);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
-
-        const profiles = readProfiles();
-        const fallbackProfile: UserProfile = {
-          avatarUrl: "",
-          username: `${mockRole}_${uid.substring(0, 6)}`,
-          isVerified: mockEmailVerified,
-          hasStake: false,
-          lastActive: "Just now",
-          bio: "",
-          location: "",
-          joinedDate: new Date().toISOString().split("T")[0],
-          role: mockRole,
-          email: mockEmail,
-          isEmailVerified: mockEmailVerified,
-        };
-
-        profiles[uid] = fallbackProfile;
-        localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(fallbackProfile));
-
-        setAccountId(uid);
-        setProfile(fallbackProfile);
+        console.warn("Worker API unreachable", apiErr);
       }
     } catch (error) {
       console.error("SSO Exchange failed", error);
@@ -275,38 +196,36 @@ export function AuthProvider({
 
       if (storedSession && token) {
         setAccountId(storedSession);
-        if (!token.startsWith("jwt_mock_")) {
-          authApi.getMe()
-            .then((meRes) => {
-              if (meRes && meRes.user) {
-                if (meRes.token) {
-                  localStorage.setItem(CUSTOM_TOKEN_KEY, meRes.token);
-                }
-                setProfile((prev) => ({
-                  ...prev,
-                  avatarUrl: prev?.avatarUrl || "",
-                  username: prev?.username || (meRes.user.email?.split("@")[0] ?? storedSession),
-                  isVerified: meRes.user.isEmailVerified,
-                  hasStake: prev?.hasStake ?? false,
-                  lastActive: prev?.lastActive || "Recently",
-                  bio: prev?.bio || "",
-                  location: prev?.location || "",
-                  joinedDate: prev?.joinedDate || new Date().toISOString().split("T")[0],
-                  role: meRes.user.role,
-                  email: meRes.user.email ?? undefined,
-                  isEmailVerified: meRes.user.isEmailVerified,
-                }));
-                if (meRes.organization) {
-                  setOrganization(meRes.organization);
-                }
-              } else {
-                void signOut();
+        authApi.getMe()
+          .then((meRes) => {
+            if (meRes && meRes.user) {
+              if (meRes.token) {
+                localStorage.setItem(CUSTOM_TOKEN_KEY, meRes.token);
               }
-            })
-            .catch(() => {
+              setProfile((prev) => ({
+                ...prev,
+                avatarUrl: prev?.avatarUrl || "",
+                username: prev?.username || (meRes.user.email?.split("@")[0] ?? storedSession),
+                isVerified: meRes.user.isEmailVerified,
+                hasStake: prev?.hasStake ?? false,
+                lastActive: prev?.lastActive || "Recently",
+                bio: prev?.bio || "",
+                location: prev?.location || "",
+                joinedDate: prev?.joinedDate || new Date().toISOString().split("T")[0],
+                role: meRes.user.role,
+                email: meRes.user.email ?? undefined,
+                isEmailVerified: meRes.user.isEmailVerified,
+              }));
+              if (meRes.organization) {
+                setOrganization(meRes.organization);
+              }
+            } else {
               void signOut();
-            });
-        }
+            }
+          })
+          .catch(() => {
+            void signOut();
+          });
       } else if (!token) {
         // Clear any orphan session keys
         localStorage.removeItem(SESSION_KEY);
@@ -362,66 +281,13 @@ export function AuthProvider({
     setAccountId(nextAccountId);
   }, []);
 
-  // [DEV ONLY]: Mock Sign In with Cloudflare Worker support
-  const mockSignIn = useCallback(async (role: "creator" | "admin" | "player") => {
-    try {
-      const res = await authApi.mockLogin(role);
-      if (res && res.token) {
-        localStorage.setItem(CUSTOM_TOKEN_KEY, res.token);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(res.uid));
-
-        const nextProfile: UserProfile = {
-          avatarUrl: "",
-          username: `${role}_user`,
-          isVerified: res.user.isEmailVerified,
-          hasStake: false,
-          lastActive: "Just now",
-          bio: "",
-          location: "",
-          joinedDate: new Date().toISOString().split("T")[0],
-          role: res.user.role,
-          email: res.user.email ?? undefined,
-          isEmailVerified: res.user.isEmailVerified,
-        };
-
-        const profiles = readProfiles();
-        profiles[res.uid] = nextProfile;
-        localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(nextProfile));
-
-        setAccountId(res.uid);
-        setProfile(nextProfile);
-        if (res.organization) {
-          setOrganization(res.organization);
-        }
-        return;
-      }
-    } catch (e) {
-      console.warn("Mock login API call failed, falling back to URL redirect mock", e);
-    }
-
-    const ssoToken =
-      role === "admin"
-        ? "mock_admin_token_verified"
-        : role === "creator"
-        ? "mock_creator_token_verified"
-        : "mock_player_token_unverified";
-
-    window.location.href = `/?sso_token=${ssoToken}`;
-  }, []);
-
   // [PIPELINE B]: Open centered popup to Main Site to get SSO Token (no whole page redirect)
   const signInWithSSO = useCallback(() => {
-    const isLocalhost =
-      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
     const mainSiteUrl =
       import.meta.env.VITE_WL_LOGIN_URL ||
       (import.meta.env.VITE_MAIN_SITE_URL
         ? `${import.meta.env.VITE_MAIN_SITE_URL}/login`
-        : isLocalhost
-        ? `${window.location.protocol}//${window.location.hostname}:3001/login`
-        : "https://test.randseed.org/login");
+        : "https://dev.randseed.org/login");
 
     const currentOrigin = window.location.origin;
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
@@ -664,7 +530,6 @@ export function AuthProvider({
       isPlayer: currentRole === "player",
       upgradeToCreator,
       signIn,
-      mockSignIn,
       signInWithSSO,
       signOut,
       updateProfile,
@@ -681,7 +546,6 @@ export function AuthProvider({
       switchRole,
       upgradeToCreator,
       signIn,
-      mockSignIn,
       signInWithSSO,
       signOut,
       updateProfile,

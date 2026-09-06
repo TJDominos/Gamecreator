@@ -26,7 +26,7 @@ export function getBaseApiUrl(): string {
   if (envUrl && typeof envUrl === "string" && envUrl.trim()) {
     return envUrl.replace(/\/+$/, "");
   }
-  return "";
+  return import.meta.env.DEV ? "https://devcreator.randseed.org" : "";
 }
 
 export async function request<T = any>(

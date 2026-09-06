@@ -58,13 +58,6 @@ export const authApi = {
     });
   },
 
-  async mockLogin(role: "player" | "creator" | "admin"): Promise<SsoExchangeResponse> {
-    return request<SsoExchangeResponse>("/api/auth/mock-login", {
-      method: "POST",
-      body: JSON.stringify({ role }),
-    });
-  },
-
   async updateProfile(data: {
     dev_notification_email?: string;
     tos_accepted_version?: string;

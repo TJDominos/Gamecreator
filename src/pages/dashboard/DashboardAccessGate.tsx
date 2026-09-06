@@ -1,20 +1,11 @@
 import React from "react";
-import { Sparkles, Shield, UserCheck, ArrowRight, Home, Rocket, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Home, Rocket, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
-import { useNavigate, Link } from "react-router";
+import { Link } from "react-router";
 
 export function DashboardAccessGate(): React.ReactElement {
-  const { switchRole, upgradeToCreator, profile, signInWithSSO } = useAuth();
-  const navigate = useNavigate();
-
-  const handleEnterAsCreator = () => {
-    switchRole("creator");
-  };
-
-  const handleEnterAsAdmin = () => {
-    switchRole("admin");
-  };
+  const { signInWithSSO } = useAuth();
 
   return (
     <div
@@ -109,109 +100,6 @@ export function DashboardAccessGate(): React.ReactElement {
             <ArrowRight size={20} color="#ffffff" />
           </button>
 
-          <div style={{ textAlign: "center", margin: "8px 0 4px", fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>
-            ── OR TEST WITH LOCAL PERSONA ──
-          </div>
-
-          {/* Creator Option */}
-          <button
-            type="button"
-            onClick={handleEnterAsCreator}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "14px 16px",
-              borderRadius: "14px",
-              border: "1px solid #e2e8f0",
-              background: "#faf5ff",
-              cursor: "pointer",
-              transition: "transform 0.15s ease, box-shadow 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(124, 58, 237, 0.15)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "none";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div
-                style={{
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "10px",
-                  background: "#7c3aed",
-                  color: "#fff",
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                <Sparkles size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: "#17151d" }}>
-                  Enter as Creator
-                </div>
-                <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                  Manage games, view sandboxes, sync Git, accept bounties
-                </div>
-              </div>
-            </div>
-            <ArrowRight size={18} color="#7c3aed" />
-          </button>
-
-          {/* Admin Option */}
-          <button
-            type="button"
-            onClick={handleEnterAsAdmin}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "16px",
-              borderRadius: "14px",
-              border: "1px solid #e2e8f0",
-              background: "#ffffff",
-              cursor: "pointer",
-              transition: "transform 0.15s ease, border-color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#ef4444";
-              e.currentTarget.style.background = "#fff5f5";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "#e2e8f0";
-              e.currentTarget.style.background = "#ffffff";
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div
-                style={{
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "10px",
-                  background: "#fee2e2",
-                  color: "#dc2626",
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                <Shield size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: "#17151d" }}>
-                  Enter as Platform Admin
-                </div>
-                <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                  Review and approve games, manage platform bounty pools
-                </div>
-              </div>
-            </div>
-            <ArrowRight size={18} color="#dc2626" />
-          </button>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #f1f5f9", paddingTop: "16px" }}>
