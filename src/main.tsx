@@ -10,6 +10,7 @@ import CreatorGuide from "./pages/guides/CreatorGuide";
 import CreatorBounties from "./pages/bounties/CreatorBounties";
 import PublicBountyDetail from "./pages/bounties/PublicBountyDetail";
 import { VersionUpdateBanner } from "./components/VersionUpdateBanner";
+import { SsoLoginFrame } from "./components/SsoLoginFrame";
 import "./index.css";
 
 // Suppress benign third-party wallet extension background communication errors in iframes
@@ -113,7 +114,10 @@ if (rootElement) {
       <HelmetProvider>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <>
+              <App />
+              <SsoLoginFrame />
+            </>
           </AuthProvider>
         </BrowserRouter>
       </HelmetProvider>

@@ -62,6 +62,7 @@ interface AuthContextValue {
   profile: UserProfile | null;
   organization: DeveloperOrganization | null;
   isSignedIn: boolean;
+  isSsoFrameOpen: boolean;
   role: UserRole;
   permissions: Permission[];
   hasPermission: (permission: Permission) => boolean;
@@ -74,6 +75,7 @@ interface AuthContextValue {
   ) => Promise<DeveloperOrganization>;
   signIn: (accountId: string) => void;
   signInWithSSO: () => void;
+  closeSsoFrame: () => void;
   signOut: () => Promise<void>;
   updateProfile: (profile: UserProfile, accountId?: string) => void;
   saveOrganization: (
@@ -114,6 +116,7 @@ export function AuthProvider({
   const [accountId, setAccountId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [organization, setOrganization] = useState<DeveloperOrganization | null>(null);
+  const [isSsoFrameOpen, setIsSsoFrameOpen] = useState(false);
 
   const processSsoToken = useCallback(async (ssoToken: string) => {
     try {
@@ -292,25 +295,12 @@ export function AuthProvider({
     const currentOrigin = window.location.origin;
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
     const targetUrl = `${mainSiteUrl}?redirect_uri=${currentUrl}&mode=popup&origin=${encodeURIComponent(currentOrigin)}`;
+    setIsSsoFrameOpen(true);
+    window.dispatchEvent(new CustomEvent("randseed:sso-target", { detail: targetUrl }));
+  }, []);
 
-    // Calculate center coordinates for popup
-    const width = 460;
-    const height = 680;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-
-    const popup = window.open(
-      targetUrl,
-      "RandSeedSSOPopup",
-      `width=${width},height=${height},left=${left},top=${top},status=no,menubar=no,toolbar=no,resizable=yes`
-    );
-
-    if (!popup || popup.closed || typeof popup.closed === "undefined") {
-      // Fallback to normal redirect if popup was blocked by browser
-      window.location.href = targetUrl;
-    } else {
-      popup.focus();
-    }
+  const closeSsoFrame = useCallback(() => {
+    setIsSsoFrameOpen(false);
   }, []);
 
   const signOut = useCallback(async () => {
@@ -520,6 +510,7 @@ export function AuthProvider({
       accountId,
       profile,
       organization,
+      isSsoFrameOpen,
       isSignedIn: Boolean(accountId),
       role: currentRole,
       permissions,
@@ -531,6 +522,7 @@ export function AuthProvider({
       upgradeToCreator,
       signIn,
       signInWithSSO,
+      closeSsoFrame,
       signOut,
       updateProfile,
       saveOrganization,
@@ -540,6 +532,7 @@ export function AuthProvider({
       accountId,
       profile,
       organization,
+      isSsoFrameOpen,
       currentRole,
       permissions,
       hasPermission,
@@ -547,6 +540,7 @@ export function AuthProvider({
       upgradeToCreator,
       signIn,
       signInWithSSO,
+      closeSsoFrame,
       signOut,
       updateProfile,
       saveOrganization,

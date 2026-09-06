@@ -7,6 +7,7 @@ export interface Env {
   JWT_SECRET: string;
   RANDSEED_PUBLIC_KEY?: string;
   MAIN_SITE_URL?: string;
+  ADMIN_EMAILS?: string;
   CORS_ORIGINS?: string;
   GITHUB_APP_ID?: string;
   GITHUB_APP_SLUG?: string;

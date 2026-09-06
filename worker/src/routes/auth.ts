@@ -159,11 +159,19 @@ async function handleSsoExchange(
       .bind(principalId)
       .first<UserRow>();
 
-    let userRole: UserRole = initialRole;
+    const configuredAdminEmails = (env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    let userRole: UserRole = email && configuredAdminEmails.includes(email.trim().toLowerCase())
+      ? "admin"
+      : initialRole;
 
     if (existingUser) {
       // User already exists in D1, preserve established role and update login timestamp
-      userRole = existingUser.role || initialRole;
+      userRole = configuredAdminEmails.includes((email || existingUser.email || "").trim().toLowerCase())
+        ? "admin"
+        : existingUser.role || initialRole;
       await env.DB.prepare(
         `UPDATE users 
          SET last_login_at = ?, 

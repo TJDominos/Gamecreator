@@ -10,7 +10,7 @@ function getPortalPath(hasOrganization: boolean): string {
 }
 
 export function SiteHeader(): React.ReactElement {
-  const { isSignedIn, profile, signInWithSSO } = useAuth();
+  const { isSignedIn, profile, organization, signInWithSSO } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
@@ -19,7 +19,7 @@ export function SiteHeader(): React.ReactElement {
 
   function openPortal(): void {
     if (isSignedIn) {
-      if (profile?.role === 'creator' || profile?.role === 'admin') {
+      if (organization || profile?.role === 'admin') {
         navigate("/dashboard");
       } else {
         setBecomeCreatorModalOpen(true);
@@ -57,7 +57,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((organization || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
             </button>
           </div>
           <div className="landing-nav__mobile-actions flex items-center gap-2">
@@ -67,7 +67,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((organization || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
             </button>
             <button 
               className="landing-nav__hamburger"
