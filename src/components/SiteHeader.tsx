@@ -5,12 +5,8 @@ import { BecomeCreatorModal } from "./BecomeCreatorModal";
 import { Menu, X } from "lucide-react";
 import "../pages/home/DeveloperLanding.css";
 
-function getPortalPath(hasOrganization: boolean): string {
-  return hasOrganization ? "/dashboard" : "/onboarding";
-}
-
 export function SiteHeader(): React.ReactElement {
-  const { isSignedIn, profile, organization, signInWithSSO } = useAuth();
+  const { isSignedIn, profile, signInWithSSO } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
@@ -19,7 +15,7 @@ export function SiteHeader(): React.ReactElement {
 
   function openPortal(): void {
     if (isSignedIn) {
-      if (organization || profile?.role === 'admin') {
+      if (profile?.role === 'creator' || profile?.role === 'admin') {
         navigate("/dashboard");
       } else {
         setBecomeCreatorModalOpen(true);
@@ -57,7 +53,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((organization || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
             </button>
           </div>
           <div className="landing-nav__mobile-actions flex items-center gap-2">
@@ -67,7 +63,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((organization || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
+              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
             </button>
             <button 
               className="landing-nav__hamburger"

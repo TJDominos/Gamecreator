@@ -118,12 +118,6 @@ function GameSeparator({ reverse = false, type = 'dark', variant = 'arcade' }: {
   );
 }
 
-function getPortalPath(hasOrganization: boolean): string {
-  return hasOrganization
-    ? "/dashboard"
-    : "/onboarding";
-}
-
 function RandseedMark({
   className = "",
 }: {
@@ -480,11 +474,11 @@ const Dice3D = ({ color, dotColor }: { color: string, dotColor: string }) => {
 export default function DeveloperLanding(): React.ReactElement {
   const navigate = useNavigate();
   const [isVnBtnActive, setIsVnBtnActive] = useState(false);
-  const { isSignedIn, signIn, signInWithSSO } = useAuth();
+  const { isSignedIn, profile, signIn, signInWithSSO } = useAuth();
 
   const openSignInModal = () => {
     if (isSignedIn) {
-      navigate(getPortalPath(true));
+      navigate(profile?.role === "creator" || profile?.role === "admin" ? "/dashboard" : "/");
     } else {
       signInWithSSO();
     }

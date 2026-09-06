@@ -72,7 +72,7 @@ interface AuthContextValue {
   isPlayer: boolean;
   upgradeToCreator: (
     customOrg?: Partial<DeveloperOrganizationInput>,
-  ) => Promise<DeveloperOrganization>;
+  ) => Promise<DeveloperOrganization | null>;
   signIn: (accountId: string) => void;
   signInWithSSO: () => void;
   closeSsoFrame: () => void;
@@ -360,28 +360,7 @@ export function AuthProvider({
       if (!currentAcc) {
         throw new Error("You must sign in before upgrading to creator.");
       }
-      const orgName = customOrg?.name || `${profile?.username || "Developer"}'s Studio`;
-      
-      const newOrg: DeveloperOrganization = {
-        accountId: currentAcc,
-        name: orgName,
-        contactEmail: customOrg?.contactEmail || profile?.email || "creator@randseed.org",
-        supportEmail: customOrg?.supportEmail || profile?.email || "support@randseed.org",
-        logo: customOrg?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(orgName)}`,
-        description: customOrg?.description || "Game creator studio on RandSeed platform.",
-        socialLinks: customOrg?.socialLinks || ["https://randseed.org", ""],
-        organizationId: createOrganizationId(),
-        level: "Creator",
-        revenueShare: 70,
-        platformAccount: `platform_${currentAcc.replace(/[^a-zA-Z0-9]/g, "").slice(-10)}`,
-        status: "approved",
-        createdAt: new Date().toISOString(),
-      };
-
-      const orgs = readOrganizations();
-      orgs[currentAcc] = newOrg;
-      localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
-      setOrganization(newOrg);
+      await authApi.becomeCreator();
 
       const updatedProfile: UserProfile = {
         avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentAcc}`,
@@ -405,9 +384,9 @@ export function AuthProvider({
       setAccountId(currentAcc);
       localStorage.removeItem("randseed_signed_out");
 
-      return newOrg;
+      return organization;
     },
-    [accountId, profile],
+    [accountId, organization, profile],
   );
 
   const updateProfile = useCallback(
@@ -490,15 +469,12 @@ export function AuthProvider({
       localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(organizations));
       setOrganization(nextOrganization);
 
-      // Upgrade local role to creator
-      setProfile((prev) => (prev ? { ...prev, role: "creator" } : prev));
-
       return nextOrganization;
     },
     [accountId, isOrganizationNameAvailable],
   );
 
-  const currentRole: UserRole = (profile?.role as UserRole) || (accountId ? "creator" : "player");
+  const currentRole: UserRole = (profile?.role as UserRole) || "player";
   const permissions = useMemo(() => ROLE_PERMISSIONS[currentRole] || [], [currentRole]);
   const hasPermission = useCallback(
     (perm: Permission) => checkPermission(currentRole, perm),

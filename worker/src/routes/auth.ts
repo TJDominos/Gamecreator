@@ -36,6 +36,10 @@ export async function handleAuthRoutes(
     return handleGetMe(request, env);
   }
 
+  if (method === "POST" && pathname === "/api/auth/become-creator") {
+    return handleBecomeCreator(request, env);
+  }
+
   if (method === "POST" && pathname === "/api/auth/mock-login") {
     return handleMockLogin(request, env);
   }
@@ -45,6 +49,25 @@ export async function handleAuthRoutes(
   }
 
   return null;
+}
+
+async function handleBecomeCreator(request: Request, env: Env): Promise<Response> {
+  const authUser = await getAuthenticatedUser(request, env);
+  if (!authUser) {
+    return errorResponse("Unauthorized", 401, "UNAUTHORIZED", request, env);
+  }
+
+  if (authUser.role === "admin" || authUser.role === "creator") {
+    return jsonResponse({ success: true, role: authUser.role }, 200, request, env);
+  }
+
+  await env.DB.prepare(
+    "UPDATE users SET role = 'creator', updated_at = ? WHERE principal_id = ?",
+  )
+    .bind(Date.now(), authUser.principal_id)
+    .run();
+
+  return jsonResponse({ success: true, role: "creator" }, 200, request, env);
 }
 
 async function handleSsoExchange(
@@ -208,14 +231,6 @@ async function handleSsoExchange(
     )
       .bind(principalId)
       .first<DeveloperOrganizationRow>();
-
-    // If user owns an organization, ensure their role is at least creator
-    if (organization && userRole === "player") {
-      userRole = "creator";
-      await env.DB.prepare("UPDATE users SET role = 'creator' WHERE principal_id = ?")
-        .bind(principalId)
-        .run();
-    }
 
     // 4. Issue Portal JWT session token
     const token = await signJwt(

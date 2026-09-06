@@ -134,13 +134,6 @@ async function handleCreateOrganization(
     )
     .run();
 
-  // Elevate user role to creator if currently player
-  if (authUser.role === "player") {
-    await env.DB.prepare("UPDATE users SET role = 'creator', updated_at = ? WHERE principal_id = ?")
-      .bind(now, authUser.principal_id)
-      .run();
-  }
-
   const savedOrg = await env.DB.prepare(
     "SELECT * FROM developer_organizations WHERE id = ?",
   )

@@ -58,6 +58,12 @@ export const authApi = {
     });
   },
 
+  async becomeCreator(): Promise<{ success: boolean; role: "creator" }> {
+    return request<{ success: boolean; role: "creator" }>("/api/auth/become-creator", {
+      method: "POST",
+    });
+  },
+
   async updateProfile(data: {
     dev_notification_email?: string;
     tos_accepted_version?: string;
