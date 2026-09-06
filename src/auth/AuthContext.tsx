@@ -103,23 +103,10 @@ function readProfiles(): Record<string, UserProfile> {
 }
 
 function getInitialAccount(): string | null {
-  if (typeof window !== "undefined" && localStorage.getItem("randseed_signed_out") === "true") {
-    return null;
-  }
-  const storedAccount = readJson<string | null>(SESSION_KEY, null);
-  if (storedAccount) {
-    return storedAccount;
-  }
-  // Online / preview default: initialize with creator persona so verification works immediately
-  const defaultPersona = DEFAULT_PERSONAS.creator;
-  localStorage.setItem(SESSION_KEY, JSON.stringify(defaultPersona.id));
-  return defaultPersona.id;
+  return readJson<string | null>(SESSION_KEY, null);
 }
 
 function readInitialProfile(): UserProfile | null {
-  if (typeof window !== "undefined" && localStorage.getItem("randseed_signed_out") === "true") {
-    return null;
-  }
   const currentAccount = getInitialAccount();
   if (!currentAccount) {
     return null;
@@ -134,33 +121,7 @@ function readInitialProfile(): UserProfile | null {
     localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
     return legacyProfile;
   }
-
-  // Pre-seed default creator profile if fresh session
-  const defaultPersona = DEFAULT_PERSONAS.creator;
-  const initialProfile: UserProfile = {
-    avatarUrl: defaultPersona.avatarUrl,
-    username: defaultPersona.username,
-    isVerified: true,
-    hasStake: true,
-    lastActive: "Just now",
-    bio: defaultPersona.bio,
-    location: "Global",
-    joinedDate: "2026-01-01",
-    role: "creator",
-    email: defaultPersona.email,
-    isEmailVerified: true,
-  };
-  profiles[defaultPersona.id] = initialProfile;
-  localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-  localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(initialProfile));
-
-  if (defaultPersona.organization) {
-    const orgs = readOrganizations();
-    orgs[defaultPersona.id] = defaultPersona.organization;
-    localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
-  }
-
-  return initialProfile;
+  return null;
 }
 
 function createOrganizationId(): string {
@@ -180,115 +141,134 @@ export function AuthProvider({
       const currentAccount = getInitialAccount();
       if (!currentAccount) return null;
       const orgs = readOrganizations();
-      if (orgs[currentAccount]) return orgs[currentAccount];
-      if (currentAccount === DEFAULT_PERSONAS.creator.id) {
-        return DEFAULT_PERSONAS.creator.organization;
-      }
-      return null;
+      return orgs[currentAccount] ?? null;
     });
 
-  // [PIPELINE A & INIT]: Intercept SSO Token on mount or restore session
+  const processSsoToken = useCallback(async (ssoToken: string) => {
+    try {
+      console.log("Processing SSO Token via Cloudflare Worker/Mock...");
+
+      let exchangeSuccess = false;
+      try {
+        const ssoRes = await authApi.verifySSO(ssoToken);
+        if (ssoRes && ssoRes.token) {
+          const uid = ssoRes.uid || ssoRes.user.principal_id;
+          localStorage.removeItem("randseed_signed_out");
+          localStorage.setItem(CUSTOM_TOKEN_KEY, ssoRes.token);
+          localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
+
+          const profiles = readProfiles();
+          const updatedProfile: UserProfile = {
+            avatarUrl: profiles[uid]?.avatarUrl || "",
+            username: profiles[uid]?.username || (ssoRes.user.email?.split("@")[0] ?? uid.substring(0, 10)),
+            isVerified: ssoRes.user.isEmailVerified,
+            hasStake: profiles[uid]?.hasStake ?? false,
+            lastActive: "Just now",
+            bio: profiles[uid]?.bio || "",
+            location: profiles[uid]?.location || "",
+            joinedDate: profiles[uid]?.joinedDate || new Date().toISOString().split("T")[0],
+            role: ssoRes.user.role,
+            email: ssoRes.user.email ?? undefined,
+            isEmailVerified: ssoRes.user.isEmailVerified,
+          };
+
+          profiles[uid] = updatedProfile;
+          localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+          localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updatedProfile));
+
+          setAccountId(uid);
+          setProfile(updatedProfile);
+
+          if (ssoRes.organization) {
+            const orgs = readOrganizations();
+            orgs[uid] = ssoRes.organization;
+            localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
+            setOrganization(ssoRes.organization);
+          }
+
+          exchangeSuccess = true;
+        }
+      } catch (apiErr) {
+        console.warn("Worker API unreachable, using client-side mock exchange fallback", apiErr);
+      }
+
+      if (!exchangeSuccess) {
+        let uid = `randseed:usr_${ssoToken.substring(0, 8)}`;
+        let mockRole: "player" | "creator" | "admin" = "creator";
+        let mockEmail = "creator@randseed.org";
+        let mockEmailVerified = true;
+
+        try {
+          const decoded = JSON.parse(atob(ssoToken));
+          if (decoded && decoded.payload) {
+            uid = decoded.payload.principal_id || uid;
+            mockEmail = decoded.payload.email || mockEmail;
+            mockEmailVerified = decoded.payload.is_email_verified ?? true;
+          }
+        } catch {
+          mockRole = ssoToken.includes("admin") ? "admin" : ssoToken.includes("creator") ? "creator" : "player";
+          mockEmail = `test_${mockRole}@example.com`;
+          mockEmailVerified = ssoToken.includes("verified");
+        }
+
+        const customToken = `jwt_mock_${ssoToken}`;
+        localStorage.removeItem("randseed_signed_out");
+        localStorage.setItem(CUSTOM_TOKEN_KEY, customToken);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
+
+        const profiles = readProfiles();
+        const fallbackProfile: UserProfile = {
+          avatarUrl: "",
+          username: `${mockRole}_${uid.substring(0, 6)}`,
+          isVerified: mockEmailVerified,
+          hasStake: false,
+          lastActive: "Just now",
+          bio: "",
+          location: "",
+          joinedDate: new Date().toISOString().split("T")[0],
+          role: mockRole,
+          email: mockEmail,
+          isEmailVerified: mockEmailVerified,
+        };
+
+        profiles[uid] = fallbackProfile;
+        localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(fallbackProfile));
+
+        setAccountId(uid);
+        setProfile(fallbackProfile);
+      }
+    } catch (error) {
+      console.error("SSO Exchange failed", error);
+    }
+  }, []);
+
+  // [PIPELINE A & INIT & POPUP LISTENER]: Intercept SSO Token on mount or restore session
   useEffect(() => {
+    const handlePostMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoToken) {
+        console.log("Received SSO Token from popup message", event.origin);
+        void processSsoToken(event.data.ssoToken);
+      }
+    };
+
+    window.addEventListener("message", handlePostMessage);
+
     const initAuth = async () => {
       // 1. Check if we are returning from Main Site with an sso_token in the URL
       const urlParams = new URLSearchParams(window.location.search);
       const ssoToken = urlParams.get("sso_token");
 
       if (ssoToken) {
-        try {
-          console.log("Intercepted SSO Token. Exchanging via Cloudflare Worker...");
-          
-          let exchangeSuccess = false;
-          try {
-            // Real exchange with Cloudflare Worker D1 backend
-            const ssoRes = await authApi.verifySSO(ssoToken);
-            if (ssoRes && ssoRes.token) {
-              const uid = ssoRes.uid || ssoRes.user.principal_id;
-              localStorage.setItem(CUSTOM_TOKEN_KEY, ssoRes.token);
-              localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
-
-              const profiles = readProfiles();
-              const updatedProfile: UserProfile = {
-                avatarUrl: profiles[uid]?.avatarUrl || "",
-                username: profiles[uid]?.username || (ssoRes.user.email?.split("@")[0] ?? uid.substring(0, 10)),
-                isVerified: ssoRes.user.isEmailVerified,
-                hasStake: profiles[uid]?.hasStake ?? false,
-                lastActive: "Just now",
-                bio: profiles[uid]?.bio || "",
-                location: profiles[uid]?.location || "",
-                joinedDate: profiles[uid]?.joinedDate || new Date().toISOString().split("T")[0],
-                role: ssoRes.user.role,
-                email: ssoRes.user.email ?? undefined,
-                isEmailVerified: ssoRes.user.isEmailVerified,
-              };
-
-              profiles[uid] = updatedProfile;
-              localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-              localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updatedProfile));
-
-              setAccountId(uid);
-              setProfile(updatedProfile);
-
-              if (ssoRes.organization) {
-                const orgs = readOrganizations();
-                orgs[uid] = ssoRes.organization;
-                localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
-                setOrganization(ssoRes.organization);
-              }
-
-              exchangeSuccess = true;
-            }
-          } catch (apiErr) {
-            console.warn("Worker API unreachable, using client-side mock exchange fallback", apiErr);
-          }
-
-          if (!exchangeSuccess) {
-            // Fallback client simulation if API server is offline
-            const uid = `randseed:usr_${ssoToken.substring(0, 8)}`;
-            const customToken = `jwt_mock_${ssoToken}`;
-            const mockRole = ssoToken.includes("admin") ? "admin" : ssoToken.includes("creator") ? "creator" : "player";
-            const mockEmail = `test_${mockRole}@example.com`;
-            const mockEmailVerified = ssoToken.includes("verified");
-
-            localStorage.setItem(CUSTOM_TOKEN_KEY, customToken);
-            localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
-
-            const profiles = readProfiles();
-            const fallbackProfile: UserProfile = {
-              avatarUrl: "",
-              username: `${mockRole}_${uid.substring(0, 6)}`,
-              isVerified: mockEmailVerified,
-              hasStake: false,
-              lastActive: "Just now",
-              bio: "",
-              location: "",
-              joinedDate: new Date().toISOString().split("T")[0],
-              role: mockRole,
-              email: mockEmail,
-              isEmailVerified: mockEmailVerified,
-            };
-
-            profiles[uid] = fallbackProfile;
-            localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-            localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(fallbackProfile));
-
-            setAccountId(uid);
-            setProfile(fallbackProfile);
-          }
-
-          // Clean up the URL to remove the sso_token for security and UX
-          window.history.replaceState({}, document.title, window.location.pathname);
-          return;
-        } catch (error) {
-          console.error("SSO Exchange failed", error);
-        }
+        await processSsoToken(ssoToken);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
       }
 
       // 2. Fallback: Check local storage for existing Custom Token / Session
       const storedSession = readJson<string | null>(SESSION_KEY, null);
       if (storedSession) {
         setAccountId(storedSession);
-        // Sync fresh profile & organization from D1 backend if token exists
         const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
         if (token && !token.startsWith("jwt_mock_")) {
           authApi.getMe()
@@ -313,14 +293,17 @@ export function AuthProvider({
                 }
               }
             })
-            .catch(() => {
-              // Ignore background fetch error
-            });
+            .catch(() => {});
         }
       }
     };
+
     initAuth();
-  }, []);
+
+    return () => {
+      window.removeEventListener("message", handlePostMessage);
+    };
+  }, [processSsoToken]);
 
   useEffect(() => {
     setOrganization(accountId ? readOrganizations()[accountId] ?? null : null);
@@ -408,7 +391,7 @@ export function AuthProvider({
     window.location.href = `/?sso_token=${ssoToken}`;
   }, []);
 
-  // [PIPELINE B]: Redirect user to Main Site to get SSO Token
+  // [PIPELINE B]: Open centered popup to Main Site to get SSO Token (no whole page redirect)
   const signInWithSSO = useCallback(() => {
     const isLocalhost =
       window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -421,8 +404,28 @@ export function AuthProvider({
         ? `${window.location.protocol}//${window.location.hostname}:3001/login`
         : "https://test.randseed.org/login");
 
+    const currentOrigin = window.location.origin;
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-    window.location.href = `${mainSiteUrl}?redirect_uri=${currentUrl}`;
+    const targetUrl = `${mainSiteUrl}?redirect_uri=${currentUrl}&mode=popup&origin=${encodeURIComponent(currentOrigin)}`;
+
+    // Calculate center coordinates for popup
+    const width = 460;
+    const height = 680;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const popup = window.open(
+      targetUrl,
+      "RandSeedSSOPopup",
+      `width=${width},height=${height},left=${left},top=${top},status=no,menubar=no,toolbar=no,resizable=yes`
+    );
+
+    if (!popup || popup.closed || typeof popup.closed === "undefined") {
+      // Fallback to normal redirect if popup was blocked by browser
+      window.location.href = targetUrl;
+    } else {
+      popup.focus();
+    }
   }, []);
 
   const signOut = useCallback(async () => {

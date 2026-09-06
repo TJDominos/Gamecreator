@@ -481,14 +481,6 @@ export default function DeveloperLanding(): React.ReactElement {
   const navigate = useNavigate();
   const [isVnBtnActive, setIsVnBtnActive] = useState(false);
   const { isSignedIn, signIn, signInWithSSO } = useAuth();
-  
-  useEffect(() => {
-    // If not signed in and no sso_token in URL (handled by AuthContext),
-    // automatically redirect to main site login
-    if (!isSignedIn && !window.location.search.includes("sso_token")) {
-      signInWithSSO();
-    }
-  }, [isSignedIn, signInWithSSO]);
 
   const openSignInModal = () => {
     if (isSignedIn) {
