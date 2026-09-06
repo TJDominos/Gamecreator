@@ -140,7 +140,7 @@ async function handleSsoExchange(
           principalId = payload.principal_id;
           email = payload.email || null;
           isEmailVerified = Boolean(payload.is_email_verified);
-          initialRole = "creator";
+          initialRole = "player";
         } else {
           // Fallback simple token
           principalId = `randseed:usr_${rawToken.substring(0, 12)}`;
