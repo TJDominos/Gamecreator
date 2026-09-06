@@ -21,6 +21,7 @@ export interface SsoExchangeResponse {
 
 export interface MeResponse {
   success: boolean;
+  token?: string;
   user: {
     principal_id: string;
     role: "player" | "creator" | "admin";

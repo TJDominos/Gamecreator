@@ -103,6 +103,7 @@ function mockApiPlugin(): Plugin {
           return res.end(
             JSON.stringify({
               success: true,
+              token: authHeader.substring(7).trim(),
               user: {
                 principal_id: "randseed:usr_creator",
                 role: "creator",

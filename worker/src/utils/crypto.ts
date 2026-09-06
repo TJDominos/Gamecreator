@@ -1,6 +1,6 @@
 import type { JwtPayload, UserRole } from "../types";
 
-const TOKEN_EXPIRY_SECONDS = 7 * 24 * 3600; // 7 days
+const TOKEN_EXPIRY_SECONDS = 30 * 24 * 3600; // 30 days
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let str = "";

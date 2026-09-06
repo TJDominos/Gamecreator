@@ -272,9 +272,20 @@ async function handleGetMe(
     .bind(authUser.principal_id)
     .first<DeveloperOrganizationRow>();
 
+  const token = await signJwt(
+    {
+      principal_id: user.principal_id,
+      role: user.role,
+      email: user.email ?? undefined,
+      is_email_verified: user.email_verified === 1,
+    },
+    env.JWT_SECRET,
+  );
+
   return jsonResponse(
     {
       success: true,
+      token,
       user: {
         principal_id: user.principal_id,
         role: user.role,

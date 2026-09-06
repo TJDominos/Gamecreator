@@ -279,6 +279,9 @@ export function AuthProvider({
           authApi.getMe()
             .then((meRes) => {
               if (meRes && meRes.user) {
+                if (meRes.token) {
+                  localStorage.setItem(CUSTOM_TOKEN_KEY, meRes.token);
+                }
                 setProfile((prev) => ({
                   ...prev,
                   avatarUrl: prev?.avatarUrl || "",
