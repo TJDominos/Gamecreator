@@ -22,6 +22,8 @@ const CUSTOM_TOKEN_KEY = "randseed_custom_jwt";
 const USER_PROFILE_KEY = "user_profile_data";
 const USER_PROFILES_KEY = "randseed_user_profiles";
 const ORGANIZATIONS_KEY = "randseed_developer_organizations";
+const AUTH_SYNC_CHANNEL = "randseed_creator_auth_sync";
+const AUTH_SYNC_STORAGE_KEY = "randseed_creator_auth_event";
 
 export interface UserProfile extends UserProfileInfo {
   email?: string;
@@ -159,6 +161,23 @@ export function AuthProvider({
             setOrganization(ssoRes.organization);
           }
 
+          // Broadcast login to all other open tabs/windows
+          const loginEvent = {
+            type: "LOGIN",
+            timestamp: Date.now(),
+            payload: {
+              uid,
+              profile: updatedProfile,
+              organization: ssoRes.organization ?? null,
+            },
+          };
+          localStorage.setItem(AUTH_SYNC_STORAGE_KEY, JSON.stringify(loginEvent));
+          try {
+            const channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
+            channel.postMessage(loginEvent);
+            channel.close();
+          } catch {}
+
           return;
         }
       } catch (apiErr) {
@@ -194,6 +213,17 @@ export function AuthProvider({
       }
 
       // 2. Fallback: Check local storage for existing Custom Token / Session
+      if (localStorage.getItem("randseed_signed_out") === "true") {
+        // User explicitly signed out, do not restore previous session or auto-renew
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(CUSTOM_TOKEN_KEY);
+        localStorage.removeItem(USER_PROFILE_KEY);
+        setAccountId(null);
+        setProfile(null);
+        setOrganization(null);
+        return;
+      }
+
       const storedSession = readJson<string | null>(SESSION_KEY, null);
       const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
 
@@ -284,7 +314,7 @@ export function AuthProvider({
     setAccountId(nextAccountId);
   }, []);
 
-  // [PIPELINE B]: Open centered popup to Main Site to get SSO Token (no whole page redirect)
+  // [PIPELINE B]: Open centered modal iframe to Main Site to get SSO Token (no whole page redirect)
   const signInWithSSO = useCallback(() => {
     const mainSiteUrl =
       import.meta.env.VITE_WL_LOGIN_URL ||
@@ -294,7 +324,7 @@ export function AuthProvider({
 
     const currentOrigin = window.location.origin;
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-    const targetUrl = `${mainSiteUrl}?redirect_uri=${currentUrl}&mode=popup&origin=${encodeURIComponent(currentOrigin)}`;
+    const targetUrl = `${mainSiteUrl}?redirect_uri=${currentUrl}&mode=iframe&origin=${encodeURIComponent(currentOrigin)}&prompt=login`;
     setIsSsoFrameOpen(true);
     window.dispatchEvent(new CustomEvent("randseed:sso-target", { detail: targetUrl }));
   }, []);
@@ -304,16 +334,74 @@ export function AuthProvider({
   }, []);
 
   const signOut = useCallback(async () => {
-    const client = WLAuthClient.getInstance();
-    await client.logout(); // Clear local IC identity if it exists
+    try {
+      const client = WLAuthClient.getInstance();
+      await client.logout(); // Clear local IC identity if it exists
+    } catch {}
 
     localStorage.setItem("randseed_signed_out", "true");
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(CUSTOM_TOKEN_KEY);
     localStorage.removeItem(USER_PROFILE_KEY);
+    localStorage.removeItem(ORGANIZATIONS_KEY);
     setAccountId(null);
     setProfile(null);
     setOrganization(null);
+    setIsSsoFrameOpen(false);
+
+    // Broadcast logout to all other open tabs/windows
+    const logoutEvent = { type: "LOGOUT", timestamp: Date.now() };
+    localStorage.setItem(AUTH_SYNC_STORAGE_KEY, JSON.stringify(logoutEvent));
+    try {
+      const channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
+      channel.postMessage(logoutEvent);
+      channel.close();
+    } catch {}
+  }, []);
+
+  // Multi-window auth state synchronization (cross-tab logout & login)
+  useEffect(() => {
+    const handleSyncEvent = (data: { type: string; timestamp: number; payload?: any }) => {
+      if (!data || typeof data !== "object") return;
+      if (data.type === "LOGOUT") {
+        setAccountId(null);
+        setProfile(null);
+        setOrganization(null);
+        setIsSsoFrameOpen(false);
+        if (window.location.pathname.startsWith("/dashboard")) {
+          window.location.href = "/";
+        }
+      } else if (data.type === "LOGIN" && data.payload) {
+        setAccountId(data.payload.uid);
+        setProfile(data.payload.profile);
+        setOrganization(data.payload.organization ?? null);
+        setIsSsoFrameOpen(false);
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === AUTH_SYNC_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          handleSyncEvent(parsed);
+        } catch {}
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
+      channel.onmessage = (e) => {
+        if (e.data) handleSyncEvent(e.data);
+      };
+    } catch {}
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      if (channel) channel.close();
+    };
   }, []);
 
   const switchRole = useCallback((targetRole: UserRole) => {

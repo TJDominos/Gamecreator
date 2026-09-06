@@ -35,7 +35,12 @@ export function SsoLoginFrame(): React.ReactElement | null {
         <button type="button" onClick={() => { setTargetUrl(null); closeSsoFrame(); }} style={closeButtonStyle} aria-label="Close sign-in">
           <X size={20} />
         </button>
-        <iframe title="RandSeed sign in" src={targetUrl} style={frameStyle} />
+        <iframe
+          title="RandSeed sign in"
+          src={targetUrl}
+          style={frameStyle}
+          allow="publickey-credentials-get; clipboard-write"
+        />
       </div>
     </div>
   );
