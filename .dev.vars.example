@@ -1,0 +1,7 @@
+# Local Worker-only secrets. Copy to .dev.vars; never commit the copied file.
+JWT_SECRET=
+GITHUB_APP_ID=
+GITHUB_APP_PRIVATE_KEY=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_WEBHOOK_SECRET=

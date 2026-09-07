@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "randseed-gamecreator-worker",
+	"name": "gamecreator-worker-dev",
 	"main": "worker/src/index.ts",
 	"compatibility_date": "2026-07-19",
 	"compatibility_flags": [
@@ -34,5 +34,79 @@
 		"GITHUB_APP_SLUG": "RDcreatordev",
 		"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
 		"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org,https://creator.randseed.org,https://test.randseed.org,https://randseed.org"
+	},
+	"env": {
+		"dev": {
+			"name": "gamecreator-worker-dev",
+			"routes": [
+				{
+					"pattern": "devcreator.randseed.org",
+					"custom_domain": true
+				}
+			],
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "gamecreator-d1",
+					"database_id": "320c8dd3-7348-4675-9f3d-e384e1713f63",
+					"remote": true
+				}
+			],
+			"vars": {
+				"MAIN_SITE_URL": "https://devcreator.randseed.org",
+				"ADMIN_EMAILS": "sns.bruce@gmail.com",
+				"GITHUB_APP_SLUG": "RDcreatordev",
+				"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
+				"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org"
+			}
+		},
+		"test": {
+			"name": "randseed-gamecreator-worker-test",
+			"routes": [
+				{
+					"pattern": "testcreator.randseed.org",
+					"custom_domain": true
+				}
+			],
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "gamecreator-d1-test",
+					"database_id": "REPLACE_WITH_TEST_D1_DATABASE_ID",
+					"remote": true
+				}
+			],
+			"vars": {
+				"MAIN_SITE_URL": "https://testcreator.randseed.org",
+				"ADMIN_EMAILS": "sns.bruce@gmail.com",
+				"GITHUB_APP_SLUG": "REPLACE_WITH_TEST_GITHUB_APP_SLUG",
+				"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
+				"CORS_ORIGINS": "https://testcreator.randseed.org"
+			}
+		},
+		"production": {
+			"name": "randseed-gamecreator-worker-production",
+			"routes": [
+				{
+					"pattern": "creator.randseed.org",
+					"custom_domain": true
+				}
+			],
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "gamecreator-d1-production",
+					"database_id": "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID",
+					"remote": true
+				}
+			],
+			"vars": {
+				"MAIN_SITE_URL": "https://creator.randseed.org",
+				"ADMIN_EMAILS": "sns.bruce@gmail.com",
+				"GITHUB_APP_SLUG": "REPLACE_WITH_PRODUCTION_GITHUB_APP_SLUG",
+				"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
+				"CORS_ORIGINS": "https://creator.randseed.org"
+			}
+		}
 	}
 }
