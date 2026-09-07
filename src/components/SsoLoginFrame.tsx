@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { X } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 
 export function SsoLoginFrame(): React.ReactElement | null {
   const { closeSsoFrame, isSsoFrameOpen } = useAuth();
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
+  const [frameHeight, setFrameHeight] = useState(560);
 
   useEffect(() => {
     const handleTarget = (event: Event): void => {
@@ -18,6 +18,13 @@ export function SsoLoginFrame(): React.ReactElement | null {
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
       if (event.origin !== new URL(targetUrl || window.location.href).origin) return;
+      if (event.data?.type === "RANDSEED_SSO_RESIZE") {
+        const nextHeight = Number(event.data.height);
+        if (Number.isFinite(nextHeight)) {
+          setFrameHeight(Math.max(420, Math.min(nextHeight, 760)));
+        }
+        return;
+      }
       if (event.data?.type === "RANDSEED_SSO_SUCCESS" || event.data?.type === "RANDSEED_SSO_CANCEL") {
         setTargetUrl(null);
         closeSsoFrame();
@@ -31,10 +38,7 @@ export function SsoLoginFrame(): React.ReactElement | null {
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Sign in with RandSeed" style={overlayStyle}>
-      <div style={frameShellStyle}>
-        <button type="button" onClick={() => { setTargetUrl(null); closeSsoFrame(); }} style={closeButtonStyle} aria-label="Close sign-in">
-          <X size={20} />
-        </button>
+      <div style={{ ...frameShellStyle, height: `min(${frameHeight}px, calc(100vh - 32px))` }}>
         <iframe
           title="RandSeed sign in"
           src={targetUrl}
@@ -52,12 +56,8 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const frameShellStyle: React.CSSProperties = {
-  position: "relative", width: "min(100%, 460px)", height: "min(760px, 92vh)",
-  overflow: "hidden", borderRadius: "18px", background: "#fff", boxShadow: "0 24px 80px rgba(0, 0, 0, 0.28)",
+  position: "relative", width: "min(100%, 380px)", height: "min(620px, calc(100vh - 32px))",
+  overflow: "hidden", borderRadius: "16px", background: "#fff", boxShadow: "0 24px 48px rgba(15, 23, 42, 0.2)",
 };
 
 const frameStyle: React.CSSProperties = { width: "100%", height: "100%", border: 0, background: "#fff" };
-const closeButtonStyle: React.CSSProperties = {
-  position: "absolute", top: 10, right: 10, zIndex: 1, display: "grid", placeItems: "center",
-  width: 34, height: 34, border: 0, borderRadius: "50%", color: "#17151d", background: "rgba(255,255,255,.9)", cursor: "pointer",
-};
