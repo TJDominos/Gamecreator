@@ -185,3 +185,30 @@ export async function verifySsoSignature(
     return false;
   }
 }
+
+export async function signSsoPayload(
+  payloadString: string,
+  privateKeyPem: string
+): Promise<string> {
+  const cleanPem = privateKeyPem
+    .replace(/-----BEGIN [A-Z0-9_-]+ PRIVATE KEY-----/g, "")
+    .replace(/-----END [A-Z0-9_-]+ PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  const keyBytes = base64UrlDecode(cleanPem);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyBytes,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: { name: "SHA-256" } },
+    cryptoKey,
+    stringToBytes(payloadString)
+  );
+
+  return base64UrlEncode(new Uint8Array(signature));
+}

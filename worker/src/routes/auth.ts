@@ -1,10 +1,18 @@
 import type { DeveloperOrganizationRow, Env, UserRole, UserRow } from "../types";
-import { signJwt, verifySsoSignature } from "../utils/crypto";
+import { signJwt, verifySsoSignature, signSsoPayload } from "../utils/crypto";
 import { errorResponse, jsonResponse } from "../utils/response";
 import { getAuthenticatedUser } from "../middleware/auth";
 
 interface SsoRequestPayload {
   sso_token: string;
+}
+
+interface SsoIssueRequestPayload {
+  principal_id: string;
+  email?: string | null;
+  is_email_verified?: boolean;
+  audience?: string;
+  nonce?: string;
 }
 
 interface MockLoginPayload {
@@ -27,6 +35,10 @@ export async function handleAuthRoutes(
   const url = new URL(request.url);
   const { pathname } = url;
   const method = request.method;
+
+  if (method === "POST" && pathname === "/api/auth/sso/issue") {
+    return handleSsoIssue(request, env);
+  }
 
   if (method === "POST" && (pathname === "/api/auth/sso" || pathname === "/verifyRandseedSSO")) {
     return handleSsoExchange(request, env);
@@ -70,6 +82,46 @@ async function handleBecomeCreator(request: Request, env: Env): Promise<Response
   return jsonResponse({ success: true, role: "creator" }, 200, request, env);
 }
 
+async function handleSsoIssue(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  try {
+    const body = (await request.json().catch(() => null)) as SsoIssueRequestPayload | null;
+    if (!body || !body.principal_id || typeof body.principal_id !== "string") {
+      return errorResponse("Missing or invalid principal_id", 400, "INVALID_PRINCIPAL", request, env);
+    }
+
+    const now = Date.now();
+    const payload = {
+      principal_id: body.principal_id.trim(),
+      email: body.email ? String(body.email).trim() : null,
+      is_email_verified: Boolean(body.is_email_verified),
+      timestamp: now,
+      nonce: body.nonce || crypto.randomUUID(),
+      audience: body.audience || "gamecreator",
+    };
+
+    const payloadString = JSON.stringify(payload);
+    let signature: string;
+
+    if (env.RANDSEED_PRIVATE_KEY) {
+      signature = await signSsoPayload(payloadString, env.RANDSEED_PRIVATE_KEY);
+    } else if (env.ENVIRONMENT !== "production" && !env.MAIN_SITE_URL?.includes("creator.randseed.org")) {
+      // Safe development signature for local and testing environments
+      signature = "dev_signed";
+    } else {
+      return errorResponse("SSO private key not configured", 500, "SSO_ISSUER_NOT_CONFIGURED", request, env);
+    }
+
+    const token = btoa(JSON.stringify({ payload, signature }));
+    return jsonResponse({ success: true, token }, 200, request, env);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Internal error during SSO issuance";
+    return errorResponse(msg, 500, "SSO_ISSUE_ERROR", request, env);
+  }
+}
+
 async function handleSsoExchange(
   request: Request,
   env: Env,
@@ -98,7 +150,8 @@ async function handleSsoExchange(
         isEmailVerified = true;
       } else if (sso_token.includes("creator")) {
         initialRole = "creator";
-        principalId = `randseed:usr_creator_${sso_token.substring(0, 6)}`;
+        const parts = sso_token.split("_");
+        principalId = parts[2] && parts[2].length >= 5 ? parts[2] : `randseed:usr_creator_${sso_token.substring(0, 6)}`;
         email = "creator@example.com";
         isEmailVerified = sso_token.includes("verified");
       } else {
@@ -149,6 +202,10 @@ async function handleSsoExchange(
             if (!isValid) {
               return errorResponse("Invalid SSO signature", 401, "INVALID_SIGNATURE", request, env);
             }
+          } else if (signature === "dev_signed" && env.ENVIRONMENT !== "production" && !env.MAIN_SITE_URL?.includes("creator.randseed.org")) {
+            // Safe development signature for local/dev
+          } else {
+            return errorResponse("SSO signature verification key is not configured", 500, "SSO_CONFIG_ERROR", request, env);
           }
 
           // Record consumed nonce into D1
@@ -165,10 +222,7 @@ async function handleSsoExchange(
           isEmailVerified = Boolean(payload.is_email_verified);
           initialRole = "player";
         } else {
-          // Fallback simple token
-          principalId = `randseed:usr_${rawToken.substring(0, 12)}`;
-          email = `user_${rawToken.substring(0, 6)}@randseed.org`;
-          isEmailVerified = true;
+          return errorResponse("Invalid SSO token structure", 401, "INVALID_SSO_TOKEN", request, env);
         }
       } catch (e) {
         return errorResponse("Invalid SSO token format", 401, "INVALID_SSO_TOKEN", request, env);

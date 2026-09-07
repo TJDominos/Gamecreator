@@ -26,6 +26,14 @@ const ORGANIZATIONS_KEY = "randseed_developer_organizations";
 const AUTH_SYNC_CHANNEL = "randseed_creator_auth_sync";
 const AUTH_SYNC_STORAGE_KEY = "randseed_creator_auth_event";
 
+const ALLOWED_SSO_ORIGINS = [
+  "https://randseed.org",
+  "https://test.randseed.org",
+  "https://dev.randseed.org",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
 export interface UserProfile extends UserProfileInfo {
   email?: string;
   isEmailVerified?: boolean;
@@ -192,11 +200,22 @@ export function AuthProvider({
   // [PIPELINE A & INIT & POPUP LISTENER]: Intercept SSO Token on mount or restore session
   useEffect(() => {
     const handlePostMessage = (event: MessageEvent) => {
+      let isAllowedOrigin = ALLOWED_SSO_ORIGINS.includes(event.origin);
+      if (!isAllowedOrigin) {
+        try {
+          const mainUrl = import.meta.env.VITE_WL_LOGIN_URL || import.meta.env.VITE_MAIN_SITE_URL;
+          if (mainUrl && new URL(mainUrl).origin === event.origin) {
+            isAllowedOrigin = true;
+          }
+        } catch {}
+      }
+      if (!isAllowedOrigin) return;
+
       if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoToken) {
-        console.log("Received SSO Token from popup message", event.origin);
+        console.log("Received SSO Token from verified origin:", event.origin);
         void processSsoToken(event.data.ssoToken);
       } else if (event.data && event.data.type === "RANDSEED_SSO_CANCEL") {
-        console.log("SSO login cancelled by user in popup");
+        console.log("SSO login cancelled by user in verified popup");
       }
     };
 
@@ -373,12 +392,28 @@ export function AuthProvider({
         iframe.src = `${originUrl}/logout?action=logout`;
         iframe.style.display = "none";
         iframe.setAttribute("aria-hidden", "true");
+
+        const sendLogoutRequest = () => {
+          try {
+            iframe.contentWindow?.postMessage({ type: "RANDSEED_LOGOUT_REQUEST" }, originUrl);
+          } catch {}
+        };
+
+        iframe.onload = sendLogoutRequest;
+        const handleLogoutMsg = (e: MessageEvent) => {
+          if (e.origin === originUrl && e.data?.type === "RANDSEED_LOGOUT_READY") {
+            sendLogoutRequest();
+          }
+        };
+        window.addEventListener("message", handleLogoutMsg);
+
         document.body.appendChild(iframe);
         setTimeout(() => {
           try {
+            window.removeEventListener("message", handleLogoutMsg);
             iframe.remove();
           } catch {}
-        }, 3000);
+        }, 4000);
       } catch (sloErr) {
         console.warn("Single Logout handoff failed:", sloErr);
       }

@@ -6,6 +6,8 @@ export interface Env {
   DB: D1Database;
   JWT_SECRET: string;
   RANDSEED_PUBLIC_KEY?: string;
+  RANDSEED_PRIVATE_KEY?: string;
+  ENVIRONMENT?: string;
   MAIN_SITE_URL?: string;
   ADMIN_EMAILS?: string;
   CORS_ORIGINS?: string;
