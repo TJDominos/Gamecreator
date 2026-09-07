@@ -45,10 +45,10 @@ export interface CreateOrgInput {
 }
 
 export const authApi = {
-  async verifySSO(ssoToken: string): Promise<SsoExchangeResponse> {
+  async verifySSO(ssoCode: string): Promise<SsoExchangeResponse> {
     return request<SsoExchangeResponse>("/api/auth/sso", {
       method: "POST",
-      body: JSON.stringify({ sso_token: ssoToken }),
+      body: JSON.stringify({ sso_code: ssoCode }),
     });
   },
 

@@ -129,12 +129,12 @@ export function AuthProvider({
   const [organization, setOrganization] = useState<DeveloperOrganization | null>(null);
   const [isSsoFrameOpen, setIsSsoFrameOpen] = useState(false);
 
-  const processSsoToken = useCallback(async (ssoToken: string) => {
+  const processSsoCode = useCallback(async (ssoCode: string) => {
     try {
       console.log("Processing SSO Token via Cloudflare Worker/Mock...");
 
       try {
-        const ssoRes = await authApi.verifySSO(ssoToken);
+        const ssoRes = await authApi.verifySSO(ssoCode);
         if (ssoRes && ssoRes.token) {
           const uid = ssoRes.uid || ssoRes.user.principal_id;
           localStorage.removeItem("randseed_signed_out");
@@ -211,9 +211,9 @@ export function AuthProvider({
       }
       if (!isAllowedOrigin) return;
 
-      if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoToken) {
+      if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoCode) {
         console.log("Received SSO Token from verified origin:", event.origin);
-        void processSsoToken(event.data.ssoToken);
+        void processSsoCode(event.data.ssoCode);
       } else if (event.data && event.data.type === "RANDSEED_SSO_CANCEL") {
         console.log("SSO login cancelled by user in verified popup");
       }
@@ -222,12 +222,12 @@ export function AuthProvider({
     window.addEventListener("message", handlePostMessage);
 
     const initAuth = async () => {
-      // 1. Check if we are returning from Main Site with an sso_token in the URL
+      // 1. Check if we are returning from Main Site with a one-time sso_code in the URL
       const urlParams = new URLSearchParams(window.location.search);
-      const ssoToken = urlParams.get("sso_token");
+      const ssoCode = urlParams.get("sso_code");
 
-      if (ssoToken) {
-        await processSsoToken(ssoToken);
+      if (ssoCode) {
+        await processSsoCode(ssoCode);
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
@@ -294,7 +294,7 @@ export function AuthProvider({
     return () => {
       window.removeEventListener("message", handlePostMessage);
     };
-  }, [processSsoToken]);
+  }, [processSsoCode]);
 
   useEffect(() => {
     setOrganization(accountId ? readOrganizations()[accountId] ?? null : null);

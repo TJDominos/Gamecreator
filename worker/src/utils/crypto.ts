@@ -9,7 +9,6 @@ function base64UrlEncode(bytes: Uint8Array): string {
   }
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-
 function base64UrlDecode(base64url: string): Uint8Array {
   let base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
   while (base64.length % 4 !== 0) {
@@ -151,64 +150,3 @@ export async function verifyGitHubWebhookSignature(
   }
 }
 
-export async function verifySsoSignature(
-  payloadString: string,
-  signatureBase64: string,
-  publicKeyPem: string
-): Promise<boolean> {
-  try {
-    const cleanPem = publicKeyPem
-      .replace(/-----BEGIN [A-Z0-9_-]+ PUBLIC KEY-----/g, "")
-      .replace(/-----END [A-Z0-9_-]+ PUBLIC KEY-----/g, "")
-      .replace(/\s+/g, "");
-    const keyBytes = base64UrlDecode(cleanPem);
-
-    const cryptoKey = await crypto.subtle.importKey(
-      "spki",
-      keyBytes,
-      { name: "ECDSA", namedCurve: "P-256" },
-      false,
-      ["verify"]
-    );
-
-    const signature = base64UrlDecode(signatureBase64);
-    const dataBytes = stringToBytes(payloadString);
-
-    return await crypto.subtle.verify(
-      { name: "ECDSA", hash: { name: "SHA-256" } },
-      cryptoKey,
-      signature,
-      dataBytes
-    );
-  } catch (err) {
-    console.error("SSO verification error:", err);
-    return false;
-  }
-}
-
-export async function signSsoPayload(
-  payloadString: string,
-  privateKeyPem: string
-): Promise<string> {
-  const cleanPem = privateKeyPem
-    .replace(/-----BEGIN [A-Z0-9_-]+ PRIVATE KEY-----/g, "")
-    .replace(/-----END [A-Z0-9_-]+ PRIVATE KEY-----/g, "")
-    .replace(/\s+/g, "");
-  const keyBytes = base64UrlDecode(cleanPem);
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    keyBytes,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    { name: "ECDSA", hash: { name: "SHA-256" } },
-    cryptoKey,
-    stringToBytes(payloadString)
-  );
-
-  return base64UrlEncode(new Uint8Array(signature));
-}

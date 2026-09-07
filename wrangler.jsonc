@@ -54,6 +54,8 @@
 			],
 			"vars": {
 				"ENVIRONMENT": "dev",
+				"IC_GATEWAY_URL": "https://ic0.app",
+				"WL_USER_CANISTER_ID": "b6m3r-zqaaa-aaaac-aacra-cai",
 				"MAIN_SITE_URL": "https://devcreator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "RDcreatordev",
@@ -79,6 +81,8 @@
 			],
 			"vars": {
 				"ENVIRONMENT": "test",
+				"IC_GATEWAY_URL": "https://ic0.app",
+				"WL_USER_CANISTER_ID": "yc4z6-iaaaa-aaaaj-azw2q-cai",
 				"MAIN_SITE_URL": "https://testcreator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_TEST_GITHUB_APP_SLUG",
@@ -104,6 +108,8 @@
 			],
 			"vars": {
 				"ENVIRONMENT": "production",
+				"IC_GATEWAY_URL": "https://ic0.app",
+				"WL_USER_CANISTER_ID": "5vx25-waaaa-aaaam-qcyeq-cai",
 				"MAIN_SITE_URL": "https://creator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_PRODUCTION_GITHUB_APP_SLUG",
