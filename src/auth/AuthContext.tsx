@@ -317,11 +317,12 @@ export function AuthProvider({
 
   // [PIPELINE B]: Open centered modal iframe to Main Site to get SSO Token (no whole page redirect)
   const signInWithSSO = useCallback(() => {
-    const mainSiteUrl =
-      import.meta.env.VITE_WL_LOGIN_URL ||
-      (import.meta.env.VITE_MAIN_SITE_URL
-        ? `${import.meta.env.VITE_MAIN_SITE_URL}/login`
-        : "https://dev.randseed.org/login");
+    let mainSiteUrl = import.meta.env.VITE_WL_LOGIN_URL || import.meta.env.VITE_MAIN_SITE_URL || "https://dev.randseed.org";
+    // Ensure it ends with /login without duplicating it
+    if (!mainSiteUrl.endsWith("/login")) {
+      // Remove trailing slash if present before appending
+      mainSiteUrl = `${mainSiteUrl.replace(/\/+$/, "")}/login`;
+    }
 
     const currentOrigin = window.location.origin;
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);

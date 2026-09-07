@@ -32,77 +32,31 @@ export function DashboardAccessGate(): React.ReactElement {
           textAlign: "center",
         }}
       >
-        <div style={{ display: "inline-flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-          <div style={{ width: "36px", height: "36px" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginBottom: "16px" }}>
+          <div style={{ width: "36px", height: "36px", display: "flex", alignItems: "center" }}>
             <WltLogo />
           </div>
-          <span style={{ fontSize: "20px", fontWeight: 800, color: "#17151d" }}>
-            RandSeed <span style={{ color: "#61369a" }}>Creators</span>
+          <span style={{ fontSize: "20px", fontWeight: 800, color: "#17151d", lineHeight: "1" }}>
+            Randseed <span style={{ color: "#61369a" }}>Creator</span>
           </span>
         </div>
 
-        <h1 style={{ fontSize: "24px", fontWeight: 700, color: "#17151d", margin: "0 0 8px" }}>
-          Developer Dashboard Access
-        </h1>
         <p style={{ fontSize: "14px", color: "#64748b", margin: "0 0 24px", lineHeight: "1.5" }}>
-          Please sign in with your RandSeed account to access your games and studio management.
+          Please sign in to access your games management.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "28px", textAlign: "left" }}>
-          {/* Real SSO Sign In */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "28px" }}>
           <button
+            className="btn btn--solid"
             type="button"
             onClick={signInWithSSO}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "16px",
-              borderRadius: "14px",
-              border: "2px solid #7c3aed",
-              background: "#7c3aed",
-              color: "#ffffff",
-              cursor: "pointer",
-              transition: "transform 0.15s ease, box-shadow 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 6px 16px rgba(124, 58, 237, 0.25)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "none";
-              e.currentTarget.style.boxShadow = "none";
-            }}
+            style={{ width: "230px", minHeight: "48px", fontSize: "16px", justifyContent: "center" }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div
-                style={{
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "10px",
-                  background: "rgba(255, 255, 255, 0.2)",
-                  color: "#fff",
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                <Rocket size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: "#ffffff" }}>
-                  Sign in with RandSeed Account
-                </div>
-                <div style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.8)" }}>
-                  Use Passkey, Web3 Wallet, or Email via secure SSO
-                </div>
-              </div>
-            </div>
-            <ArrowRight size={20} color="#ffffff" />
+            Sign In
           </button>
-
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #f1f5f9", paddingTop: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", borderTop: "1px solid #f1f5f9", paddingTop: "16px" }}>
           <Link
             to="/"
             style={{
@@ -114,21 +68,8 @@ export function DashboardAccessGate(): React.ReactElement {
               textDecoration: "none",
             }}
           >
-            <Home size={15} /> Back to Home
+            <Home size={15} /> Creator Main Page
           </Link>
-
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              fontSize: "12px",
-              color: "#16a34a",
-              fontWeight: 600,
-            }}
-          >
-            <CheckCircle2 size={14} /> Ready for Backend SSO Mapping
-          </span>
         </div>
       </div>
     </div>
