@@ -337,11 +337,9 @@ export function AuthProvider({
   // [PIPELINE B]: Open centered modal iframe to Main Site to get SSO Token (no whole page redirect)
   const signInWithSSO = useCallback(() => {
     let mainSiteUrl = import.meta.env.VITE_WL_LOGIN_URL || import.meta.env.VITE_MAIN_SITE_URL || "https://dev.randseed.org";
-    // Ensure it ends with /login without duplicating it
-    if (!mainSiteUrl.endsWith("/login")) {
-      // Remove trailing slash if present before appending
-      mainSiteUrl = `${mainSiteUrl.replace(/\/+$/, "")}/login`;
-    }
+    // Use a dedicated HTML entry so the auth-only CSP applies to this iframe.
+    mainSiteUrl = mainSiteUrl.replace(/\/+$/, "").replace(/\/login(?:\.html)?$/, "");
+    mainSiteUrl = `${mainSiteUrl}/login.html`;
 
     const currentOrigin = window.location.origin;
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
@@ -389,7 +387,10 @@ export function AuthProvider({
             : "https://dev.randseed.org/login");
         const originUrl = new URL(mainSiteUrl).origin;
         const iframe = document.createElement("iframe");
-        iframe.src = `${originUrl}/logout?action=logout`;
+        const logoutUrl = new URL(`${originUrl}/logout.html`);
+        logoutUrl.searchParams.set("action", "logout");
+        logoutUrl.searchParams.set("redirect_uri", window.location.origin);
+        iframe.src = logoutUrl.toString();
         iframe.style.display = "none";
         iframe.setAttribute("aria-hidden", "true");
 
