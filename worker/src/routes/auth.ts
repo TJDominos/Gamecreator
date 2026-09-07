@@ -8,11 +8,8 @@ interface SsoRequestPayload {
 }
 
 interface SsoIssueRequestPayload {
-  principal_id: string;
-  email?: string | null;
-  is_email_verified?: boolean;
-  audience?: string;
-  nonce?: string;
+  audience: string;
+  nonce: string;
 }
 
 interface MockLoginPayload {
@@ -87,19 +84,30 @@ async function handleSsoIssue(
   env: Env,
 ): Promise<Response> {
   try {
+    const authUser = await getAuthenticatedUser(request, env);
+    if (!authUser) {
+      return errorResponse("An authenticated issuer session is required", 401, "UNAUTHORIZED_ISSUER", request, env);
+    }
+
     const body = (await request.json().catch(() => null)) as SsoIssueRequestPayload | null;
-    if (!body || !body.principal_id || typeof body.principal_id !== "string") {
-      return errorResponse("Missing or invalid principal_id", 400, "INVALID_PRINCIPAL", request, env);
+    if (
+      !body
+      || body.audience !== "gamecreator"
+      || typeof body.nonce !== "string"
+      || !/^[0-9a-f]{32}$/i.test(body.nonce)
+    ) {
+      return errorResponse("Invalid SSO audience or nonce", 400, "INVALID_SSO_REQUEST", request, env);
     }
 
     const now = Date.now();
     const payload = {
-      principal_id: body.principal_id.trim(),
-      email: body.email ? String(body.email).trim() : null,
-      is_email_verified: Boolean(body.is_email_verified),
+      principal_id: authUser.principal_id,
+      email: authUser.email || null,
+      is_email_verified: Boolean(authUser.is_email_verified),
       timestamp: now,
-      nonce: body.nonce || crypto.randomUUID(),
-      audience: body.audience || "gamecreator",
+      nonce: body.nonce,
+      audience: "gamecreator",
+      issuer: env.MAIN_SITE_URL || "randseed",
     };
 
     const payloadString = JSON.stringify(payload);
@@ -107,7 +115,7 @@ async function handleSsoIssue(
 
     if (env.RANDSEED_PRIVATE_KEY) {
       signature = await signSsoPayload(payloadString, env.RANDSEED_PRIVATE_KEY);
-    } else if (env.ENVIRONMENT !== "production" && !env.MAIN_SITE_URL?.includes("creator.randseed.org")) {
+    } else if (env.ENVIRONMENT !== "production") {
       // Safe development signature for local and testing environments
       signature = "dev_signed";
     } else {
@@ -141,7 +149,8 @@ async function handleSsoExchange(
     let isEmailVerified = false;
     let initialRole: UserRole = "player";
 
-    if (sso_token.startsWith("mock_") || sso_token.startsWith("jwt_mock_")) {
+    const isProduction = env.ENVIRONMENT === "production" || env.MAIN_SITE_URL === "https://creator.randseed.org";
+    if ((sso_token.startsWith("mock_") || sso_token.startsWith("jwt_mock_")) && !isProduction) {
       // Mock / Dev Token Parsing
       if (sso_token.includes("admin")) {
         initialRole = "admin";
@@ -160,6 +169,8 @@ async function handleSsoExchange(
         email = "player@example.com";
         isEmailVerified = sso_token.includes("verified");
       }
+    } else if (sso_token.startsWith("mock_") || sso_token.startsWith("jwt_mock_")) {
+      return errorResponse("Mock SSO tokens are disabled in production", 401, "MOCK_SSO_DISABLED", request, env);
     } else {
       // Real SSO Token Exchange (Base64 / Token / Worker Exchange)
       try {
@@ -176,6 +187,14 @@ async function handleSsoExchange(
           const payload = parsed.payload;
           const signature = parsed.signature;
           const payloadTimestamp = Number(payload.timestamp || 0);
+
+          if (payload.audience !== "gamecreator") {
+            return errorResponse("Invalid SSO audience", 401, "INVALID_AUDIENCE", request, env);
+          }
+
+          if (payload.issuer !== (env.MAIN_SITE_URL || "randseed")) {
+            return errorResponse("Invalid SSO issuer", 401, "INVALID_ISSUER", request, env);
+          }
 
           // 60-second expiration check
           if (Math.abs(now - payloadTimestamp) > 60 * 1000) {
@@ -208,13 +227,17 @@ async function handleSsoExchange(
             return errorResponse("SSO signature verification key is not configured", 500, "SSO_CONFIG_ERROR", request, env);
           }
 
-          // Record consumed nonce into D1
+          // Consume the nonce atomically so concurrent exchanges cannot both succeed.
           if (payload.nonce) {
-            await env.DB.prepare(
-              "INSERT INTO used_sso_nonces (nonce, principal_id, expires_at, created_at) VALUES (?, ?, ?, ?)"
+            const nonceInsert = await env.DB.prepare(
+              "INSERT OR IGNORE INTO used_sso_nonces (nonce, principal_id, expires_at, created_at) VALUES (?, ?, ?, ?)"
             )
               .bind(payload.nonce, payload.principal_id, now + 120_000, now)
               .run();
+
+            if (!nonceInsert.meta?.changes) {
+              return errorResponse("SSO Token has already been used", 409, "TOKEN_REPLAYED", request, env);
+            }
           }
 
           principalId = payload.principal_id;

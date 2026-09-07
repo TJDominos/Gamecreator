@@ -53,6 +53,7 @@
 				}
 			],
 			"vars": {
+				"ENVIRONMENT": "dev",
 				"MAIN_SITE_URL": "https://devcreator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "RDcreatordev",
@@ -77,6 +78,7 @@
 				}
 			],
 			"vars": {
+				"ENVIRONMENT": "test",
 				"MAIN_SITE_URL": "https://testcreator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_TEST_GITHUB_APP_SLUG",
@@ -101,6 +103,7 @@
 				}
 			],
 			"vars": {
+				"ENVIRONMENT": "production",
 				"MAIN_SITE_URL": "https://creator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_PRODUCTION_GITHUB_APP_SLUG",
