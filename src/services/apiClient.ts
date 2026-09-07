@@ -9,6 +9,8 @@ export interface ApiResponse<T = any> {
   [key: string]: any;
 }
 
+export const AUTH_UNAUTHORIZED_EVENT = "randseed:auth-unauthorized";
+
 export class ApiError extends Error {
   public status: number;
   public code?: string | number;
@@ -65,6 +67,12 @@ export async function request<T = any>(
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+        }
+      }
+
       const errorMsg =
         (typeof responseData === "object" && (responseData.error || responseData.message)) ||
         `Request failed with status ${response.status}`;

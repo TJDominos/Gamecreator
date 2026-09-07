@@ -9,6 +9,7 @@ import React, {
 import type { UserProfileInfo } from "../types/userProfile";
 import { WLAuthClient } from "./wlAuthClient";
 import { authApi } from "../services/authApi";
+import { AUTH_UNAUTHORIZED_EVENT } from "../services/apiClient";
 import {
   UserRole,
   Permission,
@@ -357,6 +358,30 @@ export function AuthProvider({
       channel.postMessage(logoutEvent);
       channel.close();
     } catch {}
+
+    // Trigger Single Logout (SLO) on RandSeed main site via a hidden iframe
+    if (typeof document !== "undefined") {
+      try {
+        const mainSiteUrl =
+          import.meta.env.VITE_WL_LOGIN_URL ||
+          (import.meta.env.VITE_MAIN_SITE_URL
+            ? `${import.meta.env.VITE_MAIN_SITE_URL}/login`
+            : "https://dev.randseed.org/login");
+        const originUrl = new URL(mainSiteUrl).origin;
+        const iframe = document.createElement("iframe");
+        iframe.src = `${originUrl}/logout?action=logout`;
+        iframe.style.display = "none";
+        iframe.setAttribute("aria-hidden", "true");
+        document.body.appendChild(iframe);
+        setTimeout(() => {
+          try {
+            iframe.remove();
+          } catch {}
+        }, 3000);
+      } catch (sloErr) {
+        console.warn("Single Logout handoff failed:", sloErr);
+      }
+    }
   }, []);
 
   // Multi-window auth state synchronization (cross-tab logout & login)
@@ -390,6 +415,12 @@ export function AuthProvider({
 
     window.addEventListener("storage", handleStorage);
 
+    // Global 401 unauthorized listener: clear local state and sync logout across all tabs without prompt
+    const handleUnauthorized = () => {
+      void signOut();
+    };
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
@@ -400,9 +431,10 @@ export function AuthProvider({
 
     return () => {
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
       if (channel) channel.close();
     };
-  }, []);
+  }, [signOut]);
 
   const switchRole = useCallback((targetRole: UserRole) => {
     localStorage.removeItem("randseed_signed_out");
