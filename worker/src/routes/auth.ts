@@ -7,6 +7,7 @@ import { redeemSsoAuthorizationCode } from "../ic/sso";
 interface SsoRequestPayload {
   sso_code: string;
   redirect_uri: string;
+  code_verifier: string;
 }
 
 interface MockLoginPayload {
@@ -78,7 +79,7 @@ async function handleSsoExchange(
 ): Promise<Response> {
   try {
     const body = (await request.json().catch(() => null)) as SsoRequestPayload | null;
-    if (!body || !body.sso_code || typeof body.sso_code !== "string" || typeof body.redirect_uri !== "string") {
+    if (!body || !body.sso_code || typeof body.sso_code !== "string" || typeof body.redirect_uri !== "string" || typeof body.code_verifier !== "string") {
       return errorResponse("Missing sso_code parameter", 400, "MISSING_SSO_CODE", request, env);
     }
 
@@ -97,6 +98,7 @@ async function handleSsoExchange(
       sso_code.trim(),
       "gamecreator",
       redirectUri.toString(),
+      body.code_verifier,
       env,
     ).catch(() => null);
     if (!authorizationCode) {

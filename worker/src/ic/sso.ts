@@ -10,18 +10,19 @@ const SsoAuthorizationCode = IDL.Record({
   audience: IDL.Text,
   redirect_uri: IDL.Text,
   expires_at_ms: IDL.Int,
+  code_challenge: IDL.Text,
 });
 
 const idlFactory = ({ IDL: idl }: { IDL: typeof IDL }) => idl.Service({
   redeem_sso_authorization_code: idl.Func(
-    [idl.Text, idl.Text, idl.Text],
+    [idl.Text, idl.Text, idl.Text, idl.Text],
     [idl.Opt(SsoAuthorizationCode)],
     [],
   ),
 });
 
 type IdentityActor = {
-  redeem_sso_authorization_code: (code: string, audience: string, redirectUri: string) => Promise<[] | [SsoAuthorizationCodeValue]>;
+  redeem_sso_authorization_code: (code: string, audience: string, redirectUri: string, codeVerifier: string) => Promise<[] | [SsoAuthorizationCodeValue]>;
 };
 
 export interface SsoAuthorizationCodeValue {
@@ -38,6 +39,7 @@ export async function redeemSsoAuthorizationCode(
   code: string,
   audience: string,
   redirectUri: string,
+  codeVerifier: string,
   env: Env,
 ): Promise<SsoAuthorizationCodeValue | null> {
   if (!env.WL_USER_CANISTER_ID) {
@@ -51,6 +53,6 @@ export async function redeemSsoAuthorizationCode(
     agent,
     canisterId: env.WL_USER_CANISTER_ID,
   });
-  const result = await actor.redeem_sso_authorization_code(code, audience, redirectUri);
+  const result = await actor.redeem_sso_authorization_code(code, audience, redirectUri, codeVerifier);
   return result[0] || null;
 }

@@ -25,6 +25,8 @@ const USER_PROFILES_KEY = "randseed_user_profiles";
 const ORGANIZATIONS_KEY = "randseed_developer_organizations";
 const AUTH_SYNC_CHANNEL = "randseed_creator_auth_sync";
 const AUTH_SYNC_STORAGE_KEY = "randseed_creator_auth_event";
+const SSO_VERIFIER_KEY = "randseed_sso_code_verifier";
+const SSO_STATE_KEY = "randseed_sso_state";
 
 const ALLOWED_SSO_ORIGINS = [
   "https://randseed.org",
@@ -129,12 +131,15 @@ export function AuthProvider({
   const [organization, setOrganization] = useState<DeveloperOrganization | null>(null);
   const [isSsoFrameOpen, setIsSsoFrameOpen] = useState(false);
 
-  const processSsoCode = useCallback(async (ssoCode: string, redirectUri: string) => {
+  const processSsoCode = useCallback(async (ssoCode: string, redirectUri: string, state: string) => {
     try {
       console.log("Processing SSO Token via Cloudflare Worker/Mock...");
 
       try {
-        const ssoRes = await authApi.verifySSO(ssoCode, redirectUri);
+        if (state !== sessionStorage.getItem(SSO_STATE_KEY)) throw new Error("SSO state mismatch");
+        const verifier = sessionStorage.getItem(SSO_VERIFIER_KEY);
+        if (!verifier) throw new Error("SSO verifier is missing");
+        const ssoRes = await authApi.verifySSO(ssoCode, redirectUri, verifier);
         if (ssoRes && ssoRes.token) {
           const uid = ssoRes.uid || ssoRes.user.principal_id;
           localStorage.removeItem("randseed_signed_out");
@@ -162,6 +167,8 @@ export function AuthProvider({
 
           setAccountId(uid);
           setProfile(updatedProfile);
+          sessionStorage.removeItem(SSO_VERIFIER_KEY);
+          sessionStorage.removeItem(SSO_STATE_KEY);
 
           if (ssoRes.organization) {
             const orgs = readOrganizations();
@@ -213,9 +220,9 @@ export function AuthProvider({
       }
       if (!isAllowedOrigin) return;
 
-      if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoCode && event.data.redirectUri) {
+      if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoCode && event.data.redirectUri && event.data.state) {
         console.log("Received SSO authorization code from verified origin:", event.origin);
-        void processSsoCode(event.data.ssoCode, event.data.redirectUri);
+        void processSsoCode(event.data.ssoCode, event.data.redirectUri, event.data.state);
       } else if (event.data && event.data.type === "RANDSEED_SSO_CANCEL") {
         console.log("SSO login cancelled by user in verified popup");
       }
@@ -228,9 +235,10 @@ export function AuthProvider({
       const urlParams = new URLSearchParams(window.location.search);
       const ssoCode = urlParams.get("sso_code");
       const redirectUri = urlParams.get("redirect_uri");
+      const state = urlParams.get("state");
 
-      if (ssoCode && redirectUri) {
-        await processSsoCode(ssoCode, redirectUri);
+      if (ssoCode && redirectUri && state) {
+        await processSsoCode(ssoCode, redirectUri, state);
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
@@ -338,7 +346,7 @@ export function AuthProvider({
   }, []);
 
   // [PIPELINE B]: Open centered modal iframe to Main Site to get SSO Token (no whole page redirect)
-  const signInWithSSO = useCallback(() => {
+  const signInWithSSO = useCallback(async () => {
     let mainSiteUrl = import.meta.env.VITE_WL_LOGIN_URL || import.meta.env.VITE_MAIN_SITE_URL || "https://dev.randseed.org";
     // Use a dedicated HTML entry so the auth-only CSP applies to this iframe.
     mainSiteUrl = mainSiteUrl.replace(/\/+$/, "").replace(/\/login(?:\.html)?$/, "");
@@ -346,7 +354,18 @@ export function AuthProvider({
 
     const currentOrigin = window.location.origin;
     const currentUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-    const targetUrl = `${mainSiteUrl}?redirect_uri=${currentUrl}&mode=iframe&origin=${encodeURIComponent(currentOrigin)}&prompt=login`;
+    const randomBytes = new Uint8Array(32);
+    crypto.getRandomValues(randomBytes);
+    const toHex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const verifier = toHex(randomBytes);
+    const challengeBytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    const challenge = toHex(challengeBytes);
+    const stateBytes = new Uint8Array(32);
+    crypto.getRandomValues(stateBytes);
+    const state = toHex(stateBytes);
+    sessionStorage.setItem(SSO_VERIFIER_KEY, verifier);
+    sessionStorage.setItem(SSO_STATE_KEY, state);
+    const targetUrl = `${mainSiteUrl}?redirect_uri=${currentUrl}&mode=iframe&origin=${encodeURIComponent(currentOrigin)}&prompt=login&code_challenge=${challenge}&state=${state}`;
     setIsSsoFrameOpen(true);
     window.dispatchEvent(new CustomEvent("randseed:sso-target", { detail: targetUrl }));
   }, []);
