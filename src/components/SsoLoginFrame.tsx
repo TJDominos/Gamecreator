@@ -25,7 +25,11 @@ export function SsoLoginFrame(): React.ReactElement | null {
         }
         return;
       }
-      if (event.data?.type === "RANDSEED_SSO_SUCCESS" || event.data?.type === "RANDSEED_SSO_CANCEL") {
+      if (
+        event.data?.type === "RANDSEED_SSO_SUCCESS"
+        || event.data?.type === "RANDSEED_SSO_CANCEL"
+        || event.data?.type === "RANDSEED_SSO_FAILURE"
+      ) {
         setTargetUrl(null);
         closeSsoFrame();
       }
@@ -57,7 +61,7 @@ const overlayStyle: React.CSSProperties = {
 
 const frameShellStyle: React.CSSProperties = {
   position: "relative", width: "min(100%, 380px)", height: "min(620px, calc(100vh - 32px))",
-  overflow: "hidden", borderRadius: "16px", background: "#fff", boxShadow: "0 24px 48px rgba(15, 23, 42, 0.2)",
+  overflow: "visible", borderRadius: 0, background: "transparent", boxShadow: "none",
 };
 
-const frameStyle: React.CSSProperties = { width: "100%", height: "100%", border: 0, background: "#fff" };
+const frameStyle: React.CSSProperties = { width: "100%", height: "100%", border: 0, background: "transparent" };

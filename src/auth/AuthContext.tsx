@@ -190,10 +190,12 @@ export function AuthProvider({
           return;
         }
       } catch (apiErr) {
-        console.warn("Worker API unreachable", apiErr);
+        console.warn("SSO exchange failed", apiErr);
+        setIsSsoFrameOpen(false);
       }
     } catch (error) {
       console.error("SSO Exchange failed", error);
+      setIsSsoFrameOpen(false);
     }
   }, []);
 
