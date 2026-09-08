@@ -2,10 +2,11 @@ import type { DeveloperOrganizationRow, Env, UserRole, UserRow } from "../types"
 import { signJwt } from "../utils/crypto";
 import { errorResponse, jsonResponse } from "../utils/response";
 import { getAuthenticatedUser } from "../middleware/auth";
-import { getSsoAuthorizationCode } from "../ic/sso";
+import { redeemSsoAuthorizationCode } from "../ic/sso";
 
 interface SsoRequestPayload {
   sso_code: string;
+  redirect_uri: string;
 }
 
 interface MockLoginPayload {
@@ -77,35 +78,30 @@ async function handleSsoExchange(
 ): Promise<Response> {
   try {
     const body = (await request.json().catch(() => null)) as SsoRequestPayload | null;
-    if (!body || !body.sso_code || typeof body.sso_code !== "string") {
+    if (!body || !body.sso_code || typeof body.sso_code !== "string" || typeof body.redirect_uri !== "string") {
       return errorResponse("Missing sso_code parameter", 400, "MISSING_SSO_CODE", request, env);
     }
 
     const { sso_code } = body;
     const now = Date.now();
-    const authorizationCode = await getSsoAuthorizationCode(sso_code.trim(), env).catch(() => null);
+    let redirectUri: URL;
+    try {
+      redirectUri = new URL(body.redirect_uri);
+      if (!env.MAIN_SITE_URL || redirectUri.origin !== new URL(env.MAIN_SITE_URL).origin) {
+        return errorResponse("Invalid SSO redirect URI", 401, "INVALID_REDIRECT_URI", request, env);
+      }
+    } catch {
+      return errorResponse("Invalid SSO redirect URI", 400, "INVALID_REDIRECT_URI", request, env);
+    }
+    const authorizationCode = await redeemSsoAuthorizationCode(
+      sso_code.trim(),
+      "gamecreator",
+      redirectUri.toString(),
+      env,
+    ).catch(() => null);
     if (!authorizationCode) {
       return errorResponse("Invalid or expired SSO authorization code", 401, "INVALID_SSO_CODE", request, env);
     }
-    if (authorizationCode.audience !== "gamecreator") {
-      return errorResponse("Invalid SSO audience", 401, "INVALID_AUDIENCE", request, env);
-    }
-    if (!env.MAIN_SITE_URL || new URL(authorizationCode.redirect_uri).origin !== new URL(env.MAIN_SITE_URL).origin) {
-      return errorResponse("Invalid SSO redirect URI", 401, "INVALID_REDIRECT_URI", request, env);
-    }
-    if (Number(authorizationCode.expires_at_ms) <= now) {
-      return errorResponse("SSO authorization code has expired", 401, "CODE_EXPIRED", request, env);
-    }
-
-    const codeInsert = await env.DB.prepare(
-      "INSERT OR IGNORE INTO used_sso_codes (code, principal_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
-    )
-      .bind(authorizationCode.code, authorizationCode.principal_id, Number(authorizationCode.expires_at_ms), now)
-      .run();
-    if (!codeInsert.meta?.changes) {
-      return errorResponse("SSO authorization code has already been used", 409, "CODE_REPLAYED", request, env);
-    }
-
     const principalId = authorizationCode.principal_id;
     const email = authorizationCode.email?.[0] || null;
     const isEmailVerified = authorizationCode.is_email_verified;

@@ -129,12 +129,12 @@ export function AuthProvider({
   const [organization, setOrganization] = useState<DeveloperOrganization | null>(null);
   const [isSsoFrameOpen, setIsSsoFrameOpen] = useState(false);
 
-  const processSsoCode = useCallback(async (ssoCode: string) => {
+  const processSsoCode = useCallback(async (ssoCode: string, redirectUri: string) => {
     try {
       console.log("Processing SSO Token via Cloudflare Worker/Mock...");
 
       try {
-        const ssoRes = await authApi.verifySSO(ssoCode);
+        const ssoRes = await authApi.verifySSO(ssoCode, redirectUri);
         if (ssoRes && ssoRes.token) {
           const uid = ssoRes.uid || ssoRes.user.principal_id;
           localStorage.removeItem("randseed_signed_out");
@@ -211,9 +211,9 @@ export function AuthProvider({
       }
       if (!isAllowedOrigin) return;
 
-      if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoCode) {
-        console.log("Received SSO Token from verified origin:", event.origin);
-        void processSsoCode(event.data.ssoCode);
+      if (event.data && event.data.type === "RANDSEED_SSO_SUCCESS" && event.data.ssoCode && event.data.redirectUri) {
+        console.log("Received SSO authorization code from verified origin:", event.origin);
+        void processSsoCode(event.data.ssoCode, event.data.redirectUri);
       } else if (event.data && event.data.type === "RANDSEED_SSO_CANCEL") {
         console.log("SSO login cancelled by user in verified popup");
       }
@@ -225,9 +225,10 @@ export function AuthProvider({
       // 1. Check if we are returning from Main Site with a one-time sso_code in the URL
       const urlParams = new URLSearchParams(window.location.search);
       const ssoCode = urlParams.get("sso_code");
+      const redirectUri = urlParams.get("redirect_uri");
 
-      if (ssoCode) {
-        await processSsoCode(ssoCode);
+      if (ssoCode && redirectUri) {
+        await processSsoCode(ssoCode, redirectUri);
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
