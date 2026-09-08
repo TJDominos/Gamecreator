@@ -61,7 +61,7 @@ const overlayStyle: React.CSSProperties = {
 
 const frameShellStyle: React.CSSProperties = {
   position: "relative", width: "min(100%, 380px)", height: "min(620px, calc(100vh - 32px))",
-  overflow: "visible", borderRadius: 0, background: "transparent", boxShadow: "none",
+  overflow: "hidden", borderRadius: "20px", background: "transparent", boxShadow: "none",
 };
 
 const frameStyle: React.CSSProperties = {
