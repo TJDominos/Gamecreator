@@ -47,7 +47,7 @@ export function SsoLoginFrame(): React.ReactElement | null {
           title="RandSeed sign in"
           src={targetUrl}
           style={frameStyle}
-          allow="publickey-credentials-get; clipboard-write"
+          allow="publickey-credentials-get; publickey-credentials-create; clipboard-write"
         />
       </div>
     </div>
