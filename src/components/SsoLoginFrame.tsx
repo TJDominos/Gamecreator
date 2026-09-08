@@ -64,4 +64,6 @@ const frameShellStyle: React.CSSProperties = {
   overflow: "visible", borderRadius: 0, background: "transparent", boxShadow: "none",
 };
 
-const frameStyle: React.CSSProperties = { width: "100%", height: "100%", border: 0, background: "transparent" };
+const frameStyle: React.CSSProperties = {
+  display: "block", width: "100%", height: "100%", border: 0, outline: "none", background: "#fff",
+};
