@@ -28,11 +28,17 @@
 			"remote": true
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "ARTIFACTS",
+			"bucket_name": "gamecreator-artifacts-dev"
+		}
+	],
 	"vars": {
 		"MAIN_SITE_URL": "https://devcreator.randseed.org",
 		"ADMIN_EMAILS": "sns.bruce@gmail.com",
 		"GITHUB_APP_SLUG": "RDcreatordev",
-		"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
+		"SANDBOX_BASE_URL": "https://randseed.org",
 		"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org,https://creator.randseed.org,https://test.randseed.org,https://randseed.org"
 	},
 	"env": {
@@ -59,9 +65,18 @@
 				"MAIN_SITE_URL": "https://devcreator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "RDcreatordev",
-				"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
-				"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org"
-			}
+				"SANDBOX_BASE_URL": "https://randseed.org",
+				"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org",
+				"GITHUB_ACTION_WORKFLOW": "randseed-deploy.yml",
+				"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator",
+				"MAX_ARTIFACT_BYTES": "26214400"
+			},
+			"r2_buckets": [
+				{
+					"binding": "ARTIFACTS",
+					"bucket_name": "gamecreator-artifacts-dev"
+				}
+			],
 		},
 		"test": {
 			"name": "randseed-gamecreator-worker-test",
@@ -86,9 +101,18 @@
 				"MAIN_SITE_URL": "https://testcreator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_TEST_GITHUB_APP_SLUG",
-				"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
-				"CORS_ORIGINS": "https://testcreator.randseed.org"
-			}
+				"SANDBOX_BASE_URL": "https://randseed.org",
+				"CORS_ORIGINS": "https://testcreator.randseed.org",
+				"GITHUB_ACTION_WORKFLOW": "randseed-deploy.yml",
+				"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator",
+				"MAX_ARTIFACT_BYTES": "26214400"
+			},
+			"r2_buckets": [
+				{
+					"binding": "ARTIFACTS",
+					"bucket_name": "gamecreator-artifacts-test"
+				}
+			],
 		},
 		"production": {
 			"name": "randseed-gamecreator-worker-production",
@@ -113,9 +137,18 @@
 				"MAIN_SITE_URL": "https://creator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_PRODUCTION_GITHUB_APP_SLUG",
-				"SANDBOX_BASE_URL": "https://randseed.org/sandbox",
-				"CORS_ORIGINS": "https://creator.randseed.org"
-			}
+				"SANDBOX_BASE_URL": "https://randseed.org",
+				"CORS_ORIGINS": "https://creator.randseed.org",
+				"GITHUB_ACTION_WORKFLOW": "randseed-deploy.yml",
+				"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator",
+				"MAX_ARTIFACT_BYTES": "26214400"
+			},
+			"r2_buckets": [
+				{
+					"binding": "ARTIFACTS",
+					"bucket_name": "gamecreator-artifacts-production"
+				}
+			]
 		}
 	}
 }

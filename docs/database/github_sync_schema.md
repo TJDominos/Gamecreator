@@ -2,11 +2,17 @@
 
 This document specifies the backend configuration, environment variables, database schema, and API endpoints for RandSeed's GitHub App synchronization and automated Sandbox deployments.
 
+The Creator Worker is the control plane: it serves the Creator SPA and owns
+authentication, repository sync, deployment state, and release APIs. The
+separate Play Worker is the data plane: it reads completed immutable files from
+R2 and serves game runtime requests embedded via iframe under `randseed.org`.
+
 ---
 
 ## 1. Environment Variables & Secrets
 
-Configure the following variables in Cloudflare Worker secrets / `.env`:
+Configure the following values as Cloudflare Worker variables or secrets. Never
+put the secret values in a browser `VITE_*` variable or a user GitHub workflow:
 
 | Variable | Type | Description | Example |
 | :--- | :--- | :--- | :--- |
@@ -16,7 +22,7 @@ Configure the following variables in Cloudflare Worker secrets / `.env`:
 | `GITHUB_CLIENT_SECRET` | Secret | OAuth Client Secret | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `GITHUB_WEBHOOK_SECRET` | Secret | High-entropy string for HMAC SHA-256 verification | `whsec_9f83a2bc...` |
 | `GITHUB_APP_PRIVATE_KEY` | Secret | RSA Private Key (`.pem`) generated on GitHub | `-----BEGIN RSA PRIVATE KEY-----...` |
-| `SANDBOX_BASE_URL` | Var | Public base URL for game sandbox instances | `https://randseed.org/sandbox` |
+| `SANDBOX_BASE_URL` | Var | Public base URL for game instances | `https://randseed.org` |
 
 ---
 
@@ -44,7 +50,7 @@ Binds an individual game to a specific repository and branch:
 - `last_synced_commit` (TEXT): Short SHA (e.g. `a4f29cb`)
 - `last_commit_message` (TEXT): Commit message
 - `last_synced_at` (INTEGER): Last deploy timestamp
-- `sandbox_url` (TEXT): Preview link (e.g. `https://randseed.org/sandbox/g_101`)
+- `sandbox_url` (TEXT): Preview link (e.g. `https://randseed.org/g_101`)
 - `build_dir` (TEXT): Bundle output directory (default `'dist'`)
 
 ### `game_deployments`
@@ -61,15 +67,43 @@ Deployment and build audit history:
 
 ---
 
-## 3. Backend Endpoints (`worker/src/routes/github.ts`)
+## 3. Deployment pipeline (`0005_deployment_pipeline.sql`)
+
+The deployment pipeline uses `deployment_records` as the state machine source
+of truth. `deployment_upload_sessions` and `deployment_upload_files` authorize
+short-lived, manifest-bound R2 uploads. `game_release_pointers` selects the
+active immutable deployment, and `deployment_events` deduplicates GitHub
+webhook deliveries. The deployment record stores `build_dir`, so the workflow
+manifest root must match the linked repository's configured build directory.
+
+The dev R2 bucket is `gamecreator-artifacts-dev`; test and production use their
+own named-environment buckets from `wrangler.jsonc`.
+
+The Play Worker must not bind Creator `ASSETS`, JWT secrets, or Creator API
+credentials.
+
+## 4. Backend endpoints (`worker/src/routes/github.ts` and `worker/src/routes/deployments.ts`)
 
 | Route | Method | Auth | Description |
 | :--- | :--- | :--- | :--- |
 | `/api/github/install` | `GET` | Optional | Generates GitHub App installation URL with creator state |
 | `/api/github/callback` | `GET` | GitHub Redirect | Handles callback after App installation & stores record |
-| `/api/games/:gameId/repo` | `GET` | Public / Token | Returns repository binding and sync status |
-| `/api/games/:gameId/repo/link` | `POST` | Bearer Token | Links repository, branch, and generates `RANDSEED_API_TOKEN` |
-| `/api/games/:gameId/repo/unlink` | `POST` | Bearer Token | Unlinks repository and pauses automatic deployments |
-| `/api/games/:gameId/sync-status` | `GET` | Public | Live verification check of GitHub vs Sandbox sync |
+| `/api/games/:gameId/repo` | `GET` | Authenticated owner | Returns repository binding and sync status |
+| `/api/games/:gameId/repo/link` | `POST` | Authenticated owner | Links repository, branch, and build directory |
+| `/api/games/:gameId/repo/unlink` | `POST` | Authenticated owner | Unlinks repository and pauses automatic deployments |
+| `/api/games/:gameId/sync-status` | `GET` | Authenticated owner | Live verification check of GitHub vs Sandbox sync |
 | `/api/webhooks/github` | `POST` | HMAC SHA-256 | Receives GitHub webhooks (`push`, `workflow_run`, `installation`) |
-| `/api/sandbox/deploy` | `POST` | Bearer Token | Called by GitHub Action to register a successful build & update Sandbox |
+| `/api/deployments/:id/upload-session` | `POST` | GitHub Actions OIDC | Creates a manifest-bound short-lived upload session |
+| `/api/deployments/:id/artifact/:path` | `PUT` | Upload session token | Uploads one declared file to immutable R2 storage |
+| `/api/deployments/:id/upload-complete` | `POST` | GitHub Actions OIDC | Verifies checksums and publishes the release pointer |
+| `/api/games/:gameId/deployments` | `GET` | Authenticated owner | Lists deployment state and build errors |
+| `/api/games/:gameId/private-releases` | `POST` | Authenticated owner | Creates an expiring or permanent private release link |
+| `/api/games/:gameId/private-releases/:releaseId` | `DELETE` | Authenticated owner | Revokes a private release link |
+
+The legacy `/api/sandbox/deploy` endpoint returns `410` and does not accept
+long-lived deployment tokens.
+
+The Play Worker serves sandbox files from the active release pointer and private
+files only after validating the hashed opaque token, expiry, revocation state,
+published deployment, and completed upload session. Runtime responses include
+strict CSP and cross-origin security headers.

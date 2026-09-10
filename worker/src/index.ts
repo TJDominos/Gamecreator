@@ -5,6 +5,7 @@ import { errorResponse, handleOptionsRequest, jsonResponse } from "./utils/respo
 import { handleAuthRoutes } from "./routes/auth";
 import { handleOrganizationRoutes } from "./routes/organizations";
 import { handleGitHubRoutes } from "./routes/github";
+import { handleDeploymentRoutes } from "./routes/deployments";
 
 export default {
   async fetch(
@@ -19,6 +20,10 @@ export default {
 
     try {
       const url = new URL(request.url);
+
+      if (url.pathname === "/sandbox" || url.pathname.startsWith("/sandbox/")) {
+        return new Response("Game content is served from the play domain", { status: 404 });
+      }
 
       // Health check endpoint
       if (url.pathname === "/api/health" || url.pathname === "/health") {
@@ -41,10 +46,13 @@ export default {
       const orgRes = await handleOrganizationRoutes(request, env);
       if (orgRes) return orgRes;
 
+      const deploymentRes = await handleDeploymentRoutes(request, env);
+      if (deploymentRes) return deploymentRes;
+
       const ghRes = await handleGitHubRoutes(request, env);
       if (ghRes) return ghRes;
 
-      // 3. Fallback to Frontend static assets (Vite React SPA)
+      // 3. Fallback to Creator Portal static assets (Vite React SPA)
       if (
         env.ASSETS &&
         (request.method === "GET" || request.method === "HEAD") &&

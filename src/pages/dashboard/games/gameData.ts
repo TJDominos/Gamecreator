@@ -43,7 +43,7 @@ export const MOCK_GAMES: Game[] = [
       lastSyncedAt: "2 mins ago",
       isSynced: true,
       syncMethod: "github_action",
-      sandboxUrl: "https://randseed.org/sandbox/g_101"
+      sandboxUrl: "https://randseed.org/g_101"
     }
   },
   { 
@@ -64,7 +64,7 @@ export const MOCK_GAMES: Game[] = [
       lastSyncedAt: "15 mins ago",
       isSynced: true,
       syncMethod: "github_action",
-      sandboxUrl: "https://randseed.org/sandbox/g_102"
+      sandboxUrl: "https://randseed.org/g_102"
     }
   },
   { 
@@ -85,7 +85,7 @@ export const MOCK_GAMES: Game[] = [
       lastSyncedAt: "2 hours ago",
       isSynced: true,
       syncMethod: "webhook",
-      sandboxUrl: "https://randseed.org/sandbox/g_999"
+      sandboxUrl: "https://randseed.org/g_999"
     }
   },
   { 

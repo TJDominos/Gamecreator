@@ -1,11 +1,14 @@
 import type {
+  DeploymentRecordRow,
   Env,
   GameDeploymentRow,
   GameRepoBindingRow,
   GithubInstallationRow,
 } from "../types";
 import { getAuthenticatedUser } from "../middleware/auth";
-import { sha256Hex, verifyGitHubWebhookSignature } from "../utils/crypto";
+import { sha256Hex, signJwt, verifyGitHubWebhookSignature, verifyJwt } from "../utils/crypto";
+import { dispatchDeploymentWorkflow } from "../utils/githubApp";
+import { gameBaseUrl } from "../utils/playUrl";
 import { errorResponse, jsonResponse } from "../utils/response";
 
 export async function handleGitHubRoutes(
@@ -68,8 +71,18 @@ export async function handleGitHubRoutes(
  */
 async function handleGitHubInstall(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
+  if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
   const appSlug = env.GITHUB_APP_SLUG || "RDcreatordev";
-  const state = user ? user.principal_id : `anon_${Date.now()}`;
+  const state = await signJwt(
+    {
+      principal_id: user.principal_id,
+      role: user.role,
+      email: user.email,
+      is_email_verified: user.is_email_verified,
+    },
+    env.JWT_SECRET,
+    10 * 60,
+  );
   const installUrl = `https://github.com/apps/${appSlug}/installations/new?state=${encodeURIComponent(state)}`;
 
   return jsonResponse(
@@ -98,13 +111,15 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
   }
 
   const installationId = parseInt(installationIdStr, 10);
+  const statePayload = await verifyJwt(state, env.JWT_SECRET);
+  if (!statePayload) return errorResponse("Invalid or expired installation state", 400, "INVALID_STATE", request, env);
   const now = Date.now();
 
   try {
     if (env.DB) {
       // Save or update installation record
       const id = `gh_inst_${installationId}`;
-      const ownerPrincipal = state.startsWith("anon_") ? "unknown" : state;
+      const ownerPrincipal = statePayload.principal_id;
 
       await env.DB.prepare(
         `INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at)
@@ -148,7 +163,8 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
  * Fetches repository info and sync status for a game
  */
 async function handleGetGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
-  const baseUrl = env.SANDBOX_BASE_URL || "https://randseed.org/sandbox";
+  const user = await getAuthenticatedUser(request, env);
+  if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
 
   try {
     if (env.DB) {
@@ -159,6 +175,12 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
         .first<GameRepoBindingRow>();
 
       if (binding) {
+        const owner = await env.DB.prepare(
+          `SELECT owner_principal FROM github_installations WHERE installation_id = ?`,
+        ).bind(binding.installation_id).first<{ owner_principal: string }>();
+        if (!owner || (owner.owner_principal !== user.principal_id && user.role !== "admin")) {
+          return errorResponse("You do not have access to this game", 403, "FORBIDDEN", request, env);
+        }
         return jsonResponse(
           {
             success: true,
@@ -170,7 +192,7 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
               lastSyncedAt: binding.last_synced_at ? new Date(binding.last_synced_at).toISOString() : "Never",
               isSynced: binding.sync_status === "synced",
               syncMethod: binding.sync_method,
-              sandboxUrl: binding.sandbox_url || `${baseUrl}/${gameId}`,
+              sandboxUrl: gameBaseUrl(env, gameId),
             },
           },
           200,
@@ -180,25 +202,7 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
       }
     }
 
-    // Fallback default mock for dev
-    return jsonResponse(
-      {
-        success: true,
-        repo_info: {
-          repository: "TJDominos/Gamecreator",
-          branch: "main",
-          lastCommitSha: "a4f29cb",
-          lastCommitMessage: "Fix collision bugs and particle effects",
-          lastSyncedAt: "2 mins ago",
-          isSynced: true,
-          syncMethod: "github_action",
-          sandboxUrl: `${baseUrl}/${gameId}`,
-        },
-      },
-      200,
-      request,
-      env,
-    );
+    return errorResponse("No GitHub repository is connected to this game", 404, "NOT_FOUND", request, env);
   } catch (err) {
     return errorResponse(
       err instanceof Error ? err.message : "Failed to retrieve game repo info",
@@ -215,7 +219,8 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
  */
 async function handleLinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
-  const ownerPrincipal = user ? user.principal_id : (request.headers.get("X-Principal-Id") || "creator_dev");
+  if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  const ownerPrincipal = user.principal_id;
 
   const body = (await request.json().catch(() => null)) as {
     repository?: string;
@@ -230,15 +235,24 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
 
   const repository = body.repository.trim();
   const branch = (body.branch || "main").trim();
-  const installationId = body.installation_id || 1001;
-  const buildDir = body.build_dir || "dist";
+  const installationId = body.installation_id;
+  const buildDir = normalizeBuildDir((body.build_dir || "dist").trim().replace(/^\/+|\/+$/g, ""));
   const now = Date.now();
 
-  // Generate scoped RANDSEED_API_TOKEN
-  const rawToken = `rs_live_${crypto.randomUUID().replace(/-/g, "")}`;
-  const tokenHash = await sha256Hex(rawToken);
-  const baseUrl = env.SANDBOX_BASE_URL || "https://randseed.org/sandbox";
-  const sandboxUrl = `${baseUrl}/${gameId}`;
+  if (!/^[^/\s]+\/[^/\s]+$/.test(repository) || !/^[A-Za-z0-9._/-]+$/.test(branch) || !buildDir) {
+    return errorResponse("Repository, branch, or build directory is invalid", 400, "INVALID_REPOSITORY", request, env);
+  }
+
+  if (!installationId) {
+    return errorResponse("Missing required 'installation_id' parameter", 400, "MISSING_INSTALLATION_ID", request, env);
+  }
+  const installation = await env.DB.prepare(
+    `SELECT installation_id FROM github_installations WHERE installation_id = ? AND owner_principal = ?`,
+  ).bind(installationId, ownerPrincipal).first<{ installation_id: number }>();
+  if (!installation) return errorResponse("GitHub installation is not owned by the authenticated creator", 403, "FORBIDDEN", request, env);
+
+  const tokenHash = await sha256Hex(`oidc-only:${crypto.randomUUID()}`);
+  const sandboxUrl = gameBaseUrl(env, gameId);
 
   try {
     if (env.DB) {
@@ -283,8 +297,7 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
           repository,
           branch,
           sandbox_url: sandboxUrl,
-          // Only returned once on initial generation for GitHub Secrets configuration
-          api_token: rawToken,
+          deployment_auth: "github_actions_oidc",
         },
       },
       200,
@@ -306,6 +319,16 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
  * Disconnects/unlinks a repository from a game
  */
 async function handleUnlinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
+  const user = await getAuthenticatedUser(request, env);
+  if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  const binding = await env.DB.prepare(
+    `SELECT i.owner_principal FROM game_repo_bindings b
+     JOIN github_installations i ON i.installation_id = b.installation_id
+     WHERE b.game_id = ?`,
+  ).bind(gameId).first<{ owner_principal: string }>();
+  if (!binding || (binding.owner_principal !== user.principal_id && user.role !== "admin")) {
+    return errorResponse("You do not have access to this game", 403, "FORBIDDEN", request, env);
+  }
   try {
     if (env.DB) {
       await env.DB.prepare(`DELETE FROM game_repo_bindings WHERE game_id = ?`)
@@ -337,23 +360,28 @@ async function handleUnlinkGameRepo(gameId: string, request: Request, env: Env):
  * Live verification check of GitHub sync status
  */
 async function handleCheckSyncStatus(gameId: string, request: Request, env: Env): Promise<Response> {
-  const baseUrl = env.SANDBOX_BASE_URL || "https://randseed.org/sandbox";
+  const deployment = await env.DB.prepare(
+    `SELECT d.* FROM deployment_records d
+     JOIN game_release_pointers p ON p.active_deployment_id = d.id
+     WHERE p.game_id = ? AND d.status = 'published'`,
+  ).bind(gameId).first<DeploymentRecordRow>();
+  const latest = await env.DB.prepare(
+    `SELECT id, commit_sha, commit_message, status, created_at
+     FROM deployment_records WHERE game_id = ? ORDER BY created_at DESC LIMIT 1`,
+  ).bind(gameId).first<{ id: string; commit_sha: string; commit_message: string | null; status: string; created_at: number }>();
 
-  return jsonResponse(
-    {
-      success: true,
-      game_id: gameId,
-      is_synced: true,
-      last_synced_at: new Date().toISOString(),
-      latest_commit: "c8e170f",
-      commit_message: "Update player physics and sandbox camera boundaries",
-      sandbox_url: `${baseUrl}/${gameId}`,
-      message: "GitHub & RandSeed Sandbox are currently in sync",
-    },
-    200,
-    request,
-    env,
-  );
+  return jsonResponse({
+    success: true,
+    game_id: gameId,
+    is_synced: deployment?.status === "published",
+    deployment_id: deployment?.id || latest?.id || null,
+    status: deployment?.status || latest?.status || "not_deployed",
+    last_synced_at: deployment?.published_at ? new Date(deployment.published_at).toISOString() : null,
+    latest_commit: deployment?.commit_sha || latest?.commit_sha || null,
+    commit_message: deployment?.commit_message || latest?.commit_message || null,
+    sandbox_url: gameBaseUrl(env, gameId),
+    message: deployment ? "GitHub & RandSeed Sandbox are currently in sync" : "No published deployment",
+  }, 200, request, env);
 }
 
 /**
@@ -362,6 +390,7 @@ async function handleCheckSyncStatus(gameId: string, request: Request, env: Env)
 async function handleGitHubWebhook(request: Request, env: Env): Promise<Response> {
   const signature = request.headers.get("X-Hub-Signature-256");
   const event = request.headers.get("X-GitHub-Event") || "ping";
+  const deliveryId = request.headers.get("X-GitHub-Delivery") || "";
   const rawBody = await request.text();
 
   // 1. Verify HMAC SHA-256 signature
@@ -378,140 +407,170 @@ async function handleGitHubWebhook(request: Request, env: Env): Promise<Response
   }
 
   const now = Date.now();
+  const eventId = deliveryId || `synthetic_${await sha256Hex(rawBody)}`;
+  const existingEvent = await env.DB.prepare(
+    `SELECT deployment_id FROM deployment_events WHERE delivery_id = ?`,
+  ).bind(eventId).first<{ deployment_id: string | null }>();
+  if (existingEvent) {
+    return jsonResponse({ received: true, event, duplicate: true, deployment_id: existingEvent.deployment_id }, 200, request, env);
+  }
 
-  // 2. Handle 'push' events
+  let deployment: DeploymentRecordRow | null = null;
   if (event === "push") {
-    const repoFullName = payload.repository?.full_name;
-    const ref = payload.ref || "";
-    const headCommit = payload.head_commit;
-
-    if (repoFullName && headCommit) {
-      const commitSha = (headCommit.id || "").substring(0, 7);
-      const commitMessage = headCommit.message || "";
-      const branch = ref.replace("refs/heads/", "");
-
-      if (env.DB) {
-        // Update bindings matching this repo and branch
+    deployment = await createPendingDeployment(payload, eventId, request, env);
+    if (deployment) {
+      try {
+        await dispatchDeploymentWorkflow(env, {
+          installationId: deployment.installation_id,
+          repository: deployment.repository,
+          branch: deployment.branch,
+          deploymentId: deployment.id,
+          commitSha: deployment.commit_sha,
+          gameId: deployment.game_id,
+        });
         await env.DB.prepare(
-          `UPDATE game_repo_bindings
-           SET last_synced_commit = ?,
-               last_commit_message = ?,
-               last_synced_at = ?,
-               sync_status = 'synced',
-               updated_at = ?
-           WHERE repo_full_name = ? AND default_branch = ?`,
-        )
-          .bind(commitSha, commitMessage, now, now, repoFullName, branch)
-          .run();
+          `UPDATE deployment_records SET status = 'queued' WHERE id = ? AND status = 'pending'`,
+        ).bind(deployment.id).run();
+      } catch (error) {
+        await env.DB.prepare(
+          `UPDATE deployment_records SET status = 'failed', error_code = 'WORKFLOW_DISPATCH_FAILED', error_message = ?, finished_at = ?
+           WHERE id = ? AND status = 'pending'`,
+        ).bind(error instanceof Error ? error.message : "Workflow dispatch failed", now, deployment.id).run();
       }
     }
-
-    return jsonResponse({ received: true, event: "push" }, 200, request, env);
+  } else if (event === "workflow_job" || event === "workflow_run") {
+    deployment = await advanceWorkflowDeployment(payload, event, env);
   }
 
-  // 3. Handle 'workflow_run' events (GitHub Actions completion)
-  if (event === "workflow_run") {
-    const conclusion = payload.workflow_run?.conclusion; // 'success', 'failure', etc.
-    const repoFullName = payload.repository?.full_name;
-    const headSha = (payload.workflow_run?.head_sha || "").substring(0, 7);
+  await env.DB.prepare(
+    `INSERT INTO deployment_events (delivery_id, deployment_id, event_name, payload_sha256, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).bind(eventId, deployment?.id || null, event, await sha256Hex(rawBody), now).run();
 
-    if (repoFullName && conclusion) {
-      const syncStatus = conclusion === "success" ? "synced" : "error";
-      if (env.DB) {
-        await env.DB.prepare(
-          `UPDATE game_repo_bindings
-           SET sync_status = ?,
-               last_synced_at = ?,
-               updated_at = ?
-           WHERE repo_full_name = ?`,
-        )
-          .bind(syncStatus, now, now, repoFullName)
-          .run();
-      }
-    }
+  return jsonResponse({
+    received: true,
+    event,
+    deployment_id: deployment?.id || null,
+    status: deployment ? (await getDeploymentStatus(deployment.id, env)) : "ignored",
+  }, deployment ? 202 : 200, request, env);
+}
 
-    return jsonResponse({ received: true, event: "workflow_run" }, 200, request, env);
+async function createPendingDeployment(
+  payload: Record<string, any>,
+  deliveryId: string,
+  request: Request,
+  env: Env,
+): Promise<DeploymentRecordRow | null> {
+  const repository = payload.repository?.full_name;
+  const branch = String(payload.ref || "").replace(/^refs\/heads\//, "");
+  const commitSha = payload.head_commit?.id || payload.after;
+  if (!repository || !branch || !/^[a-f0-9]{40}$/i.test(commitSha || "")) return null;
+
+  const binding = await env.DB.prepare(
+    `SELECT b.*, i.owner_principal FROM game_repo_bindings b
+     JOIN github_installations i ON i.installation_id = b.installation_id
+     WHERE b.repo_full_name = ? AND b.default_branch = ?`,
+  ).bind(repository, branch).first<GameRepoBindingRow & { owner_principal: string }>();
+  if (!binding) return null;
+
+  const existing = await env.DB.prepare(
+    `SELECT * FROM deployment_records WHERE game_id = ? AND commit_sha = ?`,
+  ).bind(binding.game_id, commitSha).first<DeploymentRecordRow>();
+  if (existing) return existing;
+
+  const now = Date.now();
+  const deploymentId = `dep_${crypto.randomUUID().replace(/-/g, "")}`;
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE deployment_records
+       SET status = 'superseded', error_code = 'NEWER_COMMIT', error_message = 'Superseded by a newer push', finished_at = ?
+       WHERE game_id = ? AND status IN ('pending', 'queued', 'building', 'uploading')`,
+    ).bind(now, binding.game_id),
+    env.DB.prepare(
+      `INSERT INTO deployment_records
+      (id, tenant_id, game_id, repository, installation_id, branch, build_dir, commit_sha, commit_message, github_delivery_id, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    ).bind(
+      deploymentId,
+      binding.owner_principal,
+      binding.game_id,
+      repository,
+      binding.installation_id,
+      branch,
+      binding.build_dir,
+      commitSha,
+      payload.head_commit?.message || null,
+      deliveryId,
+      now,
+    ),
+  ]);
+  const deployment = await env.DB.prepare(`SELECT * FROM deployment_records WHERE id = ?`)
+    .bind(deploymentId).first<DeploymentRecordRow>();
+  if (!deployment) throw new Error(`Failed to create deployment for ${request.url}`);
+  return deployment;
+}
+
+async function advanceWorkflowDeployment(
+  payload: Record<string, any>,
+  event: string,
+  env: Env,
+): Promise<DeploymentRecordRow | null> {
+  const workflow = event === "workflow_job" ? payload.workflow_job : payload.workflow_run;
+  const repository = payload.repository?.full_name;
+  const commitSha = workflow?.head_sha;
+  if (!repository || !commitSha) return null;
+  const deployment = await env.DB.prepare(
+    `SELECT * FROM deployment_records WHERE repository = ? AND commit_sha = ? ORDER BY created_at DESC LIMIT 1`,
+  ).bind(repository, commitSha).first<DeploymentRecordRow>();
+  if (!deployment) return null;
+
+  const action = workflow?.status || payload.action;
+  const conclusion = workflow?.conclusion;
+  let status: string | null = null;
+  if (conclusion && conclusion !== "success") status = conclusion === "cancelled" ? "cancelled" : "failed";
+  else if (action === "queued" || action === "in_progress") status = "building";
+  if (status) {
+    await env.DB.prepare(
+      `UPDATE deployment_records SET status = ?, started_at = COALESCE(started_at, ?), github_run_id = ?, workflow_run_attempt = ?
+       WHERE id = ? AND status IN ('pending', 'queued', 'building')`,
+    ).bind(
+      status,
+      Date.now(),
+      String(workflow?.run_id || workflow?.id || "") || null,
+      Number(workflow?.run_attempt) || null,
+      deployment.id,
+    ).run();
   }
+  return deployment;
+}
 
-  return jsonResponse({ received: true, event }, 200, request, env);
+async function getDeploymentStatus(deploymentId: string, env: Env): Promise<string> {
+  const result = await env.DB.prepare(`SELECT status FROM deployment_records WHERE id = ?`)
+    .bind(deploymentId).first<{ status: string }>();
+  return result?.status || "unknown";
+}
+
+function normalizeBuildDir(value: string): string | null {
+  if (
+    value.length > 128 ||
+    value.includes("\\") ||
+    value.startsWith("/") ||
+    value.split("/").some((part) => !part || part === "." || part === "..")
+  ) {
+    return null;
+  }
+  return value;
 }
 
 /**
  * Handles deployment push from the GitHub Action sandbox-deploy-action
  */
 async function handleSandboxDeploy(request: Request, env: Env): Promise<Response> {
-  const authHeader = request.headers.get("Authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7).trim() : null;
-
-  const body = (await request.json().catch(() => null)) as {
-    game_id?: string;
-    gameId?: string;
-    commit_sha?: string;
-    commitSha?: string;
-    commit_message?: string;
-    commitMessage?: string;
-    branch?: string;
-  } | null;
-
-  const gameId = body?.game_id || body?.gameId;
-  const commitSha = ((body?.commit_sha || body?.commitSha || "head") as string).substring(0, 7);
-  const commitMessage = body?.commit_message || body?.commitMessage || "Deployed via GitHub Action";
-  const branch = body?.branch || "main";
-
-  if (!gameId) {
-    return errorResponse("Missing required 'game-id'", 400, "MISSING_GAME_ID", request, env);
-  }
-
-  const now = Date.now();
-  const deploymentId = `dep_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
-  const baseUrl = env.SANDBOX_BASE_URL || "https://randseed.org/sandbox";
-  const sandboxUrl = `${baseUrl}/${gameId}`;
-
-  try {
-    if (env.DB) {
-      // Record deployment
-      await env.DB.prepare(
-        `INSERT INTO game_deployments (id, game_id, commit_sha, commit_message, branch, status, sandbox_url, trigger_type, created_at)
-         VALUES (?, ?, ?, ?, ?, 'deployed', ?, 'github_action', ?)`,
-      )
-        .bind(deploymentId, gameId, commitSha, commitMessage, branch, sandboxUrl, now)
-        .run();
-
-      // Update repo binding status
-      await env.DB.prepare(
-        `UPDATE game_repo_bindings
-         SET last_synced_commit = ?,
-             last_commit_message = ?,
-             last_synced_at = ?,
-             sync_status = 'synced',
-             updated_at = ?
-         WHERE game_id = ?`,
-      )
-        .bind(commitSha, commitMessage, now, now, gameId)
-        .run();
-    }
-
-    return jsonResponse(
-      {
-        success: true,
-        deployment_id: deploymentId,
-        game_id: gameId,
-        commit_sha: commitSha,
-        sandbox_url: sandboxUrl,
-        deployed_at: new Date(now).toISOString(),
-        message: "Sandbox build successfully deployed and active!",
-      },
-      200,
-      request,
-      env,
-    );
-  } catch (err) {
-    return errorResponse(
-      err instanceof Error ? err.message : "Failed to record deployment",
-      500,
-      "DEPLOY_ERROR",
-      request,
-      env,
-    );
-  }
+  return errorResponse(
+    "Legacy deployment tokens are disabled; use GitHub Actions OIDC and the deployment upload API",
+    410,
+    "LEGACY_DEPLOY_DISABLED",
+    request,
+    env,
+  );
 }

@@ -56,6 +56,22 @@ The Worker uses Wrangler named environments:
 | `test` | `randseed-gamecreator-worker-test` | `testcreator.randseed.org` | Replace with test App slug |
 | `production` | `randseed-gamecreator-worker-production` | `creator.randseed.org` | Replace with production App slug |
 
+Creator Workers serve the Creator SPA and control-plane APIs only. User game
+files are served by the separate `gamecreator-play-dev` Worker on `workers.dev`
+and embedded into the main site shell via iframe:
+- Public games: `https://randseed.org/{game_id}`
+- Private releases: `https://randseed.org/private/{game_id}?token={token}`
+
+Run the Play Worker locally with:
+
+```bash
+npm run worker:play:dev
+```
+
+The Play Worker has only the game D1 and R2 bindings. It does not bind Creator
+SPA assets, JWT secrets, or Creator API routes. It deploys directly to
+`workers_dev` with built-in Cloudflare Edge caching.
+
 The current Worker and D1 configuration is the `dev` environment. `test` and
 `production` are intentionally configured with placeholder D1 IDs and must not
 be deployed until their D1 databases, domains, and GitHub Apps are created.
@@ -72,6 +88,7 @@ Deploy explicitly to an environment:
 npm run worker:deploy:dev
 npm run worker:deploy:test
 npm run worker:deploy:production
+npm run worker:play:deploy:dev
 ```
 
 Migrations must be applied to the same environment's D1 database. For the
@@ -80,7 +97,15 @@ current dev database, use `--env dev` and the actual migration file:
 ```bash
 npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0001_init.sql
 npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0002_github_sync.sql
+npm run d1:migrate:pipeline:dev
+npm run d1:migrate:private:dev
 ```
+
+The pipeline migration creates immutable deployment records, short-lived upload
+sessions, per-file checksum records, release pointers, and webhook delivery
+deduplication. Apply it only after the base migrations have been applied. The
+dev Worker expects the R2 bucket `gamecreator-artifacts-dev`; inspect or create
+it with `npm run r2:list` and `npm run r2:create:dev`.
 
 Do not run a production deployment until the placeholder values in
 `wrangler.jsonc` have been replaced.
@@ -128,3 +153,24 @@ local Worker development, put a random value in the ignored `.dev.vars` file:
 ```bash
 printf 'JWT_SECRET=%s\n' "$(openssl rand -base64 32)" > .dev.vars
 ```
+
+### GitHub Actions deployment contract
+
+The GitHub App needs repository **Contents: Read-only**, **Actions: Read and
+write**, and repository webhook delivery. The Worker verifies the GitHub
+webhook HMAC before creating one pending deployment per game and commit, then
+dispatches the configured workflow (`GITHUB_ACTION_WORKFLOW`, currently
+`randseed-deploy.yml`).
+
+The generated workflow must use `workflow_dispatch`, checkout the exact
+`commit_sha` input, and request `id-token: write`. It exchanges the GitHub
+Actions OIDC token for a 15-minute upload session. Each file is uploaded to R2
+under a deployment-specific immutable prefix and is checked against the
+manifest's SHA-256 and byte length before publication. No long-lived deployment
+token or Cloudflare credential is placed in a user repository workflow.
+
+The public game URL is `https://randseed.org/{game_id}`. The Play Worker
+resolves the active release pointer and serves completed files from the active
+deployment. Private links use `https://randseed.org/private/{game_id}?token={token}`
+and are verified against token hashes in D1; they can expire or be revoked. Older
+deployments cannot replace a newer release pointer.

@@ -13,7 +13,7 @@ export function GameOverview(): React.ReactElement {
       {/* Feedback Notification */}
       {['PRIVATE_TESTING', 'PUBLIC_ACTIVE'].includes(status) && (
         <a 
-          href={`https://randseed.org/sandbox/${gameId}?tab=feedback`} 
+          href={`https://randseed.org/${gameId}?tab=feedback`}
           target="_blank" 
           rel="noreferrer" 
           style={{ 

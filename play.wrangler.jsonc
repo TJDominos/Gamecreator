@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gamecreator-play-dev",
+  "main": "worker/src/play.ts",
+  "compatibility_date": "2026-07-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gamecreator-d1",
+      "database_id": "320c8dd3-7348-4675-9f3d-e384e1713f63",
+      "remote": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "gamecreator-artifacts-dev"
+    }
+  ],
+  "vars": {
+    "GAME_CSP_CONNECT_SRC": "'self'"
+  },
+  "env": {
+    "dev": {
+      "name": "gamecreator-play-dev",
+      "workers_dev": true,
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "gamecreator-d1",
+          "database_id": "320c8dd3-7348-4675-9f3d-e384e1713f63",
+          "remote": true
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "ARTIFACTS",
+          "bucket_name": "gamecreator-artifacts-dev"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "dev",
+        "GAME_CSP_CONNECT_SRC": "'self'"
+      }
+    }
+  }
+}

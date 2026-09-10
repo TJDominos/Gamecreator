@@ -1,44 +1,104 @@
-import React, { useState } from "react";
-import { GitCommit, ExternalLink, ShieldCheck, Globe, Clock, Rocket, Settings2, Github, Play } from "lucide-react";
-import { useOutletContext, useParams, Link } from "react-router";
-import { GameStatus, StatusLabels } from "./GameConsole";
+import React, { useEffect, useState } from "react";
+import { GitCommit, ExternalLink, ShieldCheck, Globe, Clock, Github, Play, RefreshCw } from "lucide-react";
+import { useParams, Link } from "react-router";
 import { getGameById } from "./gameData";
+import { githubApi, type DeploymentRecord, type PrivateReleaseResponse } from "../../../services/githubApi";
 
-const MOCK_DEPLOYMENTS = [
-  { id: "dep_003", commit: "a4f29cb", message: "Fix collision bugs", date: "2 mins ago", status: "Sandbox", rating: "4.8" },
-  { id: "dep_002", commit: "7b1c3a8", message: "Update boss mechanics", date: "2 days ago", status: "In Review", rating: "4.5" },
-  { id: "dep_001", commit: "9f0d1e2", message: "Initial release candidate", date: "1 week ago", status: "Approved", rating: "4.9" },
-];
+function formatDate(timestamp: number): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(timestamp);
+}
+
+function statusLabel(status: string): string {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function statusStyle(status: string): React.CSSProperties {
+  if (status === "published") return { background: "#e6f6ec", color: "#1e874b" };
+  if (["failed", "cancelled", "superseded"].includes(status)) return { background: "#fef2f2", color: "#b91c1c" };
+  if (["building", "uploading", "publishing", "queued"].includes(status)) return { background: "#fff1d9", color: "#8a5314" };
+  return { background: "#eef2ff", color: "#4f46e5" };
+}
 
 export function GameDeployments(): React.ReactElement {
   const [privateLinkModal, setPrivateLinkModal] = useState<string | null>(null);
-  const { status, setStatus } = useOutletContext<{ status: GameStatus, setStatus: (s: GameStatus) => void }>();
+  const [privateExpiryDays, setPrivateExpiryDays] = useState<number | null>(7);
+  const [privateRelease, setPrivateRelease] = useState<PrivateReleaseResponse | null>(null);
+  const [privateReleaseError, setPrivateReleaseError] = useState<string | null>(null);
+  const [isCreatingPrivateRelease, setIsCreatingPrivateRelease] = useState(false);
+  const [isRevokingPrivateRelease, setIsRevokingPrivateRelease] = useState(false);
+  const [deployments, setDeployments] = useState<DeploymentRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { gameId } = useParams();
   const game = getGameById(gameId || 'g_101');
   const repoInfo = game?.repoInfo;
 
+  const closePrivateLinkModal = () => {
+    setPrivateLinkModal(null);
+    setPrivateExpiryDays(7);
+    setPrivateRelease(null);
+    setPrivateReleaseError(null);
+    setIsCreatingPrivateRelease(false);
+    setIsRevokingPrivateRelease(false);
+  };
+
+  const createPrivateRelease = async () => {
+    if (!gameId || !privateLinkModal) return;
+    setIsCreatingPrivateRelease(true);
+    setPrivateReleaseError(null);
+    try {
+      const response = await githubApi.createPrivateRelease(gameId, privateLinkModal, privateExpiryDays);
+      setPrivateRelease(response);
+    } catch (error) {
+      setPrivateReleaseError(error instanceof Error ? error.message : "Unable to create private link");
+    } finally {
+      setIsCreatingPrivateRelease(false);
+    }
+  };
+
+  const revokePrivateRelease = async () => {
+    if (!gameId || !privateRelease?.release_id) return;
+    setIsRevokingPrivateRelease(true);
+    setPrivateReleaseError(null);
+    try {
+      await githubApi.revokePrivateRelease(gameId, privateRelease.release_id);
+      setPrivateRelease({ ...privateRelease, revoked: true });
+    } catch (error) {
+      setPrivateReleaseError(error instanceof Error ? error.message : "Unable to revoke private link");
+    } finally {
+      setIsRevokingPrivateRelease(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!gameId) return;
+    let cancelled = false;
+    let intervalId: number | undefined;
+
+    const loadDeployments = async () => {
+      try {
+        const response = await githubApi.listDeployments(gameId);
+        if (!cancelled) {
+          setDeployments(response.deployments || []);
+          setLoadError(null);
+        }
+      } catch (error) {
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : "Unable to load deployments");
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    void loadDeployments();
+    intervalId = window.setInterval(() => void loadDeployments(), 3000);
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [gameId]);
+
   return (
     <div>
-      {/* Developer Control Panel */}
-      <div style={{ background: '#fbfafc', border: '1px dashed var(--portal-purple)', borderRadius: '12px', padding: '16px', marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ background: 'var(--portal-purple-soft)', color: 'var(--portal-purple)', padding: '8px', borderRadius: '8px' }}><Settings2 size={20} /></div>
-          <div>
-            <h3 style={{ margin: '0 0 4px', fontSize: '14px', color: 'var(--portal-purple)' }}>Status Overrider (Developer Mode)</h3>
-            <p style={{ margin: 0, fontSize: '12px', color: 'var(--portal-muted)' }}>Manually step through the deployment status machine for testing permissions.</p>
-          </div>
-        </div>
-        <select 
-          value={status} 
-          onChange={(e) => setStatus(e.target.value as GameStatus)}
-          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--portal-border)', fontSize: '13px', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
-        >
-          {Object.entries(StatusLabels).map(([val, label]) => (
-            <option key={val} value={val}>{label}</option>
-          ))}
-        </select>
-      </div>
-
       {/* Connected GitHub & Sandbox Quick Bar */}
       {repoInfo && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '14px 18px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
@@ -57,7 +117,7 @@ export function GameDeployments(): React.ReactElement {
             <Link to={`/dashboard/games/${gameId}/settings`} style={{ fontSize: '13px', color: 'var(--portal-purple)', textDecoration: 'none', fontWeight: 500 }}>
               Sync Settings &rarr;
             </Link>
-            <a href={`https://randseed.org/sandbox/${gameId}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#111827', color: '#fff', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
+            <a href={repoInfo.sandboxUrl || `https://randseed.org/${gameId}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#111827', color: '#fff', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
               <Play size={12} fill="#fff" /> Sandbox Link
             </a>
           </div>
@@ -71,8 +131,17 @@ export function GameDeployments(): React.ReactElement {
         </div>
       </div>
 
+      {isLoading && (
+        <div style={{ padding: '36px', textAlign: 'center', color: 'var(--portal-muted)' }}><RefreshCw size={18} className="spin" /> Loading deployments...</div>
+      )}
+      {loadError && !isLoading && (
+        <div style={{ padding: '20px', border: '1px solid #fecaca', background: '#fff7f7', color: '#991b1b', borderRadius: '12px' }}>{loadError}</div>
+      )}
+      {!isLoading && !loadError && deployments.length === 0 && (
+        <div style={{ padding: '36px', textAlign: 'center', border: '1px dashed var(--portal-border)', borderRadius: '12px', color: 'var(--portal-muted)' }}>No deployments yet.</div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {MOCK_DEPLOYMENTS.map(dep => (
+        {deployments.map(dep => (
           <div key={dep.id} style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', gap: '16px' }}>
@@ -81,23 +150,19 @@ export function GameDeployments(): React.ReactElement {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '16px', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {dep.message}
-                    <span className="status-pill" style={
-                      dep.status === 'Approved' ? { background: '#e6f6ec', color: '#1e874b' } :
-                      dep.status === 'In Review' ? { background: '#fff1d9', color: '#8a5314' } :
-                      { background: '#eef2ff', color: '#4f46e5' }
-                    }>{dep.status}</span>
+                    {dep.commit_message || "Deployment"}
+                    <span className="status-pill" style={statusStyle(dep.status)}>{statusLabel(dep.status)}</span>
                   </h3>
                   <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: 'var(--portal-muted)' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> {dep.date}</span>
-                    <span style={{ fontFamily: 'monospace' }}>{dep.commit}</span>
-                    <span>⭐ {dep.rating} (Playtest)</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={14} /> {formatDate(dep.created_at)}</span>
+                    <span style={{ fontFamily: 'monospace' }}>{dep.commit_sha.slice(0, 12)}</span>
+                    {dep.error_message && <span style={{ color: '#b91c1c' }}>{dep.error_message}</span>}
                   </div>
                 </div>
               </div>
               
               <div style={{ display: 'flex', gap: '8px' }}>
-                {dep.status === 'Sandbox' && (
+                {dep.status === 'published' && (
                   <>
                     <button className="primary-action" style={{ background: 'transparent', color: 'var(--portal-purple)', border: '1px solid var(--portal-purple)' }} onClick={() => setPrivateLinkModal(dep.id)}>
                       <ExternalLink size={16} /> Private Link
@@ -107,14 +172,14 @@ export function GameDeployments(): React.ReactElement {
                     </button>
                   </>
                 )}
-                {dep.status === 'In Review' && (
+                {['pending', 'queued', 'building', 'uploading', 'publishing'].includes(dep.status) && (
                   <button className="primary-action" disabled style={{ opacity: 0.5 }}>
                     <Clock size={16} /> Under Review
                   </button>
                 )}
-                {dep.status === 'Approved' && (
+                {dep.status === 'failed' && (
                   <button className="primary-action" style={{ background: '#1e874b', color: '#fff' }}>
-                    <Globe size={16} /> Publish to Public
+                    <RefreshCw size={16} /> Build Failed
                   </button>
                 )}
               </div>
@@ -128,36 +193,35 @@ export function GameDeployments(): React.ReactElement {
           <div style={{ background: '#fff', padding: '32px', borderRadius: '16px', width: '500px', maxWidth: '90vw' }}>
             <h3 style={{ margin: '0 0 16px', fontSize: '20px' }}>Create Private Link</h3>
             <p style={{ color: 'var(--portal-muted)', fontSize: '13px', marginBottom: '24px' }}>
-              Generate a secure, sharable link for closed testing without public listing. No player limits.
+              Generate a secure link for closed testing without changing the public release pointer.
             </p>
+            {privateReleaseError && <div style={{ marginBottom: '16px', padding: '10px 12px', border: '1px solid #fecaca', background: '#fff7f7', color: '#991b1b', borderRadius: '8px', fontSize: '13px' }}>{privateReleaseError}</div>}
+            {privateRelease?.url && !privateRelease.revoked && (
+              <div style={{ marginBottom: '20px', padding: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input value={privateRelease.url} readOnly style={{ flex: 1, minWidth: 0, padding: '9px 10px', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '12px' }} />
+                  <button className="primary-action" onClick={() => void navigator.clipboard?.writeText(privateRelease.url || "")}>Copy</button>
+                </div>
+                <button style={{ marginTop: '10px', padding: 0, background: 'transparent', border: 'none', cursor: 'pointer', color: '#b91c1c', fontSize: '12px' }} disabled={isRevokingPrivateRelease} onClick={() => void revokePrivateRelease()}>
+                  {isRevokingPrivateRelease ? 'Revoking...' : 'Revoke link'}
+                </button>
+              </div>
+            )}
+            {privateRelease?.revoked && <div style={{ marginBottom: '20px', color: '#b91c1c', fontSize: '13px' }}>This private link has been revoked.</div>}
             <div className="onboarding-form">
               <div className="field">
                 <span>Link Validity</span>
-                <select style={{ width: '100%', padding: '11px 12px', background: '#fbfafc', border: '1px solid #dcd7e0', borderRadius: '9px', fontSize: '12px' }}>
-                  <option>7 Days</option>
-                  <option>30 Days</option>
-                  <option>Permanent</option>
+                <select value={privateExpiryDays === null ? 'permanent' : String(privateExpiryDays)} onChange={(event) => setPrivateExpiryDays(event.target.value === 'permanent' ? null : Number(event.target.value))} disabled={Boolean(privateRelease?.url)} style={{ width: '100%', padding: '11px 12px', background: '#fbfafc', border: '1px solid #dcd7e0', borderRadius: '9px', fontSize: '12px' }}>
+                  <option value="7">7 Days</option>
+                  <option value="30">30 Days</option>
+                  <option value="permanent">Permanent</option>
                 </select>
-              </div>
-              <div className="field">
-                <span>Token Asset Mode</span>
-                <select style={{ width: '100%', padding: '11px 12px', background: '#fbfafc', border: '1px solid #dcd7e0', borderRadius: '9px', fontSize: '12px' }}>
-                  <option>Real Gcoin / Bonus</option>
-                  <option>Test Tokens Only</option>
-                </select>
-              </div>
-              <div className="field--wide" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <input type="checkbox" id="require-login" defaultChecked style={{ width: '16px' }} />
-                <label htmlFor="require-login" style={{ fontSize: '13px' }}>Require RandSeed login to play and earn milestone rewards</label>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
-              <button style={{ padding: '10px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, color: 'var(--portal-muted)' }} onClick={() => setPrivateLinkModal(null)}>Cancel</button>
-              <button className="primary-action" onClick={() => {
-                alert("Generated: randseed.org/preview/neon-dash?token=eyJhbGci...");
-                setPrivateLinkModal(null);
-              }}>
-                Generate Link
+              <button style={{ padding: '10px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, color: 'var(--portal-muted)' }} onClick={closePrivateLinkModal}>Close</button>
+              <button className="primary-action" disabled={isCreatingPrivateRelease || Boolean(privateRelease?.url)} onClick={() => void createPrivateRelease()}>
+                {isCreatingPrivateRelease ? 'Generating...' : 'Generate Link'}
               </button>
             </div>
           </div>

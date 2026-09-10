@@ -14,9 +14,7 @@ import {
   AlertCircle,
   Plus,
   ArrowUpRight,
-  ShieldCheck,
-  KeyRound,
-  CheckCheck
+  ShieldCheck
 } from "lucide-react";
 import { GameRepoInfo } from "./gameData";
 import { githubApi } from "../../../services/githubApi";
@@ -45,7 +43,7 @@ export function GitHubSyncCard({
       lastSyncedAt: "2 mins ago",
       isSynced: true,
       syncMethod: "github_action",
-      sandboxUrl: `https://randseed.org/sandbox/${gameId}`
+      sandboxUrl: `https://randseed.org/${gameId}`
     }
   );
 
@@ -55,11 +53,9 @@ export function GitHubSyncCard({
   const [activeSyncTab, setActiveSyncTab] = useState<'action' | 'webhook' | 'manual'>('action');
   const [copiedWorkflow, setCopiedWorkflow] = useState(false);
   const [copiedSandboxUrl, setCopiedSandboxUrl] = useState(false);
-  const [copiedToken, setCopiedToken] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
-  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
 
   // Connect form state
   const [repoInput, setRepoInput] = useState(repoInfo.repository || "TJDominos/Gamecreator");
@@ -141,6 +137,7 @@ export function GitHubSyncCard({
         repository: repoInput.trim(),
         branch: branchInput.trim() || "main",
         build_dir: buildDirInput.trim() || "dist",
+        installation_id: Number(new URLSearchParams(window.location.search).get("installation_id")) || undefined,
       });
 
       if (res.success && res.binding) {
@@ -152,10 +149,6 @@ export function GitHubSyncCard({
           isSynced: true,
           lastSyncedAt: "Just now",
         }));
-
-        if (res.binding.api_token) {
-          setGeneratedToken(res.binding.api_token);
-        }
 
         setIsDisconnected(false);
         setShowConnectModal(false);
@@ -179,41 +172,78 @@ export function GitHubSyncCard({
     }
     setShowUnlinkModal(false);
     setIsDisconnected(true);
-    setGeneratedToken(null);
   };
 
   const handleCopyWorkflow = () => {
-    const workflowContent = `name: Deploy to RandSeed Sandbox
-
-on:
-  push:
-    branches: [ ${repoInfo.branch} ]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install & Build
-        run: |
-          npm ci
-          npm run build
-
-      - name: Deploy to RandSeed Sandbox
-        uses: randseed-org/sandbox-deploy-action@v1
-        with:
-          game-id: '${gameId}'
-          api-token: \${{ secrets.RANDSEED_API_TOKEN }}
-          build-dir: '${buildDirInput || "dist"}'
-`;
+    const buildDir = buildDirInput || "dist";
+    const workflowContent = [
+      "name: Deploy to RandSeed Sandbox",
+      "",
+      "on:",
+      "  workflow_dispatch:",
+      "    inputs:",
+      "      deployment_id:",
+      "        required: true",
+      "        type: string",
+      "      commit_sha:",
+      "        required: true",
+      "        type: string",
+      "      game_id:",
+      "        required: true",
+      "        type: string",
+      "",
+      "permissions:",
+      "  contents: read",
+      "  id-token: write",
+      "",
+      "jobs:",
+      "  build-and-deploy:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: actions/checkout@v4",
+      "        with:",
+      "          ref: ${{ inputs.commit_sha }}",
+      "      - uses: actions/setup-node@v4",
+      "        with:",
+      "          node-version: 20",
+      "      - run: npm ci && npm run build",
+      "      - name: Create manifest",
+      "        env:",
+      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
+      "          COMMIT_SHA: ${{ inputs.commit_sha }}",
+      "        run: |",
+      "          node <<'NODE' > /tmp/randseed-manifest.json",
+      "          const fs = require('fs'), path = require('path'), crypto = require('crypto');",
+      `          const root = '${buildDir}';`,
+      "          const files = [];",
+      "          function walk(dir) { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full); else { const relative = path.relative(root, full).split(path.sep).join('/'); const bytes = fs.readFileSync(full); files.push({ path: relative, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), size: bytes.length }); } } }",
+      "          walk(root); files.sort((a, b) => a.path.localeCompare(b.path));",
+      `          console.log(JSON.stringify({ deployment_id: process.env.DEPLOYMENT_ID, commit_sha: process.env.COMMIT_SHA, root: '${buildDir}', files, total_bytes: files.reduce((sum, file) => sum + file.size, 0) }));`,
+      "          NODE",
+      "      - name: Request upload session",
+      "        env:",
+      "          RANDSEED_API_URL: https://devcreator.randseed.org",
+      "          OIDC_AUDIENCE: randseed-gamecreator",
+      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
+      "        run: |",
+      "          OIDC_TOKEN=$(curl -fsS -H \"Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN\" \"$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$OIDC_AUDIENCE\" | node -e \"let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).value))\")",
+      "          echo \"::add-mask::$OIDC_TOKEN\"; echo \"OIDC_TOKEN=$OIDC_TOKEN\" >> \"$GITHUB_ENV\"",
+      "          node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('/tmp/randseed-manifest.json'));process.stdout.write(JSON.stringify({manifest:m}))\" | curl -fsS -X POST \"$RANDSEED_API_URL/api/deployments/$DEPLOYMENT_ID/upload-session\" -H \"Authorization: Bearer $OIDC_TOKEN\" -H 'Content-Type: application/json' --data-binary @- > /tmp/randseed-session.json",
+      "      - name: Upload static files",
+      "        env:",
+      "          RANDSEED_API_URL: https://devcreator.randseed.org",
+      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
+      "        run: |",
+      "          UPLOAD_TOKEN=$(node -e \"console.log(require('/tmp/randseed-session.json').upload_token)\"); UPLOAD_BASE_URL=$(node -e \"console.log(require('/tmp/randseed-session.json').upload_base_url)\"); echo \"::add-mask::$UPLOAD_TOKEN\"",
+      "          node -e \"const m=require('/tmp/randseed-manifest.json');for(const f of m.files)console.log(f.path+'\\t'+f.size)\" | while IFS=$'\\t' read -r FILE_PATH FILE_SIZE; do ENCODED_PATH=$(node -e \"console.log(encodeURIComponent(process.argv[1]))\" \"$FILE_PATH\"); curl -fsS -X PUT \"$UPLOAD_BASE_URL/$ENCODED_PATH\" -H \"Authorization: Bearer $UPLOAD_TOKEN\" -H \"Content-Length: $FILE_SIZE\" --data-binary \"${buildDir}/$FILE_PATH\" > /dev/null; done",
+      "      - name: Verify and publish",
+      "        env:",
+      "          RANDSEED_API_URL: https://devcreator.randseed.org",
+      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
+      "        run: |",
+      "          curl -fsS -X POST \"$RANDSEED_API_URL/api/deployments/$DEPLOYMENT_ID/upload-complete\" -H \"Authorization: Bearer $OIDC_TOKEN\" -H 'Content-Type: application/json' --data \"$(node -e \"const fs=require('fs');console.log(JSON.stringify({manifest:JSON.parse(fs.readFileSync('/tmp/randseed-manifest.json'))}))\")\"",
+      "",
+    ].join("\\n");
     navigator.clipboard.writeText(workflowContent);
     setCopiedWorkflow(true);
     setTimeout(() => setCopiedWorkflow(false), 2500);
@@ -223,14 +253,6 @@ jobs:
     navigator.clipboard.writeText(repoInfo.sandboxUrl);
     setCopiedSandboxUrl(true);
     setTimeout(() => setCopiedSandboxUrl(false), 2000);
-  };
-
-  const handleCopyToken = () => {
-    if (generatedToken) {
-      navigator.clipboard.writeText(generatedToken);
-      setCopiedToken(true);
-      setTimeout(() => setCopiedToken(false), 2500);
-    }
   };
 
   if (isDisconnected) {
@@ -498,43 +520,6 @@ jobs:
             <span>App: {GITHUB_APP_SLUG}</span>
           </span>
         </div>
-
-        {/* Secret / Token Banner if newly generated */}
-        {generatedToken && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', fontWeight: 600, fontSize: '13px' }}>
-                <KeyRound size={15} /> Deployment API Token Generated
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyToken}
-                style={{
-                  background: '#dcfce7',
-                  border: '1px solid #86efac',
-                  borderRadius: '6px',
-                  padding: '3px 8px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: '#166534',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                {copiedToken ? <CheckCheck size={12} /> : <Copy size={12} />}
-                <span>{copiedToken ? "Copied!" : "Copy Token"}</span>
-              </button>
-            </div>
-            <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#15803d', lineHeight: 1.4 }}>
-              Add this token as secret <code>RANDSEED_API_TOKEN</code> in your GitHub repository secrets (<strong>Settings &gt; Secrets and variables &gt; Actions</strong>).
-            </p>
-            <div style={{ background: '#fff', border: '1px dashed #86efac', borderRadius: '6px', padding: '6px 10px', fontFamily: 'monospace', fontSize: '12px', color: '#14532d', wordBreak: 'break-all' }}>
-              {generatedToken}
-            </div>
-          </div>
-        )}
 
         {/* Section: Repository */}
         <div style={{ marginBottom: '20px' }}>
@@ -994,23 +979,23 @@ jobs:
             >
 {`name: Deploy to RandSeed Sandbox
 on:
-  push:
-    branches: [ ${repoInfo.branch} ]
-
+  workflow_dispatch:
+    inputs:
+      deployment_id: { required: true, type: string }
+      commit_sha: { required: true, type: string }
+      game_id: { required: true, type: string }
+permissions:
+  contents: read
+  id-token: write
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          ref: \${{ inputs.commit_sha }}
       - run: npm ci && npm run build
-      - uses: randseed-org/sandbox-deploy-action@v1
-        with:
-          game-id: '${gameId}'
-          api-token: \${{ secrets.RANDSEED_API_TOKEN }}
-          build-dir: 'dist'`}
+      - run: Generate manifest, upload files with OIDC, then call upload-complete`}
             </pre>
           </div>
         )}

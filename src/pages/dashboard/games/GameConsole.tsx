@@ -31,7 +31,7 @@ export function GameConsole(): React.ReactElement {
 
   const isMetaLocked = ['PENDING_REVIEW', 'APPROVED', 'PUBLIC_ACTIVE', 'MAINTENANCE', 'ARCHIVED'].includes(status);
   const [copiedUrl, setCopiedUrl] = React.useState(false);
-  const sandboxUrl = repoInfo?.sandboxUrl || `https://randseed.org/sandbox/${gameId || 'g_101'}`;
+  const sandboxUrl = repoInfo?.sandboxUrl || `https://randseed.org/${gameId || 'g_101'}`;
 
   const handleCopySandboxUrl = () => {
     navigator.clipboard.writeText(sandboxUrl);

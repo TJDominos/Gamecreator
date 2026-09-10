@@ -30,6 +30,14 @@ function bytesToString(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
 }
 
+export function base64UrlEncodeBytes(bytes: Uint8Array): string {
+  return base64UrlEncode(bytes);
+}
+
+export function base64UrlDecodeBytes(value: string): Uint8Array {
+  return base64UrlDecode(value);
+}
+
 async function getHmacKey(secret: string): Promise<CryptoKey> {
   return await crypto.subtle.importKey(
     "raw",
@@ -110,10 +118,94 @@ export async function verifyJwt(
 
 export async function sha256Hex(data: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", stringToBytes(data));
-  const bytes = new Uint8Array(digest);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+export async function sha256HexBytes(data: ArrayBuffer | Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function derLength(length: number): Uint8Array {
+  if (length < 128) return new Uint8Array([length]);
+  const bytes: number[] = [];
+  let remaining = length;
+  while (remaining > 0) {
+    bytes.unshift(remaining & 0xff);
+    remaining >>>= 8;
+  }
+  return new Uint8Array([0x80 | bytes.length, ...bytes]);
+}
+
+function derSequence(...parts: Uint8Array[]): Uint8Array {
+  const content = concatBytes(parts);
+  return new Uint8Array([0x30, ...derLength(content.length), ...content]);
+}
+
+function derOctetString(content: Uint8Array): Uint8Array {
+  return new Uint8Array([0x04, ...derLength(content.length), ...content]);
+}
+
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const result = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.length;
+  }
+  return result;
+}
+
+function pemToDer(pem: string): Uint8Array {
+  const base64 = pem
+    .replace(/-----BEGIN [^-]+-----/g, "")
+    .replace(/-----END [^-]+-----/g, "")
+    .replace(/\s+/g, "");
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function pkcs1ToPkcs8(pkcs1: Uint8Array): Uint8Array {
+  const rsaEncryptionOid = new Uint8Array([
+    0x30, 0x0d,
+    0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+    0x05, 0x00,
+  ]);
+  return derSequence(
+    new Uint8Array([0x02, 0x01, 0x00]),
+    rsaEncryptionOid,
+    derOctetString(pkcs1),
+  );
+}
+
+export async function signRs256Jwt(
+  payload: Record<string, unknown>,
+  privateKeyPem: string,
+): Promise<string> {
+  const keyDer = privateKeyPem.includes("BEGIN PRIVATE KEY")
+    ? pemToDer(privateKeyPem)
+    : pkcs1ToPkcs8(pemToDer(privateKeyPem));
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    keyDer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const header = base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
+  const body = base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(payload)));
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(`${header}.${body}`),
+  );
+  return `${header}.${body}.${base64UrlEncodeBytes(new Uint8Array(signature))}`;
 }
 
 export async function verifyGitHubWebhookSignature(
@@ -122,8 +214,7 @@ export async function verifyGitHubWebhookSignature(
   secret?: string,
 ): Promise<boolean> {
   if (!secret) {
-    // If no secret configured in dev, accept with warning
-    return true;
+    return false;
   }
 
   if (!signatureHeader || !signatureHeader.startsWith("sha256=")) {

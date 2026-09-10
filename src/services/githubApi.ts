@@ -28,8 +28,39 @@ export interface LinkGameRepoResponse {
     repository: string;
     branch: string;
     sandbox_url: string;
-    api_token?: string;
+    deployment_auth?: "github_actions_oidc";
   };
+  error?: string;
+}
+
+export interface DeploymentRecord {
+  id: string;
+  game_id: string;
+  repository: string;
+  branch: string;
+  commit_sha: string;
+  commit_message: string | null;
+  status: string;
+  live_url: string | null;
+  error_message: string | null;
+  created_at: number;
+  published_at: number | null;
+  finished_at: number | null;
+}
+
+export interface DeploymentListResponse {
+  success: boolean;
+  deployments?: DeploymentRecord[];
+  error?: string;
+}
+
+export interface PrivateReleaseResponse {
+  success: boolean;
+  release_id?: string;
+  deployment_id?: string;
+  expires_at?: string | null;
+  url?: string;
+  revoked?: boolean;
   error?: string;
 }
 
@@ -108,6 +139,34 @@ export const githubApi = {
       {
         method: "GET",
       },
+    );
+  },
+
+  async listDeployments(gameId: string): Promise<DeploymentListResponse> {
+    return request<DeploymentListResponse>(
+      `/api/games/${encodeURIComponent(gameId)}/deployments`,
+      { method: "GET" },
+    );
+  },
+
+  async createPrivateRelease(
+    gameId: string,
+    deploymentId: string,
+    expiresInDays: number | null,
+  ): Promise<PrivateReleaseResponse> {
+    return request<PrivateReleaseResponse>(
+      `/api/games/${encodeURIComponent(gameId)}/private-releases`,
+      {
+        method: "POST",
+        body: JSON.stringify({ deployment_id: deploymentId, expires_in_days: expiresInDays }),
+      },
+    );
+  },
+
+  async revokePrivateRelease(gameId: string, releaseId: string): Promise<PrivateReleaseResponse> {
+    return request<PrivateReleaseResponse>(
+      `/api/games/${encodeURIComponent(gameId)}/private-releases/${encodeURIComponent(releaseId)}`,
+      { method: "DELETE" },
     );
   },
 };

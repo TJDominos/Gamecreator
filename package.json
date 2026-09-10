@@ -10,15 +10,21 @@
     "lint": "tsc --noEmit",
     "postinstall": "cd vendor/RS && (node style-dictionary.config.js || true) && (node scripts/build-css.js || true)",
     "worker:dev": "npx wrangler dev --env dev",
+    "worker:play:dev": "npx wrangler dev --config play.wrangler.jsonc --env dev",
     "worker:dev:test": "npx wrangler dev --env test",
     "worker:deploy": "npm run worker:deploy:dev",
     "worker:deploy:dev": "npm run build && npx wrangler deploy --env dev",
     "worker:deploy:test": "npm run build && npx wrangler deploy --env test",
     "worker:deploy:production": "npm run build && npx wrangler deploy --env production",
+    "worker:play:deploy:dev": "npx wrangler deploy --config play.wrangler.jsonc --env dev",
     "d1:migrate:local": "npx wrangler d1 execute gamecreator-d1 --local --file=./migrations/0001_init.sql",
     "d1:migrate:remote": "npx wrangler d1 execute gamecreator-d1 --remote --file=./migrations/0001_init.sql",
     "d1:migrate:github:local": "npx wrangler d1 execute gamecreator-d1 --local --file=./migrations/0002_github_sync.sql",
-    "d1:migrate:github:remote": "npx wrangler d1 execute gamecreator-d1 --remote --file=./migrations/0002_github_sync.sql"
+    "d1:migrate:github:remote": "npx wrangler d1 execute gamecreator-d1 --remote --file=./migrations/0002_github_sync.sql",
+    "d1:migrate:pipeline:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0005_deployment_pipeline.sql",
+    "d1:migrate:private:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0006_private_releases.sql",
+    "r2:list": "npx wrangler r2 bucket list",
+    "r2:create:dev": "npx wrangler r2 bucket create gamecreator-artifacts-dev"
   },
   "dependencies": {
     "@dfinity/agent": "^3.4.3",
