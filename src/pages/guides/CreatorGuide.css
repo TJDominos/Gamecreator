@@ -53,7 +53,7 @@
 
 .guide-main {
   display: flex;
-  max-width: 1200px;
+  max-width: 1520px;
   margin: 0 auto;
   padding: 40px 24px;
   gap: 60px;
@@ -123,7 +123,7 @@
   line-height: 1.5;
 }
 
-.guide-steps li::before {
+.guide-steps > li::before {
   counter-increment: guide-step;
   content: counter(guide-step);
   position: absolute;
