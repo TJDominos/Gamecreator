@@ -64,11 +64,11 @@ export default function CreatorGuide() {
     const isSdkActive = activeSection.startsWith('sdk');
 
     return (
-      <ul className="flex flex-col gap-4 m-0 p-0 list-none text-sm">
+      <ul className="flex flex-col gap-2 m-0 p-0 list-none text-sm">
         <li className="font-bold text-gray-900">
           <a href="#welcome" onClick={(e) => handleNavClick(e, 'welcome')} className={`nav-link font-bold ${activeSection === 'welcome' ? 'active' : ''}`}>Welcome to RandSeed</a>
           {isWelcomeActive && (
-            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal">
+            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal mt-1">
               <li><a href="#code-to-game" onClick={(e) => handleNavClick(e, 'code-to-game')} className={`nav-link ${activeSection === 'code-to-game' ? 'active' : ''}`}>From Code to Playable Game</a></li>
               <li><a href="#start-creating" onClick={(e) => handleNavClick(e, 'start-creating')} className={`nav-link ${activeSection === 'start-creating' ? 'active' : ''}`}>Start Creating Faster</a></li>
               <li><a href="#community" onClick={(e) => handleNavClick(e, 'community')} className={`nav-link ${activeSection === 'community' ? 'active' : ''}`}>Built-in Player & Community Capabilities</a></li>
@@ -82,11 +82,11 @@ export default function CreatorGuide() {
         <li className="font-bold text-gray-900">
           <a href="#get-started" onClick={(e) => handleNavClick(e, 'get-started')} className={`nav-link font-bold ${activeSection === 'get-started' ? 'active' : ''}`}>Get Started</a>
           {isGetStartedActive && (
-            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal">
+            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal mt-1">
               <li>
                 <a href="#get-started-create" onClick={(e) => handleNavClick(e, 'get-started-create')} className={`nav-link ${activeSection === 'get-started-create' ? 'active' : ''}`}>1. Create Game</a>
                 {activeSection.startsWith('get-started-create') && (
-                  <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2">
+                  <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 mt-1">
                     <li><a href="#get-started-create-quick" onClick={(e) => handleNavClick(e, 'get-started-create-quick')} className={`nav-link ${activeSection === 'get-started-create-quick' ? 'active' : ''}`} style={{fontSize: '13px'}}>Quick Start: Conceptualize your game and prototype with AI tools</a></li>
                   </ul>
                 )}
@@ -94,7 +94,7 @@ export default function CreatorGuide() {
               <li>
                 <a href="#get-started-architecture" onClick={(e) => handleNavClick(e, 'get-started-architecture')} className={`nav-link ${activeSection === 'get-started-architecture' ? 'active' : ''}`}>2. Choose Your Game Architecture</a>
                 {activeSection.startsWith('get-started-architecture') && (
-                  <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2">
+                  <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 mt-1">
                     <li><a href="#get-started-architecture-static" onClick={(e) => handleNavClick(e, 'get-started-architecture-static')} className={`nav-link ${activeSection === 'get-started-architecture-static' ? 'active' : ''}`} style={{fontSize: '13px'}}>A. Static Game / Zero-Ops Backend</a></li>
                     <li><a href="#get-started-architecture-self" onClick={(e) => handleNavClick(e, 'get-started-architecture-self')} className={`nav-link ${activeSection === 'get-started-architecture-self' ? 'active' : ''}`} style={{fontSize: '13px'}}>B. Self-Hosted Backend</a></li>
                   </ul>
@@ -103,7 +103,7 @@ export default function CreatorGuide() {
               <li>
                 <a href="#get-started-release" onClick={(e) => handleNavClick(e, 'get-started-release')} className={`nav-link ${activeSection === 'get-started-release' ? 'active' : ''}`}>3. From Creation to Private Release</a>
                 {activeSection.startsWith('get-started-release') && (
-                  <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2">
+                  <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 mt-1">
                     <li><a href="#get-started-release-step1" onClick={(e) => handleNavClick(e, 'get-started-release-step1')} className={`nav-link ${activeSection === 'get-started-release-step1' ? 'active' : ''}`} style={{fontSize: '13px'}}>Step 1: Activate Creator Identity</a></li>
                     <li><a href="#get-started-release-step2" onClick={(e) => handleNavClick(e, 'get-started-release-step2')} className={`nav-link ${activeSection === 'get-started-release-step2' ? 'active' : ''}`} style={{fontSize: '13px'}}>Step 2: Create Game and Prepare Project</a></li>
                     <li><a href="#get-started-release-step3" onClick={(e) => handleNavClick(e, 'get-started-release-step3')} className={`nav-link ${activeSection === 'get-started-release-step3' ? 'active' : ''}`} style={{fontSize: '13px'}}>Step 3: Connect Code Repository</a></li>
@@ -116,21 +116,21 @@ export default function CreatorGuide() {
             </ul>
           )}
         </li>
-        <li className="font-bold text-gray-900 mt-2">
+        <li className="font-bold text-gray-900">
           <a href="#security" onClick={(e) => handleNavClick(e, 'security')} className={`nav-link font-bold ${activeSection === 'security' ? 'active' : ''}`}>Security and Publishing Recommendations</a>
           {isSecurityActive && (
-            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal">
+            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal mt-1">
               <li><a href="#pre-launch" onClick={(e) => handleNavClick(e, 'pre-launch')} className={`nav-link ${activeSection === 'pre-launch' ? 'active' : ''}`}>Creator Pre-Launch Checklist</a></li>
             </ul>
           )}
         </li>
-        <li className="font-bold text-gray-900 mt-2">
+        <li className="font-bold text-gray-900">
           <a href="#public-release" onClick={(e) => handleNavClick(e, 'public-release')} className={`nav-link font-bold ${activeSection === 'public-release' ? 'active' : ''}`}>Public Release</a>
         </li>
-        <li className="font-bold text-gray-900 mt-2">
+        <li className="font-bold text-gray-900">
           <a href="#sdk" onClick={(e) => handleNavClick(e, 'sdk')} className={`nav-link font-bold ${activeSection === 'sdk' ? 'active' : ''}`}>SDK Capabilities</a>
           {isSdkActive && (
-            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal">
+            <ul className="flex flex-col gap-1 ml-4 list-none border-l border-gray-200 pl-2 font-normal mt-1">
               <li><a href="#sdk-lifecycle" onClick={(e) => handleNavClick(e, 'sdk-lifecycle')} className={`nav-link ${activeSection === 'sdk-lifecycle' ? 'active' : ''}`}>Lifecycle</a></li>
               <li><a href="#sdk-identity" onClick={(e) => handleNavClick(e, 'sdk-identity')} className={`nav-link ${activeSection === 'sdk-identity' ? 'active' : ''}`}>Player Identity</a></li>
               <li><a href="#sdk-cloud-save" onClick={(e) => handleNavClick(e, 'sdk-cloud-save')} className={`nav-link ${activeSection === 'sdk-cloud-save' ? 'active' : ''}`}>Cloud Save</a></li>

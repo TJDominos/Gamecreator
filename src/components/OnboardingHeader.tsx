@@ -7,7 +7,7 @@ export function OnboardingHeader(): React.ReactElement {
     <header className="onboarding-header">
       <Link to="/" className="portal-brand">
         <WltLogo />
-        <span>RandSeed</span>
+        <span>Randseed</span>
         <b>Creators</b>
       </Link>
       <span>Creator onboarding</span>

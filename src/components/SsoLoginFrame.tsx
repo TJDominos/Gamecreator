@@ -41,10 +41,10 @@ export function SsoLoginFrame(): React.ReactElement | null {
   if (!isSsoFrameOpen || !targetUrl) return null;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Sign in with RandSeed" style={overlayStyle}>
+    <div role="dialog" aria-modal="true" aria-label="Sign in with Randseed" style={overlayStyle}>
       <div style={{ ...frameShellStyle, height: `min(${frameHeight}px, calc(100vh - 32px))` }}>
         <iframe
-          title="RandSeed sign in"
+          title="Randseed sign in"
           src={targetUrl}
           style={frameStyle}
           allow="publickey-credentials-get; publickey-credentials-create; clipboard-write"

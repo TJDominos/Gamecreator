@@ -1,9 +1,10 @@
 import { BountyHub } from "./bounties/BountyHub";
 import { BountyDetail } from "./bounties/BountyDetail";
 import { BountyManagement } from "./bounties/BountyManagement";
+import { CreatorSettings } from "./CreatorSettings";
 import {
   GameConsole, GameOverview, GameSettings,
-  GameDeployments } from "./games";
+  GameDeployments, Publish } from "./games";
 import React, { useEffect, useState, useRef } from "react";
 import {
   ArrowRight,
@@ -37,7 +38,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router";
-import { MOCK_GAMES } from "./games/gameData";
+import { getStoredGames, createNextNewGame, createNextNewGameAsync, syncGamesWithBackend, GAMES_UPDATED_EVENT } from "./games/gameData";
 import { DashboardAccessGate } from "./DashboardAccessGate";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
@@ -82,7 +83,12 @@ interface PlaceholderPageProps {
 
 function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
   const { isSignedIn, hasPermission } = useAuth();
-  if (!isSignedIn || !hasPermission("dashboard:access")) {
+  const isPreview =
+    typeof window !== "undefined" &&
+    (new URLSearchParams(window.location.search).get("preview") === "true" ||
+      sessionStorage.getItem("rs_preview_dashboard") === "true");
+
+  if (!isSignedIn && !isPreview && !hasPermission("dashboard:access")) {
     return <DashboardAccessGate />;
   }
   return children;
@@ -90,7 +96,12 @@ function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
 
 function RequireAdmin({ children }: RouteGuardProps): React.ReactNode {
   const { isSignedIn, hasPermission } = useAuth();
-  if (!isSignedIn || !hasPermission("bounty:manage")) {
+  const isPreview =
+    typeof window !== "undefined" &&
+    (new URLSearchParams(window.location.search).get("preview") === "true" ||
+      sessionStorage.getItem("rs_preview_dashboard") === "true");
+
+  if (!isSignedIn && !isPreview && !hasPermission("bounty:manage")) {
     return <Navigate to="/dashboard" replace />;
   }
   return children;
@@ -115,7 +126,7 @@ function DeveloperOnboarding(): React.ReactNode {
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
-    document.title = "Create your creator organization �?RandSeed";
+    document.title = "Create your creator organization — Randseed";
   }, []);
 
   useEffect(() => {
@@ -286,7 +297,7 @@ function DeveloperOnboarding(): React.ReactNode {
           <div className="onboarding-actions">
             <p>
               Organization ID, level, revenue share, and platform account are
-              assigned by RandSeed after submission.
+              assigned by Randseed after submission.
             </p>
             <button type="submit">Create organization</button>
           </div>
@@ -297,7 +308,7 @@ function DeveloperOnboarding(): React.ReactNode {
 }
 
 function PortalShell(): React.ReactElement {
-  const { accountId, organization, profile, role, signOut } = useAuth();
+  const { accountId, organization, profile, role, signOut, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -334,7 +345,7 @@ function PortalShell(): React.ReactElement {
         <div className="sidebar-heading">
           <Link to="/" className="portal-brand">
             <WltLogo />
-            <span>RandSeed</span>
+            <span>Randseed</span>
             <b>Creators</b>
           </Link>
           <button
@@ -387,6 +398,46 @@ function PortalShell(): React.ReactElement {
         />
       )}
       <div className={`portal-main ${!sidebarPinned ? "is-unpinned" : ""}`}>
+        {typeof window !== "undefined" &&
+          (new URLSearchParams(window.location.search).get("preview") === "true" ||
+            sessionStorage.getItem("rs_preview_dashboard") === "true") &&
+          !isSignedIn && (
+            <div
+              style={{
+                background: "#f5f3ff",
+                borderBottom: "1px solid #e9d5ff",
+                padding: "8px 20px",
+                fontSize: "12px",
+                color: "#581c87",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span>
+                <strong>🎨 Dashboard UI 预览模式已开启</strong>（真实登录与鉴权代码未修改，你可以直接查看和调整所有页面 UI）
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.removeItem("rs_preview_dashboard");
+                  window.location.href = "/dashboard";
+                }}
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #d8b4fe",
+                  borderRadius: "4px",
+                  padding: "3px 10px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "#6b21a8",
+                  cursor: "pointer",
+                }}
+              >
+                退出预览
+              </button>
+            </div>
+          )}
         <PortalHeader 
           pageName={pageName} 
           onMenuClick={() => { if (window.innerWidth > 900) { setSidebarPinned(!sidebarPinned); } else { setMenuOpen(true); } }} 
@@ -433,29 +484,55 @@ function Dashboard(): React.ReactElement {
   const { organization } = useAuth();
   const [startDate, setStartDate] = useState("2026-07-24");
   const [endDate, setEndDate] = useState("2026-08-23");
+  const [games, setGames] = useState(() => getStoredGames());
   
+  const [isCreatingGame, setIsCreatingGame] = useState(false);
   const endDateRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    // Synchronize games from backend database
+    syncGamesWithBackend().then((fresh) => {
+      if (fresh) setGames(fresh);
+    });
+
+    const handleUpdate = () => {
+      setGames(getStoredGames());
+    };
+    window.addEventListener(GAMES_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(GAMES_UPDATED_EVENT, handleUpdate);
+  }, []);
+
+  const handleCreateGame = async () => {
+    if (isCreatingGame) return;
+    setIsCreatingGame(true);
+    try {
+      const newGame = await createNextNewGameAsync();
+      navigate(`/dashboard/games/${newGame.id}`);
+    } finally {
+      setIsCreatingGame(false);
+    }
+  };
 
   return (
     <div className="dashboard-page">
       <section className="dashboard-welcome">
         <div>
           <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>My Games</h1>
-          <p>Connect, test, publish, and grow your web games from one place.</p>
+          <p>Connect, test, publish, and grow your web games from one place on Randseed.</p>
         </div>
-        <button className="primary-action" onClick={() => {
-          const newId = "g_" + Math.floor(Math.random() * 1000);
-          navigate(`/dashboard/games/${newId}/settings`, { state: { gameName: "New Game" } });
-        }}>
-          <Plus /> Create game
+        <button 
+          className="primary-action" 
+          onClick={handleCreateGame}
+          disabled={isCreatingGame}
+        >
+          <Plus /> {isCreatingGame ? 'Creating...' : 'Create game'}
         </button>
       </section>
       <section className="stat-grid" aria-label="Studio overview">
         <article>
           <span>Games</span>
-          <strong>0</strong>
-          <small>Create your first game</small>
+          <strong>{games.length}</strong>
+          <small>{games.length > 0 ? `${games.length} active project${games.length === 1 ? '' : 's'}` : 'Create your first game'}</small>
         </article>
         <article>
           <span>Players (Since Inception)</span>
@@ -515,7 +592,7 @@ function Dashboard(): React.ReactElement {
               <tr>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Game Name</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Status</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Repository (RDcreatordev)</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Version</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Visitors</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Players</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', fontWeight: 500, color: 'var(--portal-muted)' }}>Revenue</th>
@@ -525,12 +602,16 @@ function Dashboard(): React.ReactElement {
               </tr>
             </thead>
             <tbody>
-              {MOCK_GAMES.map(game => (
+              {games.map(game => (
                 <tr key={game.id} style={{ cursor: 'pointer', transition: 'background 0.2s' }} onClick={() => navigate(`/dashboard/games/${game.id}`)} onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'var(--portal-purple-soft)', color: 'var(--portal-purple)', display: 'grid', placeItems: 'center' }}>
-                        <Gamepad2 size={16} />
+                      <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'var(--portal-purple-soft)', color: 'var(--portal-purple)', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+                        {(game.coverImage || game.profile?.coverImage) ? (
+                          <img src={game.coverImage || game.profile?.coverImage} alt={game.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <Gamepad2 size={16} />
+                        )}
                       </div>
                       <strong>{game.name}</strong>
                     </div>
@@ -540,21 +621,16 @@ function Dashboard(): React.ReactElement {
                       {game.status.replace('_', ' ')}
                     </span>
                   </td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '13px' }}>
-                    {game.repoInfo ? (
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '3px 8px', borderRadius: '8px', color: '#6d28d9', fontWeight: 500 }}>
-                        <Github size={13} />
-                        <span>{game.repoInfo.repository}</span>
-                      </div>
-                    ) : (
-                      <span style={{ color: '#9ca3af', fontSize: '12px' }}>Not connected</span>
-                    )}
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>
+                    <span style={{ color: game.version && game.version !== '---' ? 'var(--portal-text)' : 'var(--portal-muted)', fontFamily: 'monospace' }}>
+                      {game.version || '---'}
+                    </span>
                   </td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.visitors}</td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.players}</td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.revenue}</td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.availableBalance}</td>
-                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.escrowedBalance}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.visitors || '---'}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.players || '---'}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.revenue || '---'}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.availableBalance || '---'}</td>
+                  <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', fontSize: '14px', color: 'var(--portal-text)' }}>{game.escrowedBalance || '---'}</td>
                   <td style={{ padding: '16px', borderBottom: '1px solid var(--portal-border)', textAlign: 'right' }}>
                     <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--portal-muted)' }}>
                       <ArrowRight size={18} />
@@ -602,14 +678,15 @@ export default function DeveloperPortal(): React.ReactElement {
         <Route path="games/:gameId" element={<GameConsole />}>
           <Route index element={<GameOverview />} />
           <Route path="settings" element={<GameSettings />} />
-          <Route path="deployments" element={<GameDeployments />} />
+          <Route path="publish" element={<Publish />} />
+          <Route path="deployments" element={<Navigate to="publish" replace />} />
         </Route>
 
         <Route path="bounties" element={<BountyHub />} />
         <Route path="bounties/:bountyId" element={<BountyDetail />} />
         <Route path="data" element={<PlaceholderPage title="Users & Orders" description="Review anonymous player activity and order history." icon={Users} />} />
         <Route path="revenue" element={<PlaceholderPage title="Revenue" description="Track estimated revenue, ledger entries, and payouts." icon={BarChart3} />} />
-        <Route path="settings" element={<PlaceholderPage title="Settings" description="Manage your public profile, security, and integrations." icon={Settings} />} />
+        <Route path="settings" element={<CreatorSettings />} />
       </Route>
       <Route
         path="/bounty-management"

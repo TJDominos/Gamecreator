@@ -54,6 +54,19 @@ export interface DeploymentListResponse {
   error?: string;
 }
 
+export interface ActivePrivateReleaseInfo {
+  id: string;
+  deployment_id: string;
+  expires_at: string | null;
+  created_at: number;
+}
+
+export interface ActivePrivateReleaseResponse {
+  success: boolean;
+  active_release: ActivePrivateReleaseInfo | null;
+  error?: string;
+}
+
 export interface PrivateReleaseResponse {
   success: boolean;
   release_id?: string;
@@ -149,16 +162,28 @@ export const githubApi = {
     );
   },
 
+  async getActivePrivateRelease(gameId: string): Promise<ActivePrivateReleaseResponse> {
+    return request<ActivePrivateReleaseResponse>(
+      `/api/games/${encodeURIComponent(gameId)}/private-releases`,
+      { method: "GET" },
+    );
+  },
+
   async createPrivateRelease(
     gameId: string,
     deploymentId: string,
     expiresInDays: number | null,
+    forceReplace: boolean = false,
   ): Promise<PrivateReleaseResponse> {
     return request<PrivateReleaseResponse>(
       `/api/games/${encodeURIComponent(gameId)}/private-releases`,
       {
         method: "POST",
-        body: JSON.stringify({ deployment_id: deploymentId, expires_in_days: expiresInDays }),
+        body: JSON.stringify({
+          deployment_id: deploymentId,
+          expires_in_days: expiresInDays,
+          force_replace: forceReplace,
+        }),
       },
     );
   },

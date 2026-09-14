@@ -29,6 +29,11 @@ export interface MeResponse {
     isEmailVerified: boolean;
     tosAcceptedVersion?: string | null;
     kycStatus?: string;
+    creatorOrgName?: string | null;
+    withdrawalToken?: string | null;
+    withdrawalNetwork?: string | null;
+    withdrawalAddress?: string | null;
+    withdrawalUpdatedAt?: number | null;
     lastLoginAt?: number;
     createdAt?: number;
   };
@@ -65,9 +70,13 @@ export const authApi = {
   },
 
   async updateProfile(data: {
-    dev_notification_email?: string;
+    email?: string;
     tos_accepted_version?: string;
     kyc_status?: string;
+    creator_org_name?: string | null;
+    withdrawal_token?: string | null;
+    withdrawal_network?: string | null;
+    withdrawal_address?: string | null;
   }): Promise<{ success: boolean; message: string }> {
     return request<{ success: boolean; message: string }>("/api/auth/profile", {
       method: "PUT",

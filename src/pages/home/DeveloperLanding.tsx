@@ -128,7 +128,7 @@ function RandseedMark({
       className={className}
       viewBox="0 0 100 100"
       role="img"
-      aria-label="RandSeed"
+      aria-label="Randseed"
     >
       <path
         fill="#f68532"

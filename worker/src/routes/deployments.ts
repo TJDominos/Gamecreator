@@ -55,6 +55,9 @@ export async function handleDeploymentRoutes(
   if (privateReleaseMatch) {
     const gameId = decodeURIComponent(privateReleaseMatch[1]);
     const releaseId = privateReleaseMatch[2] ? decodeURIComponent(privateReleaseMatch[2]) : null;
+    if (request.method === "GET" && !releaseId) {
+      return handleGetActivePrivateRelease(gameId, request, env);
+    }
     if (request.method === "POST" && !releaseId) {
       return handleCreatePrivateRelease(gameId, request, env);
     }
@@ -167,11 +170,37 @@ async function handleCreateUploadSession(
   }, 201, request, env);
 }
 
+async function handleGetActivePrivateRelease(gameId: string, request: Request, env: Env): Promise<Response> {
+  const access = await authorizeGameAccess(gameId, request, env);
+  if (!access.ok) return access.response;
+
+  const now = Date.now();
+  const activeRelease = await env.DB.prepare(
+    `SELECT * FROM private_releases
+     WHERE game_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
+     ORDER BY created_at DESC LIMIT 1`,
+  ).bind(gameId, now).first<PrivateReleaseRow>();
+
+  if (!activeRelease) {
+    return jsonResponse({ success: true, active_release: null }, 200, request, env);
+  }
+
+  return jsonResponse({
+    success: true,
+    active_release: {
+      id: activeRelease.id,
+      deployment_id: activeRelease.deployment_id,
+      expires_at: activeRelease.expires_at ? new Date(activeRelease.expires_at).toISOString() : null,
+      created_at: activeRelease.created_at,
+    },
+  }, 200, request, env);
+}
+
 async function handleCreatePrivateRelease(gameId: string, request: Request, env: Env): Promise<Response> {
   const access = await authorizeGameAccess(gameId, request, env);
   if (!access.ok) return access.response;
 
-  const body = await request.json().catch(() => null) as { deployment_id?: string; expires_in_days?: number | null } | null;
+  const body = await request.json().catch(() => null) as { deployment_id?: string; expires_in_days?: number | null; force_replace?: boolean } | null;
   if (!body?.deployment_id) return errorResponse("A deployment_id is required", 400, "MISSING_DEPLOYMENT_ID", request, env);
 
   const deployment = await env.DB.prepare(
@@ -186,9 +215,34 @@ async function handleCreatePrivateRelease(gameId: string, request: Request, env:
     return errorResponse("Private release expiry must be between 1 and 30 days", 400, "INVALID_EXPIRY", request, env);
   }
 
+  const now = Date.now();
+
+  // Enforce single active private publishing link: check if an active unrevoked link already exists
+  const existingActive = await env.DB.prepare(
+    `SELECT * FROM private_releases
+     WHERE game_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
+     ORDER BY created_at DESC LIMIT 1`,
+  ).bind(gameId, now).first<PrivateReleaseRow>();
+
+  if (existingActive) {
+    if (body.force_replace) {
+      // Auto-revoke the existing active release to guarantee only one active link exists
+      await env.DB.prepare(
+        `UPDATE private_releases SET revoked_at = ? WHERE id = ? AND game_id = ?`,
+      ).bind(now, existingActive.id, gameId).run();
+    } else {
+      return errorResponse(
+        "A private publishing link is already active for this game. Randseed limits private publishing to one active link pointing to a single deployment version. Revoke the existing link or confirm replacement before publishing a new one.",
+        409,
+        "ACTIVE_PRIVATE_RELEASE_EXISTS",
+        request,
+        env,
+      );
+    }
+  }
+
   const token = `rs_private_${crypto.randomUUID().replace(/-/g, "")}`;
   const releaseId = `pr_${crypto.randomUUID().replace(/-/g, "")}`;
-  const now = Date.now();
   const expiresAt = days === null ? null : now + days * 24 * 60 * 60 * 1000;
   await env.DB.prepare(
     `INSERT INTO private_releases

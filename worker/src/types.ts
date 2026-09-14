@@ -182,6 +182,11 @@ export interface UserRow {
   tos_accepted_version: string | null;
   kyc_status: string;
   last_login_at: number | null;
+  creator_org_name: string | null;
+  withdrawal_token: string | null;
+  withdrawal_network: string | null;
+  withdrawal_address: string | null;
+  withdrawal_updated_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -199,6 +204,26 @@ export interface DeveloperOrganizationRow {
   level: string;
   revenue_share: number;
   platform_account: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface GameRow {
+  id: string;
+  tenant_id: string | null;
+  creator_principal: string;
+  name: string;
+  status: string;
+  version: string;
+  display_version?: string | null;
+  description: string | null;
+  cover_image: string | null;
+  animation_url: string | null;
+  visitors: string;
+  players: string;
+  revenue: string;
+  available_balance: string;
+  escrowed_balance: string;
   created_at: number;
   updated_at: number;
 }

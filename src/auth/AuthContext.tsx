@@ -40,6 +40,11 @@ export interface UserProfile extends UserProfileInfo {
   email?: string;
   isEmailVerified?: boolean;
   role?: "player" | "creator" | "admin"; // B-side role
+  creatorOrgName?: string | null;
+  withdrawalToken?: string | null;
+  withdrawalNetwork?: string | null;
+  withdrawalAddress?: string | null;
+  withdrawalUpdatedAt?: number | null;
   [key: string]: unknown;
 }
 
@@ -279,6 +284,11 @@ export function AuthProvider({
                 role: meRes.user.role,
                 email: meRes.user.email ?? undefined,
                 isEmailVerified: meRes.user.isEmailVerified,
+                creatorOrgName: meRes.user.creatorOrgName,
+                withdrawalToken: meRes.user.withdrawalToken,
+                withdrawalNetwork: meRes.user.withdrawalNetwork,
+                withdrawalAddress: meRes.user.withdrawalAddress,
+                withdrawalUpdatedAt: meRes.user.withdrawalUpdatedAt,
               }));
               if (meRes.organization) {
                 setOrganization(meRes.organization);

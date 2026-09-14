@@ -21,6 +21,10 @@ interface UpdateProfilePayload {
   email?: string;
   tos_accepted_version?: string;
   kyc_status?: string;
+  creator_org_name?: string | null;
+  withdrawal_token?: string | null;
+  withdrawal_network?: string | null;
+  withdrawal_address?: string | null;
 }
 
 export async function handleAuthRoutes(
@@ -250,6 +254,11 @@ async function handleGetMe(
         isEmailVerified: user.email_verified === 1,
         tosAcceptedVersion: user.tos_accepted_version,
         kycStatus: user.kyc_status,
+        creatorOrgName: user.creator_org_name,
+        withdrawalToken: user.withdrawal_token,
+        withdrawalNetwork: user.withdrawal_network,
+        withdrawalAddress: user.withdrawal_address,
+        withdrawalUpdatedAt: user.withdrawal_updated_at,
         lastLoginAt: user.last_login_at,
         createdAt: user.created_at,
       },
@@ -349,12 +358,38 @@ async function handleUpdateProfile(
     return errorResponse("Invalid body", 400, "INVALID_BODY", request, env);
   }
 
+  const user = await env.DB.prepare("SELECT * FROM users WHERE principal_id = ?").bind(authUser.principal_id).first();
+  if (!user) {
+    return errorResponse("User not found", 404, "USER_NOT_FOUND", request, env);
+  }
+
   const now = Date.now();
+  
+  // Check withdrawal update limit (once per 30 days)
+  const isUpdatingWithdrawal = body.withdrawal_token !== undefined || body.withdrawal_network !== undefined || body.withdrawal_address !== undefined;
+  let nextWithdrawalUpdatedAt = user.withdrawal_updated_at;
+
+  if (isUpdatingWithdrawal) {
+    const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+    if (user.withdrawal_updated_at) {
+      const nextAllowed = user.withdrawal_updated_at + ONE_MONTH_MS;
+      if (now < nextAllowed) {
+        return errorResponse("Withdrawal address can only be changed once a month.", 400, "UPDATE_LIMIT_REACHED", request, env);
+      }
+    }
+    nextWithdrawalUpdatedAt = now;
+  }
+
   await env.DB.prepare(
     `UPDATE users 
      SET email = COALESCE(?, email),
          tos_accepted_version = COALESCE(?, tos_accepted_version),
          kyc_status = COALESCE(?, kyc_status),
+         creator_org_name = COALESCE(?, creator_org_name),
+         withdrawal_token = COALESCE(?, withdrawal_token),
+         withdrawal_network = COALESCE(?, withdrawal_network),
+         withdrawal_address = COALESCE(?, withdrawal_address),
+         withdrawal_updated_at = COALESCE(?, withdrawal_updated_at),
          updated_at = ?
      WHERE principal_id = ?`,
   )
@@ -362,6 +397,11 @@ async function handleUpdateProfile(
       body.email ?? null,
       body.tos_accepted_version ?? null,
       body.kyc_status ?? null,
+      body.creator_org_name !== undefined ? body.creator_org_name : null,
+      body.withdrawal_token !== undefined ? body.withdrawal_token : null,
+      body.withdrawal_network !== undefined ? body.withdrawal_network : null,
+      body.withdrawal_address !== undefined ? body.withdrawal_address : null,
+      nextWithdrawalUpdatedAt !== undefined ? nextWithdrawalUpdatedAt : null,
       now,
       authUser.principal_id,
     )

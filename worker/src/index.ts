@@ -6,6 +6,7 @@ import { handleAuthRoutes } from "./routes/auth";
 import { handleOrganizationRoutes } from "./routes/organizations";
 import { handleGitHubRoutes } from "./routes/github";
 import { handleDeploymentRoutes } from "./routes/deployments";
+import { handleGameRoutes } from "./routes/games";
 
 export default {
   async fetch(
@@ -51,6 +52,9 @@ export default {
 
       const ghRes = await handleGitHubRoutes(request, env);
       if (ghRes) return ghRes;
+
+      const gameRes = await handleGameRoutes(request, env);
+      if (gameRes) return gameRes;
 
       // 3. Fallback to Creator Portal static assets (Vite React SPA)
       if (
