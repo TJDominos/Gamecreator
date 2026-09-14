@@ -78,6 +78,7 @@ export type DeploymentStatus =
   | "pending"
   | "queued"
   | "building"
+  | "build_succeeded"
   | "uploading"
   | "uploaded"
   | "verifying"

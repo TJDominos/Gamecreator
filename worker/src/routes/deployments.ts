@@ -113,7 +113,7 @@ async function handleCreateUploadSession(
     return errorResponse(error instanceof Error ? error.message : "Invalid GitHub OIDC token", 401, "INVALID_OIDC", request, env);
   }
 
-  if (!["pending", "queued", "building", "uploading"].includes(deployment.status)) {
+  if (!["pending", "queued", "building", "build_succeeded", "uploading"].includes(deployment.status)) {
     return errorResponse("Deployment is not accepting an artifact", 409, "INVALID_DEPLOYMENT_STATE", request, env);
   }
 
@@ -148,7 +148,7 @@ async function handleCreateUploadSession(
     env.DB.prepare(
       `UPDATE deployment_records
        SET status = 'uploading', upload_session_id = ?, artifact_prefix = ?, started_at = COALESCE(started_at, ?)
-       WHERE id = ? AND status IN ('pending', 'queued', 'building', 'uploading')`,
+      WHERE id = ? AND status IN ('pending', 'queued', 'building', 'build_succeeded', 'uploading')`,
     ).bind(sessionId, objectPrefix, now, deploymentId),
   ];
   for (const file of manifest.files) {
@@ -543,12 +543,13 @@ async function handleGetDeploymentEvents(deploymentId: string, request: Request,
 async function authorizeGameAccess(gameId: string, request: Request, env: Env): Promise<{ ok: true } | { ok: false; response: Response }> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return { ok: false, response: errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env) };
+  if (user.role !== "creator") {
+    return { ok: false, response: errorResponse("Creator access required", 403, "FORBIDDEN", request, env) };
+  }
   const binding = await env.DB.prepare(
-    `SELECT i.owner_principal FROM game_repo_bindings b
-     JOIN github_installations i ON i.installation_id = b.installation_id
-     WHERE b.game_id = ?`,
-  ).bind(gameId).first<{ owner_principal: string }>();
-  if (!binding || (binding.owner_principal !== user.principal_id && user.role !== "admin")) {
+    `SELECT id FROM games WHERE id = ? AND creator_principal = ?`,
+  ).bind(gameId, user.principal_id).first<{ id: string }>();
+  if (!binding) {
     return { ok: false, response: errorResponse("You do not have access to this game", 403, "FORBIDDEN", request, env) };
   }
   return { ok: true };

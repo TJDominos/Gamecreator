@@ -72,6 +72,7 @@ export async function handleGitHubRoutes(
 async function handleGitHubInstall(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  if (user.role !== "creator") return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   const appSlug = env.GITHUB_APP_SLUG || "RDcreatordev";
   const state = await signJwt(
     {
@@ -113,6 +114,7 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
   const installationId = parseInt(installationIdStr, 10);
   const statePayload = await verifyJwt(state, env.JWT_SECRET);
   if (!statePayload) return errorResponse("Invalid or expired installation state", 400, "INVALID_STATE", request, env);
+  if (statePayload.role !== "creator") return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   const now = Date.now();
 
   try {
@@ -165,6 +167,8 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
 async function handleGetGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  if (!access.ok) return access.response;
 
   try {
     if (env.DB) {
@@ -175,12 +179,6 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
         .first<GameRepoBindingRow>();
 
       if (binding) {
-        const owner = await env.DB.prepare(
-          `SELECT owner_principal FROM github_installations WHERE installation_id = ?`,
-        ).bind(binding.installation_id).first<{ owner_principal: string }>();
-        if (!owner || (owner.owner_principal !== user.principal_id && user.role !== "admin")) {
-          return errorResponse("You do not have access to this game", 403, "FORBIDDEN", request, env);
-        }
         return jsonResponse(
           {
             success: true,
@@ -220,6 +218,8 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
 async function handleLinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  if (!access.ok) return access.response;
   const ownerPrincipal = user.principal_id;
 
   const body = (await request.json().catch(() => null)) as {
@@ -321,14 +321,8 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
 async function handleUnlinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  const binding = await env.DB.prepare(
-    `SELECT i.owner_principal FROM game_repo_bindings b
-     JOIN github_installations i ON i.installation_id = b.installation_id
-     WHERE b.game_id = ?`,
-  ).bind(gameId).first<{ owner_principal: string }>();
-  if (!binding || (binding.owner_principal !== user.principal_id && user.role !== "admin")) {
-    return errorResponse("You do not have access to this game", 403, "FORBIDDEN", request, env);
-  }
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  if (!access.ok) return access.response;
   try {
     if (env.DB) {
       await env.DB.prepare(`DELETE FROM game_repo_bindings WHERE game_id = ?`)
@@ -360,6 +354,11 @@ async function handleUnlinkGameRepo(gameId: string, request: Request, env: Env):
  * Live verification check of GitHub sync status
  */
 async function handleCheckSyncStatus(gameId: string, request: Request, env: Env): Promise<Response> {
+  const user = await getAuthenticatedUser(request, env);
+  if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  if (!access.ok) return access.response;
+
   const deployment = await env.DB.prepare(
     `SELECT d.* FROM deployment_records d
      JOIN game_release_pointers p ON p.active_deployment_id = d.id
@@ -520,27 +519,33 @@ async function advanceWorkflowDeployment(
   const commitSha = workflow?.head_sha;
   if (!repository || !commitSha) return null;
   const deployment = await env.DB.prepare(
-    `SELECT * FROM deployment_records WHERE repository = ? AND commit_sha = ? ORDER BY created_at DESC LIMIT 1`,
-  ).bind(repository, commitSha).first<DeploymentRecordRow>();
+    `SELECT * FROM deployment_records
+     WHERE repository = ? AND commit_sha = ?
+       AND (? = '' OR github_run_id = ? OR github_run_id IS NULL)
+     ORDER BY created_at DESC LIMIT 1`,
+  ).bind(repository, commitSha, String(workflow?.run_id || workflow?.id || ""), String(workflow?.run_id || workflow?.id || "")).first<DeploymentRecordRow>();
   if (!deployment) return null;
 
   const action = workflow?.status || payload.action;
   const conclusion = workflow?.conclusion;
   let status: string | null = null;
-  if (conclusion && conclusion !== "success") status = conclusion === "cancelled" ? "cancelled" : "failed";
+  if (event === "workflow_run" && conclusion === "success") status = "build_succeeded";
+  else if (conclusion && conclusion !== "success") status = conclusion === "cancelled" ? "cancelled" : "failed";
   else if (action === "queued" || action === "in_progress") status = "building";
-  if (status) {
-    await env.DB.prepare(
-      `UPDATE deployment_records SET status = ?, started_at = COALESCE(started_at, ?), github_run_id = ?, workflow_run_attempt = ?
-       WHERE id = ? AND status IN ('pending', 'queued', 'building')`,
-    ).bind(
-      status,
-      Date.now(),
-      String(workflow?.run_id || workflow?.id || "") || null,
-      Number(workflow?.run_attempt) || null,
-      deployment.id,
-    ).run();
-  }
+  await env.DB.prepare(
+    `UPDATE deployment_records SET
+       status = COALESCE(?, status),
+       started_at = COALESCE(started_at, ?),
+       github_run_id = COALESCE(?, github_run_id),
+       workflow_run_attempt = COALESCE(?, workflow_run_attempt)
+     WHERE id = ? AND status IN ('pending', 'queued', 'building', 'build_succeeded')`,
+  ).bind(
+    status,
+    Date.now(),
+    String(workflow?.run_id || workflow?.id || "") || null,
+    Number(workflow?.run_attempt) || null,
+    deployment.id,
+  ).run();
   return deployment;
 }
 
@@ -560,6 +565,25 @@ function normalizeBuildDir(value: string): string | null {
     return null;
   }
   return value;
+}
+
+async function authorizeCreatorGame(
+  gameId: string,
+  principalId: string,
+  role: string,
+  request: Request,
+  env: Env,
+): Promise<{ ok: true } | { ok: false; response: Response }> {
+  if (role !== "creator") {
+    return { ok: false, response: errorResponse("Creator access required", 403, "FORBIDDEN", request, env) };
+  }
+  const game = await env.DB.prepare(
+    `SELECT id FROM games WHERE id = ? AND creator_principal = ?`,
+  ).bind(gameId, principalId).first<{ id: string }>();
+  if (!game) {
+    return { ok: false, response: errorResponse("You do not have access to this game", 403, "FORBIDDEN", request, env) };
+  }
+  return { ok: true };
 }
 
 /**

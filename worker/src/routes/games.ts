@@ -63,7 +63,13 @@ export async function handleGameRoutes(
  */
 async function handleListGames(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
-  const creatorPrincipal = user?.principal_id || "randseed:usr_creator";
+  if (!user) {
+    return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  }
+  if (user.role !== "creator") {
+    return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
+  }
+  const creatorPrincipal = user.principal_id;
 
   try {
     if (!env.DB) {
@@ -142,6 +148,9 @@ async function handleListGames(request: Request, env: Env): Promise<Response> {
  * Get single game details
  */
 async function handleGetGame(gameId: string, request: Request, env: Env): Promise<Response> {
+  const access = await authorizeGame(gameId, request, env);
+  if (!access.ok) return access.response;
+
   try {
     if (!env.DB) {
       return errorResponse("Database not available", 503, "DB_UNAVAILABLE", request, env);
@@ -216,7 +225,11 @@ async function handleGetGame(gameId: string, request: Request, env: Env): Promis
  */
 async function handleCreateGame(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
-  const creatorPrincipal = user?.principal_id || "randseed:usr_creator";
+  if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  if (user.role !== "creator") {
+    return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
+  }
+  const creatorPrincipal = user.principal_id;
 
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
@@ -253,7 +266,7 @@ async function handleCreateGame(request: Request, env: Env): Promise<Response> {
       }
     }
 
-    const id = body.id || `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = body.id || `g_${crypto.randomUUID().replace(/-/g, "")}`;
     const now = Date.now();
 
     await env.DB.prepare(
@@ -296,6 +309,9 @@ async function handleCreateGame(request: Request, env: Env): Promise<Response> {
  * Updates game fields (excluding version, which is bound to deployment publishing)
  */
 async function handleUpdateGame(gameId: string, request: Request, env: Env): Promise<Response> {
+  const access = await authorizeGame(gameId, request, env);
+  if (!access.ok) return access.response;
+
   const body = (await request.json().catch(() => null)) as {
     name?: string;
     status?: string;
@@ -364,6 +380,9 @@ async function handleUpdateGame(gameId: string, request: Request, env: Env): Pro
  * Deletes a game and its bindings
  */
 async function handleDeleteGame(gameId: string, request: Request, env: Env): Promise<Response> {
+  const access = await authorizeGame(gameId, request, env);
+  if (!access.ok) return access.response;
+
   try {
     if (!env.DB) {
       return errorResponse("Database not available", 503, "DB_UNAVAILABLE", request, env);
@@ -389,6 +408,9 @@ async function handleDeleteGame(gameId: string, request: Request, env: Env): Pro
  * Production media upload handler for Cover Image (<=1MB) and Animation (<=10MB, MP4)
  */
 async function handleUploadMedia(gameId: string, request: Request, env: Env): Promise<Response> {
+  const access = await authorizeGame(gameId, request, env);
+  if (!access.ok) return access.response;
+
   const contentType = request.headers.get("content-type") || "";
 
   try {
@@ -441,7 +463,7 @@ async function handleUploadMedia(gameId: string, request: Request, env: Env): Pr
     }
 
     const ext = isAnimation ? "mp4" : (mimeType.split("/")[1]?.replace("+xml", "") || "png");
-    const filename = `${mediaType}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const filename = `${mediaType}_${crypto.randomUUID()}.${ext}`;
     const key = `games/${gameId}/media/${filename}`;
 
     // Store in Cloudflare R2 bucket if configured
@@ -509,6 +531,11 @@ async function handleServeMedia(key: string, request: Request, env: Env): Promis
   }
 
   try {
+    const match = key.match(/^games\/([^/]+)\/media\/(?:cover|animation)_[^/]+\.[a-z0-9]+$/i);
+    if (!match) return errorResponse("Invalid media key", 400, "INVALID_MEDIA_KEY", request, env);
+    const game = await env.DB.prepare(`SELECT id FROM games WHERE id = ?`).bind(match[1]).first<{ id: string }>();
+    if (!game) return errorResponse("Media not found", 404, "NOT_FOUND", request, env);
+
     const object = await env.ARTIFACTS.get(key);
     if (!object) {
       return errorResponse("Media not found", 404, "NOT_FOUND", request, env);
@@ -531,4 +558,26 @@ async function handleServeMedia(key: string, request: Request, env: Env): Promis
       env,
     );
   }
+}
+
+async function authorizeGame(
+  gameId: string,
+  request: Request,
+  env: Env,
+): Promise<{ ok: true } | { ok: false; response: Response }> {
+  const user = await getAuthenticatedUser(request, env);
+  if (!user) {
+    return { ok: false, response: errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env) };
+  }
+  if (user.role !== "creator") {
+    return { ok: false, response: errorResponse("Creator access required", 403, "FORBIDDEN", request, env) };
+  }
+
+  const game = await env.DB.prepare(
+    `SELECT id FROM games WHERE id = ? AND creator_principal = ?`,
+  ).bind(gameId, user.principal_id).first<{ id: string }>();
+  if (!game) {
+    return { ok: false, response: errorResponse("You do not have access to this game", 403, "FORBIDDEN", request, env) };
+  }
+  return { ok: true };
 }
