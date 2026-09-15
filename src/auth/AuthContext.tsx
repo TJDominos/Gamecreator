@@ -79,6 +79,7 @@ interface AuthContextValue {
   accountId: string | null;
   profile: UserProfile | null;
   organization: DeveloperOrganization | null;
+  isAuthLoading: boolean;
   isSignedIn: boolean;
   isSsoFrameOpen: boolean;
   role: UserRole;
@@ -135,6 +136,7 @@ export function AuthProvider({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [organization, setOrganization] = useState<DeveloperOrganization | null>(null);
   const [isSsoFrameOpen, setIsSsoFrameOpen] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const processSsoCode = useCallback(async (ssoCode: string, redirectUri: string, state: string) => {
     try {
@@ -236,37 +238,38 @@ export function AuthProvider({
     window.addEventListener("message", handlePostMessage);
 
     const initAuth = async () => {
-      // 1. Check if we are returning from Main Site with a one-time sso_code in the URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const ssoCode = urlParams.get("sso_code");
-      const redirectUri = urlParams.get("redirect_uri");
-      const state = urlParams.get("state");
+      try {
+        // 1. Check if we are returning from Main Site with a one-time sso_code in the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const ssoCode = urlParams.get("sso_code");
+        const redirectUri = urlParams.get("redirect_uri");
+        const state = urlParams.get("state");
 
-      if (ssoCode && redirectUri && state) {
-        await processSsoCode(ssoCode, redirectUri, state);
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return;
-      }
+        if (ssoCode && redirectUri && state) {
+          await processSsoCode(ssoCode, redirectUri, state);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
 
-      // 2. Fallback: Check local storage for existing Custom Token / Session
-      if (localStorage.getItem("randseed_signed_out") === "true") {
-        // User explicitly signed out, do not restore previous session or auto-renew
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem(CUSTOM_TOKEN_KEY);
-        localStorage.removeItem(USER_PROFILE_KEY);
-        setAccountId(null);
-        setProfile(null);
-        setOrganization(null);
-        return;
-      }
+        // 2. Fallback: Check local storage for existing Custom Token / Session
+        if (localStorage.getItem("randseed_signed_out") === "true") {
+          // User explicitly signed out, do not restore previous session or auto-renew
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(CUSTOM_TOKEN_KEY);
+          localStorage.removeItem(USER_PROFILE_KEY);
+          setAccountId(null);
+          setProfile(null);
+          setOrganization(null);
+          return;
+        }
 
-      const storedSession = readJson<string | null>(SESSION_KEY, null);
-      const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
+        const storedSession = readJson<string | null>(SESSION_KEY, null);
+        const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
 
-      if (storedSession && token) {
-        setAccountId(storedSession);
-        authApi.getMe()
-          .then((meRes) => {
+        if (storedSession && token) {
+          setAccountId(storedSession);
+          try {
+            const meRes = await authApi.getMe();
             if (meRes && meRes.user) {
               if (meRes.token) {
                 localStorage.setItem(CUSTOM_TOKEN_KEY, meRes.token);
@@ -294,19 +297,21 @@ export function AuthProvider({
                 setOrganization(meRes.organization);
               }
             } else {
-              void signOut();
+              await signOut();
             }
-          })
-          .catch(() => {
-            void signOut();
-          });
-      } else if (!token) {
-        // Clear any orphan session keys
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem(USER_PROFILE_KEY);
-        setAccountId(null);
-        setProfile(null);
-        setOrganization(null);
+          } catch {
+            await signOut();
+          }
+        } else if (!token) {
+          // Clear any orphan session keys
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(USER_PROFILE_KEY);
+          setAccountId(null);
+          setProfile(null);
+          setOrganization(null);
+        }
+      } finally {
+        setIsAuthLoading(false);
       }
     };
 
@@ -675,6 +680,7 @@ export function AuthProvider({
       accountId,
       profile,
       organization,
+      isAuthLoading,
       isSsoFrameOpen,
       isSignedIn: Boolean(accountId),
       role: currentRole,
@@ -697,6 +703,7 @@ export function AuthProvider({
       accountId,
       profile,
       organization,
+      isAuthLoading,
       isSsoFrameOpen,
       currentRole,
       permissions,

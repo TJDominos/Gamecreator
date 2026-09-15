@@ -1,4 +1,5 @@
 const CUSTOM_TOKEN_KEY = "randseed_custom_jwt";
+const REQUEST_TIMEOUT_MS = 15000;
 
 export interface ApiResponse<T = any> {
   success?: boolean;
@@ -51,10 +52,16 @@ export async function request<T = any>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  const requestController = options.signal ? null : new AbortController();
+  const timeoutId = requestController
+    ? window.setTimeout(() => requestController.abort(), REQUEST_TIMEOUT_MS)
+    : undefined;
+
   try {
     const response = await fetch(url, {
       ...options,
       headers,
+      signal: requestController?.signal ?? options.signal,
     });
 
     const contentType = response.headers.get("content-type");
@@ -85,6 +92,18 @@ export async function request<T = any>(
     if (err instanceof ApiError) {
       throw err;
     }
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new ApiError(
+        requestController?.signal.aborted
+          ? "Request timed out. Please try again."
+          : "Request cancelled.",
+        0,
+      );
+    }
     throw new ApiError(err instanceof Error ? err.message : "Network error", 0);
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
   }
 }

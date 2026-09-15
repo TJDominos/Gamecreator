@@ -43,10 +43,12 @@ export function SsoLoginFrame(): React.ReactElement | null {
   return (
     <div role="dialog" aria-modal="true" aria-label="Sign in with Randseed" style={overlayStyle}>
       <div style={{ ...frameShellStyle, height: `min(${frameHeight}px, calc(100vh - 32px))` }}>
+        {!isFrameLoaded && <div style={frameLoadingStyle}><span style={ssoLoadingDotStyle} />Opening secure sign-in...</div>}
         <iframe
           title="Randseed sign in"
           src={targetUrl}
-          style={frameStyle}
+          onLoad={() => setIsFrameLoaded(true)}
+          style={{ ...frameStyle, opacity: isFrameLoaded ? 1 : 0 }}
           allow="publickey-credentials-get; publickey-credentials-create; clipboard-write"
         />
       </div>
@@ -66,4 +68,15 @@ const frameShellStyle: React.CSSProperties = {
 
 const frameStyle: React.CSSProperties = {
   display: "block", width: "100%", height: "100%", border: 0, outline: "none", background: "#fff",
+};
+
+const frameLoadingStyle: React.CSSProperties = {
+  position: "absolute", inset: 0, zIndex: 1, display: "grid", placeItems: "center",
+  alignContent: "center", gap: "14px", color: "#e2e8f0", background: "#101820",
+  fontSize: "13px", fontFamily: "system-ui, sans-serif",
+};
+
+const ssoLoadingDotStyle: React.CSSProperties = {
+  width: "10px", height: "10px", borderRadius: "50%", background: "#f4b942",
+  boxShadow: "0 0 14px rgba(244, 185, 66, 0.7)",
 };

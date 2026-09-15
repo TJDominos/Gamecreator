@@ -45,6 +45,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
 import { PortalHeader } from "../../components/PortalHeader";
 import { OnboardingHeader } from "../../components/OnboardingHeader";
+import { AppLoadingScreen } from "../../components/AppLoadingScreen";
 import "./DeveloperPortal.css";
 
 const navigation = [
@@ -83,11 +84,15 @@ interface PlaceholderPageProps {
 }
 
 function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
-  const { isSignedIn, hasPermission } = useAuth();
+  const { isAuthLoading, isSignedIn, hasPermission } = useAuth();
   const isPreview =
     typeof window !== "undefined" &&
     (new URLSearchParams(window.location.search).get("preview") === "true" ||
       sessionStorage.getItem("rs_preview_dashboard") === "true");
+
+  if (isAuthLoading && !isPreview) {
+    return <AppLoadingScreen message="Checking your sign-in..." />;
+  }
 
   if (!isSignedIn && !isPreview && !hasPermission("dashboard:access")) {
     return <DashboardAccessGate />;
