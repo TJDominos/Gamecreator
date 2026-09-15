@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TipTapEditor } from '../../../components/TipTapEditor';
-import { Target, Plus, Search, Filter, ShieldCheck, ArrowRight, ArrowLeft, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Target, Plus, Search, Filter, ShieldCheck, ArrowRight, ArrowLeft, Image as ImageIcon, Trash2, Upload, X, Loader2, AlertCircle, Save } from 'lucide-react';
 import { MOCK_BOUNTIES, Bounty, Category } from './bountyData';
 
 const countWords = (str: string) => str.trim().split(/\s+/).filter(Boolean).length;
@@ -8,7 +8,29 @@ const countWords = (str: string) => str.trim().split(/\s+/).filter(Boolean).leng
 const CATEGORIES: Category[] = ['Casino', 'Puzzle', 'Card & Board', 'Simulation', 'Arcade', 'Strategy', 'Word', 'Trivia', 'Role-Playing', 'Sports', 'Music'];
 
 export function BountyManagement(): React.ReactElement {
-  const [bounties, setBounties] = useState<Bounty[]>(MOCK_BOUNTIES);
+  const [bounties, setBounties] = useState<Bounty[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    fetchBounties();
+  }, []);
+
+  const fetchBounties = async () => {
+    try {
+      const token = localStorage.getItem("randseed_custom_token");
+      const res = await fetch("/api/admin/bounties", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.bounties) setBounties(data.bounties);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'participants'>('list');
   const [selectedBounty, setSelectedBounty] = useState<Bounty | null>(null);
   
@@ -17,22 +39,85 @@ export function BountyManagement(): React.ReactElement {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // Form State
   const [form, setForm] = useState({
-    title: '',
-    category: 'Arcade' as Category,
-    shortDesc: '',
-    fullDesc: '',
-    thumbnailUrl: '',
-    poolAmount: 0,
-    currency: 'WLT' as 'WLT' | 'USD',
-    maxParticipants: 100,
-    participationEndDate: '',
-    releaseDate: '',
-    distributionDate: '',
-    settlementRules: 'Default Distribution Algorithm',
+    title: '', category: 'Arcade' as Category, shortDesc: '', fullDesc: '', thumbnailUrl: '',
+    poolAmount: 0, currency: 'WLT' as 'WLT' | 'USD', maxParticipants: 100, participationEndDate: '',
+    releaseDate: '', distributionDate: '', settlementRules: 'Default Distribution Algorithm',
     examples: [{ type: 'image', name: '', url: '', thumbnail: '' }] as { type: string; name?: string; url: string; thumbnail: string; }[]
   });
+
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [formErrors, setFormErrors] = useState<{ coverImage?: string }>({});
+  const [autoSaveStatus, setAutoSaveStatus] = useState<string>('');
+  
+  const lastSavedFormRef = React.useRef(form);
+  const formRef = React.useRef(form);
+
+  React.useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
+  // Auto-save logic
+  React.useEffect(() => {
+    if (view === 'edit' && selectedBounty) {
+      // 3 minutes = 180000 ms
+      const intervalId = setInterval(() => {
+        if (JSON.stringify(formRef.current) !== JSON.stringify(lastSavedFormRef.current)) {
+           handleSave(true);
+        }
+      }, 180000);
+      return () => clearInterval(intervalId);
+    }
+  }, [view, selectedBounty]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setFormErrors(prev => ({ ...prev, coverImage: "File size exceeds the 10 MB limit." }));
+      return;
+    }
+
+    if (!file.type.startsWith('image/') && file.type !== 'video/mp4') {
+      setFormErrors(prev => ({ ...prev, coverImage: "Only PNG, JPEG, WebP, and MP4 files are supported." }));
+      return;
+    }
+
+    setFormErrors(prev => ({ ...prev, coverImage: undefined }));
+    setIsUploadingCover(true);
+
+    try {
+      const token = localStorage.getItem("randseed_custom_token");
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await fetch("/api/admin/bounties/media", {
+        method: "PUT",
+        headers: { "Authorization": `Bearer ${token}` },
+        body: formData
+      });
+      
+      const result = await res.json();
+      if (result.url) {
+        setForm({...formRef.current, thumbnailUrl: result.url});
+      } else {
+        throw new Error(result.error || "Upload failed");
+      }
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setForm({...formRef.current, thumbnailUrl: reader.result});
+        }
+      };
+      reader.readAsDataURL(file);
+      setFormErrors(prev => ({ ...prev, coverImage: err instanceof Error ? err.message : "Cloud upload failed, using local preview" }));
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
 
   const handleEdit = (b: Bounty) => {
     setSelectedBounty(b);
@@ -54,7 +139,8 @@ export function BountyManagement(): React.ReactElement {
     setView('edit');
   };
 
-  const handleSave = () => {
+  const handleSave = (isAutoSave: boolean = false) => {
+    if (isAutoSave) setAutoSaveStatus("Saving...");
     // Word limit checks
     if (form.title.split(' ').length > 10) {
       alert("Title must be max 10 words.");
@@ -65,9 +151,40 @@ export function BountyManagement(): React.ReactElement {
       return;
     }
     
-    // In a real app, this would make an API call.
-    alert(`Bounty Saved: ${form.title}`);
-    setView('list');
+    setLoading(true);
+    const token = localStorage.getItem("randseed_custom_token");
+    const isEdit = !!selectedBounty;
+    const url = isEdit ? `/api/admin/bounties/${selectedBounty.id}` : "/api/admin/bounties";
+    const method = isEdit ? "PUT" : "POST";
+    
+    fetch(url, {
+      method,
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(form)
+    })
+    .then(res => res.json())
+    .then(() => {
+      fetchBounties();
+      lastSavedFormRef.current = form;
+      if (isAutoSave) {
+        setAutoSaveStatus("Saved at " + new Date().toLocaleTimeString());
+        setLoading(false);
+      } else {
+        setView('list');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      if (isAutoSave) {
+        setAutoSaveStatus("Auto-save failed");
+      } else {
+        alert("Failed to save bounty");
+      }
+      setLoading(false);
+    });
   };
 
   const filteredBounties = bounties.filter(b => {
@@ -245,7 +362,7 @@ export function BountyManagement(): React.ReactElement {
               )}
               <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
                 <button onClick={() => setView('list')} style={{ padding: '12px 24px', background: 'transparent', border: '1px solid var(--portal-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-                <button onClick={handleSave} style={{ padding: '12px 24px', background: 'var(--portal-ink)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{view === 'create' ? 'Publish Bounty' : 'Save Changes'}</button>
+                <button onClick={() => handleSave(false)} style={{ padding: '12px 24px', background: 'var(--portal-ink)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{view === 'create' ? 'Publish Bounty' : 'Save Changes'}</button>
               </div>
             </div>
           </div>

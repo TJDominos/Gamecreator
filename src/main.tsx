@@ -11,6 +11,7 @@ import CreatorBounties from "./pages/bounties/CreatorBounties";
 import PublicBountyDetail from "./pages/bounties/PublicBountyDetail";
 import { VersionUpdateBanner } from "./components/VersionUpdateBanner";
 import { SsoLoginFrame } from "./components/SsoLoginFrame";
+import AdminPortal from "./pages/AdminPortal";
 import "./index.css";
 
 // Suppress benign third-party wallet extension background communication errors in iframes
@@ -94,6 +95,15 @@ function App() {
     return (
       <>
         <CreatorBounties />
+        <VersionUpdateBanner />
+      </>
+    );
+  }
+
+    if (location.pathname.startsWith("/admin")) {
+    return (
+      <>
+        <AdminPortal />
         <VersionUpdateBanner />
       </>
     );

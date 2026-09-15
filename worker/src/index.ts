@@ -7,6 +7,8 @@ import { handleOrganizationRoutes } from "./routes/organizations";
 import { handleGitHubRoutes } from "./routes/github";
 import { handleDeploymentRoutes } from "./routes/deployments";
 import { handleGameRoutes } from "./routes/games";
+import { handleAdminRoutes } from "./routes/admin";
+import { handleBountyRoutes } from "./routes/bounties";
 
 export default {
   async fetch(
@@ -41,6 +43,12 @@ export default {
       }
 
       // 2. Dispatch to modular route handlers
+      const bountyRes = await handleBountyRoutes(request, env);
+      if (bountyRes) return bountyRes;
+
+      const adminRes = await handleAdminRoutes(request, env);
+      if (adminRes) return adminRes;
+
       const authRes = await handleAuthRoutes(request, env);
       if (authRes) return authRes;
 

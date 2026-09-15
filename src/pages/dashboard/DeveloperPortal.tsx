@@ -2,6 +2,7 @@ import { BountyHub } from "./bounties/BountyHub";
 import { BountyDetail } from "./bounties/BountyDetail";
 import { BountyManagement } from "./bounties/BountyManagement";
 import { CreatorSettings } from "./CreatorSettings";
+import { NotFound } from "../NotFound";
 import {
   GameConsole, GameOverview, GameSettings,
   GameDeployments, Publish } from "./games";
@@ -94,18 +95,6 @@ function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
   return children;
 }
 
-function RequireAdmin({ children }: RouteGuardProps): React.ReactNode {
-  const { isSignedIn, hasPermission } = useAuth();
-  const isPreview =
-    typeof window !== "undefined" &&
-    (new URLSearchParams(window.location.search).get("preview") === "true" ||
-      sessionStorage.getItem("rs_preview_dashboard") === "true");
-
-  if (!isSignedIn && !isPreview && !hasPermission("bounty:manage")) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  return children;
-}
 
 
 
@@ -688,14 +677,6 @@ export default function DeveloperPortal(): React.ReactElement {
         <Route path="revenue" element={<PlaceholderPage title="Revenue" description="Track estimated revenue, ledger entries, and payouts." icon={BarChart3} />} />
         <Route path="settings" element={<CreatorSettings />} />
       </Route>
-      <Route
-        path="/bounty-management"
-        element={
-          <RequireAdmin>
-            <BountyManagement />
-          </RequireAdmin>
-        }
-      />
       
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
