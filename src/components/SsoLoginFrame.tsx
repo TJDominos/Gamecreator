@@ -29,6 +29,11 @@ export function SsoLoginFrame(): React.ReactElement | null {
         }
         return;
       }
+      if (event.data?.type === "RANDSEED_SSO_READY") {
+        setIsFrameLoaded(true);
+        setIsFrameSlow(false);
+        return;
+      }
       if (
         event.data?.type === "RANDSEED_SSO_SUCCESS"
         || event.data?.type === "RANDSEED_SSO_CANCEL"
@@ -63,7 +68,7 @@ export function SsoLoginFrame(): React.ReactElement | null {
         <iframe
           title="Randseed sign in"
           src={targetUrl}
-          onLoad={() => setIsFrameLoaded(true)}
+          onLoad={() => undefined}
           style={{ ...frameStyle, opacity: isFrameLoaded ? 1 : 0 }}
           allow="publickey-credentials-get; publickey-credentials-create; clipboard-write"
         />
