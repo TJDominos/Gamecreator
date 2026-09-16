@@ -98,14 +98,34 @@ async function handleSsoExchange(
     } catch {
       return errorResponse("Invalid SSO redirect URI", 400, "INVALID_REDIRECT_URI", request, env);
     }
-    const authorizationCode = await redeemSsoAuthorizationCode(
-      sso_code.trim(),
-      "gamecreator",
-      redirectUri.toString(),
-      body.code_verifier,
-      env,
-    ).catch(() => null);
+    let authorizationCode;
+    try {
+      authorizationCode = await redeemSsoAuthorizationCode(
+        sso_code.trim(),
+        "gamecreator",
+        body.redirect_uri,
+        body.code_verifier,
+        env,
+      );
+    } catch (error) {
+      console.error("SSO authorization code redemption failed", {
+        canisterId: env.WL_USER_CANISTER_ID || "missing",
+        redirectOrigin: redirectUri.origin,
+        redirectPath: redirectUri.pathname,
+        codeLength: sso_code.trim().length,
+        verifierLength: body.code_verifier.length,
+        error: error instanceof Error ? error.message : "unknown error",
+      });
+      return errorResponse("SSO authorization service unavailable", 502, "SSO_REDEMPTION_FAILED", request, env);
+    }
     if (!authorizationCode) {
+      console.warn("SSO authorization code rejected", {
+        canisterId: env.WL_USER_CANISTER_ID || "missing",
+        redirectOrigin: redirectUri.origin,
+        redirectPath: redirectUri.pathname,
+        codeLength: sso_code.trim().length,
+        verifierLength: body.code_verifier.length,
+      });
       return errorResponse("Invalid or expired SSO authorization code", 401, "INVALID_SSO_CODE", request, env);
     }
     const principalId = authorizationCode.principal_id;
