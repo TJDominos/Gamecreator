@@ -6,11 +6,13 @@ export function SsoLoginFrame(): React.ReactElement | null {
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
   const [frameHeight, setFrameHeight] = useState(560);
   const [isFrameLoaded, setIsFrameLoaded] = useState(false);
+  const [isFrameSlow, setIsFrameSlow] = useState(false);
 
   useEffect(() => {
     const handleTarget = (event: Event): void => {
       const target = (event as CustomEvent<string>).detail;
       setIsFrameLoaded(false);
+      setIsFrameSlow(false);
       setTargetUrl(typeof target === "string" ? target : null);
     };
     window.addEventListener("randseed:sso-target", handleTarget);
@@ -40,12 +42,24 @@ export function SsoLoginFrame(): React.ReactElement | null {
     return () => window.removeEventListener("message", handleMessage);
   }, [closeSsoFrame, targetUrl]);
 
+  useEffect(() => {
+    if (!targetUrl || isFrameLoaded) return;
+    const slowConnectionTimer = window.setTimeout(() => setIsFrameSlow(true), 8000);
+    return () => window.clearTimeout(slowConnectionTimer);
+  }, [isFrameLoaded, targetUrl]);
+
   if (!isSsoFrameOpen || !targetUrl) return null;
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Sign in with Randseed" style={overlayStyle}>
       <div style={{ ...frameShellStyle, height: `min(${frameHeight}px, calc(100vh - 32px))` }}>
-        {!isFrameLoaded && <div style={frameLoadingStyle}><span style={ssoLoadingDotStyle} />Opening secure sign-in...</div>}
+        {!isFrameLoaded && (
+          <div role="status" aria-live="polite" style={frameLoadingStyle}>
+            <span style={ssoLoadingDotStyle} />
+            <strong>{isFrameSlow ? "Still connecting..." : "Opening secure sign-in..."}</strong>
+            <span className="sso-loading-bar" style={ssoLoadingBarStyle}><span /></span>
+          </div>
+        )}
         <iframe
           title="Randseed sign in"
           src={targetUrl}
@@ -81,4 +95,10 @@ const frameLoadingStyle: React.CSSProperties = {
 const ssoLoadingDotStyle: React.CSSProperties = {
   width: "10px", height: "10px", borderRadius: "50%", background: "#f4b942",
   boxShadow: "0 0 14px rgba(244, 185, 66, 0.7)",
+  animation: "sso-loading-pulse 1.4s ease-in-out infinite",
+};
+
+const ssoLoadingBarStyle: React.CSSProperties = {
+  width: "min(180px, 65vw)", height: "3px", overflow: "hidden", borderRadius: "99px",
+  background: "rgba(255, 255, 255, 0.16)",
 };

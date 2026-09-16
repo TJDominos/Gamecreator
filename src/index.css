@@ -91,6 +91,20 @@ body {
   50% { transform: scale(1.06); opacity: 1; }
 }
 
+@keyframes sso-loading-pulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.62; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+
+.sso-loading-bar span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: #f4b942;
+  animation: app-loading-slide 1.4s ease-in-out infinite;
+}
+
 /* Custom scrollbar for inner elements */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
