@@ -1,52 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MOCK_BOUNTIES, canUnsubscribeFromBounty } from './bountyData';
-
-const STORAGE_KEY = 'RS_BOUNTY_SUBSCRIPTIONS';
-const DEFAULT_SUBSCRIBED_IDS = ['bty_001', 'bty_002', 'bty_003', 'bty_004'];
-
-function getStoredSubscriptions(): string[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SUBSCRIBED_IDS));
-      return DEFAULT_SUBSCRIBED_IDS;
-    }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-    return DEFAULT_SUBSCRIBED_IDS;
-  } catch {
-    return DEFAULT_SUBSCRIBED_IDS;
-  }
-}
+import { bountyApi } from '../../../services/bountyApi';
 
 export function useBountySubscriptions() {
-  const [subscribedIds, setSubscribedIds] = useState<string[]>(getStoredSubscriptions);
+  const [subscribedIds, setSubscribedIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleSync = () => {
-      setSubscribedIds(getStoredSubscriptions());
-    };
+    let active = true;
+    bountyApi.list()
+      .then((bounties) => {
+        if (active) setSubscribedIds(bounties.filter((bounty) => bounty.isSubscribed).map((bounty) => bounty.id));
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Could not load subscriptions.');
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
 
-    window.addEventListener('storage', handleSync);
-    window.addEventListener('bounty_subscriptions_changed', handleSync);
-
-    return () => {
-      window.removeEventListener('storage', handleSync);
-      window.removeEventListener('bounty_subscriptions_changed', handleSync);
-    };
+    return () => { active = false; };
   }, []);
-
-  const persist = (next: string[]) => {
-    setSubscribedIds(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      window.dispatchEvent(new CustomEvent('bounty_subscriptions_changed'));
-    } catch (e) {
-      console.error('Failed to save bounty subscriptions', e);
-    }
-  };
 
   const isSubscribed = useCallback(
     (bountyId: string) => subscribedIds.includes(bountyId),
@@ -54,47 +28,48 @@ export function useBountySubscriptions() {
   );
 
   const subscribe = useCallback(
-    (bountyId: string) => {
-      if (!subscribedIds.includes(bountyId)) {
-        const next = [...subscribedIds, bountyId];
-        persist(next);
+    async (bountyId: string) => {
+      setError(null);
+      try {
+        await bountyApi.participate(bountyId);
+        setSubscribedIds((current) => current.includes(bountyId) ? current : [...current, bountyId]);
+        return true;
+      } catch (subscribeError) {
+        setError(subscribeError instanceof Error ? subscribeError.message : 'Could not subscribe to this bounty.');
+        return false;
       }
     },
-    [subscribedIds]
+    []
   );
 
   const unsubscribe = useCallback(
-    (bountyId: string) => {
-      // Creators can only unsubscribe on bounties with open status and development stages
-      const bounty = MOCK_BOUNTIES.find(b => b.id === bountyId);
-      if (bounty && !canUnsubscribeFromBounty(bounty.state)) {
-        console.warn(`Unsubscription locked for bounty ${bountyId} in stage: ${bounty.state}`);
+    async (bountyId: string) => {
+      setError(null);
+      try {
+        await bountyApi.leave(bountyId);
+        setSubscribedIds((current) => current.filter((id) => id !== bountyId));
+        return true;
+      } catch (unsubscribeError) {
+        setError(unsubscribeError instanceof Error ? unsubscribeError.message : 'Could not unsubscribe from this bounty.');
         return false;
       }
-
-      if (subscribedIds.includes(bountyId)) {
-        const next = subscribedIds.filter(id => id !== bountyId);
-        persist(next);
-        return true;
-      }
-      return false;
     },
-    [subscribedIds]
+    []
   );
 
   const toggleSubscription = useCallback(
-    (bountyId: string) => {
+    async (bountyId: string) => {
       if (subscribedIds.includes(bountyId)) {
-        unsubscribe(bountyId);
+        await unsubscribe(bountyId);
       } else {
-        subscribe(bountyId);
+        await subscribe(bountyId);
       }
     },
     [subscribedIds, subscribe, unsubscribe]
   );
 
   const resetSubscriptions = useCallback(() => {
-    persist(DEFAULT_SUBSCRIBED_IDS);
+    setSubscribedIds([]);
   }, []);
 
   return {
@@ -104,5 +79,7 @@ export function useBountySubscriptions() {
     unsubscribe,
     toggleSubscription,
     resetSubscriptions,
+    isLoading,
+    error,
   };
 }

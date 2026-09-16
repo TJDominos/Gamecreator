@@ -1,4 +1,4 @@
-CREATE TABLE bounties (
+CREATE TABLE IF NOT EXISTS bounties (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE bounties (
     updated_at INTEGER NOT NULL
 );
 
-CREATE TABLE bounty_examples (
+CREATE TABLE IF NOT EXISTS bounty_examples (
     id TEXT PRIMARY KEY,
     bounty_id TEXT NOT NULL REFERENCES bounties(id) ON DELETE CASCADE,
     title TEXT,
@@ -23,14 +23,14 @@ CREATE TABLE bounty_examples (
     url TEXT
 );
 
-CREATE TABLE bounty_participants (
+CREATE TABLE IF NOT EXISTS bounty_participants (
     bounty_id TEXT NOT NULL REFERENCES bounties(id) ON DELETE CASCADE,
     principal_id TEXT NOT NULL REFERENCES users(principal_id) ON DELETE CASCADE,
     joined_at INTEGER NOT NULL,
     PRIMARY KEY(bounty_id, principal_id)
 );
 
-CREATE TABLE bounty_published_games (
+CREATE TABLE IF NOT EXISTS bounty_published_games (
     id TEXT PRIMARY KEY,
     bounty_id TEXT NOT NULL REFERENCES bounties(id) ON DELETE CASCADE,
     game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,

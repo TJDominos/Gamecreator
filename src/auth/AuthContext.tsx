@@ -9,7 +9,7 @@ import React, {
 import type { UserProfileInfo } from "../types/userProfile";
 import { WLAuthClient } from "./wlAuthClient";
 import { authApi } from "../services/authApi";
-import { AUTH_UNAUTHORIZED_EVENT } from "../services/apiClient";
+import { ApiError, AUTH_UNAUTHORIZED_EVENT } from "../services/apiClient";
 import {
   UserRole,
   Permission,
@@ -174,6 +174,7 @@ export function AuthProvider({
 
           setAccountId(uid);
           setProfile(updatedProfile);
+          setIsSsoFrameOpen(false);
           sessionStorage.removeItem(SSO_VERIFIER_KEY);
           sessionStorage.removeItem(SSO_STATE_KEY);
 
@@ -268,9 +269,10 @@ export function AuthProvider({
 
         if (storedSession && token) {
           setAccountId(storedSession);
-          try {
-            const meRes = await authApi.getMe();
-            if (meRes && meRes.user) {
+          void authApi
+            .getMe()
+            .then((meRes) => {
+              if (!meRes?.user) return;
               if (meRes.token) {
                 localStorage.setItem(CUSTOM_TOKEN_KEY, meRes.token);
               }
@@ -296,12 +298,12 @@ export function AuthProvider({
               if (meRes.organization) {
                 setOrganization(meRes.organization);
               }
-            } else {
-              await signOut();
-            }
-          } catch {
-            await signOut();
-          }
+            })
+            .catch((error) => {
+              if (error instanceof ApiError && (error.status === 401 || error.status === 404)) {
+                void signOut();
+              }
+            });
         } else if (!token) {
           // Clear any orphan session keys
           localStorage.removeItem(SESSION_KEY);

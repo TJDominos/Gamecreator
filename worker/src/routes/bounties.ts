@@ -26,15 +26,21 @@ export async function handleBountyRoutes(request: Request, env: Env): Promise<Re
   if (url.pathname === "/api/bounties" && request.method === "GET") {
     return handleListBounties(request, env);
   }
+  if (url.pathname.startsWith("/api/bounties/") && request.method === "GET") {
+    return handleGetBounty(request, env);
+  }
   if (url.pathname.startsWith("/api/bounties/") && url.pathname.endsWith("/participate") && request.method === "POST") {
     return handleParticipate(request, env);
+  }
+  if (url.pathname.startsWith("/api/bounties/") && url.pathname.endsWith("/participate") && request.method === "DELETE") {
+    return handleLeaveBounty(request, env);
   }
   
   return null;
 }
 
 // Generate an ID for new bounties
-const generateId = () => 'bty_' + Math.random().toString(36).substr(2, 9);
+const generateId = () => `bty_${crypto.randomUUID().replace(/-/g, "").slice(0, 18)}`;
 
 async function handleAdminListBounties(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
@@ -47,12 +53,9 @@ async function handleAdminListBounties(request: Request, env: Env): Promise<Resp
       SELECT * FROM bounties ORDER BY created_at DESC
     `).all();
 
-    // Fetch examples and attach them
+    // Attach participants and published games for the admin management view.
     for (const b of bounties) {
-      const { results: examples } = await env.DB.prepare(`
-        SELECT * FROM bounty_examples WHERE bounty_id = ?
-      `).bind(b.id).all();
-      b.examples = examples;
+      Object.assign(b, await attachBountyDetails(b, env, authUser.principal_id));
     }
 
     return jsonResponse({ success: true, bounties }, 200, request, env);
@@ -79,10 +82,10 @@ async function handleCreateBounty(request: Request, env: Env): Promise<Response>
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      id, body.title, body.shortDesc || body.description, body.fullDesc || body.fullDescription, 
-      body.state || 'OPEN', body.category, body.poolAmount || body.prizePool, body.currency, 
+      id, body.title, body.shortDesc || body.description, body.fullDesc || body.fullDescription,
+      body.state || 'OPEN', body.category, body.poolAmount || body.prizePool, body.currency,
       JSON.stringify(body.tags || []), body.participationEndDate || body.deadline, 
-      body.distributionDate || body.battleEnd, body.videoUrl || null, now, now
+      body.distributionDate || body.battleEnd, body.videoUrl || body.thumbnailUrl || null, now, now
     ).run();
 
     // Insert examples if any
@@ -125,7 +128,7 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
       body.title, body.shortDesc || body.description, body.fullDesc || body.fullDescription, 
       body.state, body.category, body.poolAmount || body.prizePool, body.currency, 
       JSON.stringify(body.tags || []), body.participationEndDate || body.deadline, 
-      body.distributionDate || body.battleEnd, body.videoUrl || null, now, id
+      body.distributionDate || body.battleEnd, body.videoUrl || body.thumbnailUrl || null, now, id
     ).run();
 
     // Recreate examples (naive approach: delete and insert)
@@ -166,9 +169,18 @@ async function handleDeleteBounty(request: Request, env: Env): Promise<Response>
 
 async function handleListBounties(request: Request, env: Env): Promise<Response> {
   try {
+    const authUser = await getAuthenticatedUser(request, env);
     const { results: bounties } = await env.DB.prepare(`
-      SELECT * FROM bounties ORDER BY created_at DESC
-    `).all();
+      SELECT b.*,
+        (SELECT COUNT(*) FROM bounty_participants p WHERE p.bounty_id = b.id) AS subscriptions,
+        (SELECT COUNT(*) FROM bounty_published_games g WHERE g.bounty_id = b.id) AS online_games,
+        CASE WHEN ? IS NULL THEN 0 ELSE EXISTS(
+          SELECT 1 FROM bounty_participants p2
+          WHERE p2.bounty_id = b.id AND p2.principal_id = ?
+        ) END AS is_subscribed
+      FROM bounties b
+      ORDER BY b.created_at DESC
+    `).bind(authUser?.principal_id ?? null, authUser?.principal_id ?? null).all();
 
     for (const b of bounties) {
       const { results: examples } = await env.DB.prepare(`
@@ -178,6 +190,106 @@ async function handleListBounties(request: Request, env: Env): Promise<Response>
     }
 
     return jsonResponse({ success: true, bounties }, 200, request, env);
+  } catch (err: any) {
+    return errorResponse(err.message, 500, "DB_ERROR", request, env);
+  }
+}
+
+async function getBountyRow(request: Request, env: Env, bountyId: string): Promise<any | null> {
+  const authUser = await getAuthenticatedUser(request, env);
+  return env.DB.prepare(`
+    SELECT b.*,
+      (SELECT COUNT(*) FROM bounty_participants p WHERE p.bounty_id = b.id) AS subscriptions,
+      (SELECT COUNT(*) FROM bounty_published_games g WHERE g.bounty_id = b.id) AS online_games,
+      (SELECT COALESCE(SUM(g.performance_score), 0) FROM bounty_published_games g WHERE g.bounty_id = b.id) AS total_score,
+      CASE WHEN ? IS NULL THEN 0 ELSE EXISTS(
+        SELECT 1 FROM bounty_participants p2
+        WHERE p2.bounty_id = b.id AND p2.principal_id = ?
+      ) END AS is_subscribed
+    FROM bounties b
+    WHERE b.id = ?
+  `).bind(authUser?.principal_id ?? null, authUser?.principal_id ?? null, bountyId).first();
+}
+
+async function attachBountyDetails(
+  bounty: any,
+  env: Env,
+  principalId?: string,
+): Promise<any> {
+  const { results: examples } = await env.DB.prepare(
+    "SELECT id, title, thumbnail, url FROM bounty_examples WHERE bounty_id = ? ORDER BY id",
+  ).bind(bounty.id).all();
+
+  const { results: participants } = await env.DB.prepare(`
+    SELECT p.principal_id, p.joined_at, u.email
+    FROM bounty_participants p
+    LEFT JOIN users u ON u.principal_id = p.principal_id
+    WHERE p.bounty_id = ?
+    ORDER BY p.joined_at ASC
+  `).bind(bounty.id).all<any>();
+
+  const { results: publishedGames } = await env.DB.prepare(`
+    SELECT p.id, p.game_id, p.principal_id, p.prize, p.uu, p.review_score, p.performance_score,
+      p.is_winner, p.game_id AS game_name, u.email
+    FROM bounty_published_games p
+    LEFT JOIN users u ON u.principal_id = p.principal_id
+    WHERE p.bounty_id = ?
+    ORDER BY p.performance_score DESC, p.published_at ASC
+  `).bind(bounty.id).all<any>();
+
+  const mappedGames = publishedGames.map((game) => ({
+    id: game.id,
+    gameId: game.game_id,
+    creator: {
+      id: game.principal_id,
+      name: game.email || game.principal_id,
+      avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(game.principal_id)}`,
+    },
+    gameName: game.game_name || "Published game",
+    prize: game.prize,
+    uu: game.uu,
+    reviewScore: game.review_score,
+    performanceScore: game.performance_score,
+    isWinner: Boolean(game.is_winner),
+  }));
+
+  const userGame = principalId
+    ? mappedGames.find((game) => game.creator.id === principalId)
+    : undefined;
+
+  return {
+    ...bounty,
+    examples,
+    participants: participants.map((participant: any) => ({
+      id: participant.principal_id,
+      name: participant.email || participant.principal_id,
+      avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(participant.principal_id)}`,
+      joinedAt: participant.joined_at,
+    })),
+    published_games: mappedGames.filter((game) => !game.isWinner),
+    winners: mappedGames.filter((game) => game.isWinner),
+    my_game_name: userGame?.gameName,
+    my_game_score: userGame?.performanceScore,
+  };
+}
+
+async function handleGetBounty(request: Request, env: Env): Promise<Response> {
+  const parts = new URL(request.url).pathname.split("/");
+  const bountyId = parts[3];
+  if (!bountyId || bountyId === "participate") {
+    return errorResponse("Bounty not found", 404, "NOT_FOUND", request, env);
+  }
+
+  try {
+    const authUser = await getAuthenticatedUser(request, env);
+    const bounty = await getBountyRow(request, env, bountyId);
+    if (!bounty) return errorResponse("Bounty not found", 404, "NOT_FOUND", request, env);
+    return jsonResponse(
+      { success: true, bounty: await attachBountyDetails(bounty, env, authUser?.principal_id) },
+      200,
+      request,
+      env,
+    );
   } catch (err: any) {
     return errorResponse(err.message, 500, "DB_ERROR", request, env);
   }
@@ -194,12 +306,46 @@ async function handleParticipate(request: Request, env: Env): Promise<Response> 
     const parts = url.pathname.split('/');
     const bountyId = parts[3]; // /api/bounties/:id/participate
     
+    const bounty = await env.DB.prepare("SELECT state FROM bounties WHERE id = ?")
+      .bind(bountyId)
+      .first<{ state: string }>();
+    if (!bounty) return errorResponse("Bounty not found", 404, "NOT_FOUND", request, env);
+    if (bounty.state !== "OPEN") {
+      return errorResponse("This bounty is not accepting new subscriptions", 409, "SUBSCRIPTION_LOCKED", request, env);
+    }
+
     await env.DB.prepare(`
       INSERT INTO bounty_participants (bounty_id, principal_id, joined_at)
       VALUES (?, ?, ?)
       ON CONFLICT DO NOTHING
     `).bind(bountyId, authUser.principal_id, Date.now()).run();
 
+    return jsonResponse({ success: true }, 200, request, env);
+  } catch (err: any) {
+    return errorResponse(err.message, 500, "DB_ERROR", request, env);
+  }
+}
+
+async function handleLeaveBounty(request: Request, env: Env): Promise<Response> {
+  const authUser = await getAuthenticatedUser(request, env);
+  if (!authUser) {
+    return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  }
+
+  try {
+    const parts = new URL(request.url).pathname.split("/");
+    const bountyId = parts[3];
+    const bounty = await env.DB.prepare("SELECT state FROM bounties WHERE id = ?")
+      .bind(bountyId)
+      .first<{ state: string }>();
+    if (!bounty) return errorResponse("Bounty not found", 404, "NOT_FOUND", request, env);
+    if (bounty.state !== "OPEN" && bounty.state !== "RUNNING") {
+      return errorResponse("Unsubscription is locked for this bounty", 409, "SUBSCRIPTION_LOCKED", request, env);
+    }
+
+    await env.DB.prepare(
+      "DELETE FROM bounty_participants WHERE bounty_id = ? AND principal_id = ?",
+    ).bind(bountyId, authUser.principal_id).run();
     return jsonResponse({ success: true }, 200, request, env);
   } catch (err: any) {
     return errorResponse(err.message, 500, "DB_ERROR", request, env);

@@ -1,8 +1,10 @@
 import Markdown from 'react-markdown';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { MOCK_BOUNTIES, getBountyScores } from './bountyData';
+import { getBountyScores, type Bounty } from './bountyData';
 import { useBountySubscriptions } from './useBountySubscriptions';
+import { useBounties } from './useBounties';
+import { bountyApi } from '../../../services/bountyApi';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Share2, Trophy, Users, CheckCircle2, Target, ExternalLink, AlertCircle } from 'lucide-react';
 
@@ -11,14 +13,38 @@ import { CategorySidebar } from '../../../components/CategorySidebar';
 export function BountyDetail(): React.ReactElement {
   const { bountyId } = useParams();
   const navigate = useNavigate();
-  const bounty = MOCK_BOUNTIES.find(b => b.id === bountyId);
-  const { isSubscribed, subscribe } = useBountySubscriptions();
+  const [bounty, setBounty] = useState<Bounty | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { bounties } = useBounties();
+  const { isSubscribed, subscribe, error: subscriptionError } = useBountySubscriptions();
 
-  if (!bounty) {
-    return <div style={{ padding: '40px' }}>Bounty not found.</div>;
+  useEffect(() => {
+    if (!bountyId) return;
+    let active = true;
+    setIsLoading(true);
+    setError(null);
+    bountyApi.get(bountyId)
+      .then((nextBounty) => {
+        if (active) setBounty(nextBounty);
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Could not load this bounty.');
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => { active = false; };
+  }, [bountyId]);
+
+  if (isLoading) {
+    return <div style={{ padding: '40px' }}>Loading bounty...</div>;
+  }
+  if (error || !bounty) {
+    return <div style={{ padding: '40px' }}>{error || 'Bounty not found.'}</div>;
   }
 
-  const isParticipated = isSubscribed(bounty.id);
+  const isParticipated = bounty.isSubscribed || isSubscribed(bounty.id);
   const scores = getBountyScores(bounty);
 
   const shareUrl = window.location.href;
@@ -66,7 +92,8 @@ export function BountyDetail(): React.ReactElement {
         
         {/* Left Sidebar (Desktop) / Top Slider (Mobile) */}
         <div className="lg:w-[260px] shrink-0 lg:sticky lg:top-[112px] h-fit">
-          <CategorySidebar 
+              <CategorySidebar
+            bounties={bounties}
             activeCategory={bounty.category} 
             onSelectCategory={(cat) => navigate((window.location.pathname.startsWith('/dashboard') ? '/dashboard/bounties' : '/bounties') + (cat === 'All' ? '' : '?category=' + encodeURIComponent(cat)))} 
           />
@@ -80,7 +107,7 @@ export function BountyDetail(): React.ReactElement {
             
             {/* Left side: Thumbnail/Video */}
             <div className="shrink-0 flex items-center justify-center bg-slate-900 border-b md:border-b-0 md:border-r border-[var(--portal-border)] w-full md:w-[320px] lg:w-[380px] xl:w-[420px]">
-              {bounty.videoUrl ? (
+              {bounty.videoUrl?.toLowerCase().endsWith('.mp4') ? (
                 <video 
                   src={bounty.videoUrl} 
                   controls
@@ -89,12 +116,16 @@ export function BountyDetail(): React.ReactElement {
                   loop
                   className="w-full aspect-video object-cover block"
                 />
-              ) : (
+              ) : bounty.videoUrl ? (
                 <img 
-                  src={`https://picsum.photos/seed/${bounty.id}/1920/1080`} 
+                  src={bounty.videoUrl}
                   alt={bounty.title}
                   className="w-full aspect-video object-cover block"
                 />
+              ) : (
+                <div className="w-full aspect-video grid place-items-center bg-[var(--portal-soft,#f4f0fb)]">
+                  <Target size={48} color="var(--portal-purple)" aria-hidden="true" />
+                </div>
               )}
             </div>
             
@@ -179,8 +210,11 @@ export function BountyDetail(): React.ReactElement {
                     Subscribed
                   </button>
                 ) : (
-                  <button 
-                    onClick={() => subscribe(bounty.id)}
+                  <button
+                    onClick={async () => {
+                      const didSubscribe = await subscribe(bounty.id);
+                      if (didSubscribe) setBounty((current) => current ? { ...current, isSubscribed: true, subscriptions: current.subscriptions + 1 } : current);
+                    }}
                     className="w-full sm:w-auto justify-center"
                     style={{
                       padding: '12px 28px',
@@ -201,6 +235,7 @@ export function BountyDetail(): React.ReactElement {
                     Participate Now
                   </button>
                 )}
+                {subscriptionError && <p role="alert" className="text-sm text-red-700 mt-2">{subscriptionError}</p>}
               </div>
             </div>
           </div>
@@ -307,28 +342,20 @@ export function BountyDetail(): React.ReactElement {
             )}
 
             {bounty.participants && (() => {
-              const myParticipant = { id: 'me', name: 'AlexTheDev (You)', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AlexTheDev' };
-              const participantList = isParticipated
-                ? [myParticipant, ...bounty.participants.filter(p => p.name !== 'AlexTheDev' && p.id !== 'me')]
-                : bounty.participants.filter(p => p.name !== 'AlexTheDev' && p.id !== 'me');
-
+              const participantList = bounty.participants;
               return (
                 <div>
                   <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Users size={18} color="var(--portal-muted)" /> Subscribed ({participantList.length})
                   </h3>
                   <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
-                    {participantList.map((creator, idx) => (
-                      <div key={idx} className="flex items-center gap-3">
+                    {participantList.map((creator) => (
+                      <div key={creator.id} className="flex items-center gap-3">
                         <img src={creator.avatar} alt={creator.name} className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
                         <span className="text-[13px] font-medium text-[var(--portal-ink)] truncate flex-1">{creator.name}</span>
-                        {creator.id === 'me' && (
-                          <span className="text-[10px] font-semibold bg-purple-50 text-[var(--portal-purple)] px-1.5 py-0.5 rounded border border-purple-200">
-                            You
-                          </span>
-                        )}
                       </div>
                     ))}
+                    {participantList.length === 0 && <p className="text-sm text-[var(--portal-muted)]">No subscribers yet.</p>}
                   </div>
                 </div>
               );

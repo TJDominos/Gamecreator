@@ -1,6 +1,6 @@
 import React from 'react';
 import { Gamepad2, LayoutDashboard, Dices, Music, Puzzle, Swords, Building2, Trophy, Map, Lightbulb, Type, LayoutGrid } from 'lucide-react';
-import { MOCK_BOUNTIES } from '../pages/dashboard/bounties/bountyData';
+import type { Bounty } from '../pages/dashboard/bounties/bountyData';
 
 export const CATEGORIES = [
   { name: 'Arcade', icon: Gamepad2 },
@@ -19,14 +19,15 @@ export const CATEGORIES = [
 interface CategorySidebarProps {
   activeCategory: string;
   onSelectCategory: (cat: string) => void;
+  bounties?: Bounty[];
 }
 
-export function CategorySidebar({ activeCategory, onSelectCategory }: CategorySidebarProps) {
+export function CategorySidebar({ activeCategory, onSelectCategory, bounties = [] }: CategorySidebarProps) {
   
   const getOpenCount = (catName: string) => {
-    return MOCK_BOUNTIES.filter(b => b.category === catName && b.state === 'OPEN').length;
+    return bounties.filter(b => b.category === catName && b.state === 'OPEN').length;
   };
-  const allOpenCount = MOCK_BOUNTIES.filter(b => b.state === 'OPEN').length;
+  const allOpenCount = bounties.filter(b => b.state === 'OPEN').length;
 
   return (
     <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 hide-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0">

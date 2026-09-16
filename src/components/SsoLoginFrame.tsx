@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 
 export function SsoLoginFrame(): React.ReactElement | null {
-  const { closeSsoFrame, isSignedIn, isSsoFrameOpen } = useAuth();
+  const { closeSsoFrame, isSsoFrameOpen } = useAuth();
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
   const [frameHeight, setFrameHeight] = useState(560);
   const [isFrameLoaded, setIsFrameLoaded] = useState(false);
@@ -19,12 +19,6 @@ export function SsoLoginFrame(): React.ReactElement | null {
     window.addEventListener("randseed:sso-target", handleTarget);
     return () => window.removeEventListener("randseed:sso-target", handleTarget);
   }, []);
-
-  useEffect(() => {
-    if (!isSsoFrameOpen || !isSignedIn) return;
-    setTargetUrl(null);
-    closeSsoFrame();
-  }, [closeSsoFrame, isSignedIn, isSsoFrameOpen]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {

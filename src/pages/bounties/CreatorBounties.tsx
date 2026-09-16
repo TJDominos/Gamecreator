@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Gamepad2, LayoutDashboard, Dices, Music, Puzzle, Swords, Building2, Trophy, Map, Lightbulb, Type, Users, LayoutGrid, CheckCircle2, Lock, Activity, Target } from 'lucide-react';
-import { MOCK_BOUNTIES } from '../dashboard/bounties/bountyData';
+import type { Bounty } from '../dashboard/bounties/bountyData';
 import { useBountySubscriptions } from '../dashboard/bounties/useBountySubscriptions';
+import { useBounties } from '../dashboard/bounties/useBounties';
 import { SiteHeader } from '../../components/SiteHeader';
 import { CategorySidebar } from '../../components/CategorySidebar';
 import '../guides/CreatorGuide.css';
@@ -19,7 +20,8 @@ export default function CreatorBounties() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState<string>(searchParams.get('category') || 'All');
   const [activeStatus, setActiveStatus] = useState<string>('All');
-  const { isSubscribed, subscribe } = useBountySubscriptions();
+  const { bounties, isLoading, error, reload } = useBounties();
+  const { isSubscribed, subscribe, error: subscriptionError } = useBountySubscriptions();
   
   useEffect(() => {
     const categoryQuery = searchParams.get('category');
@@ -41,15 +43,15 @@ export default function CreatorBounties() {
   };
 
   
-  const displayedBounties = MOCK_BOUNTIES.filter(b => {
+  const displayedBounties = bounties.filter(b => {
     const matchCategory = activeCategory === 'All' || b.category === activeCategory;
     const matchStatus = activeStatus === 'All' || b.state === activeStatus;
     return matchCategory && matchStatus;
   });
 
 
-  const renderTimeStatus = (bounty: typeof MOCK_BOUNTIES[0]) => {
-    const now = new Date('2026-08-30T00:00:00Z').getTime();
+  const renderTimeStatus = (bounty: Bounty) => {
+    const now = Date.now();
 
     const getDays = (targetDateStr?: string) => {
       if (!targetDateStr) return 0;
@@ -111,7 +113,7 @@ export default function CreatorBounties() {
         <div className="guide-sidebar">
           <nav className="guide-nav">
             <div className="guide-nav__section border-none !p-0 !bg-transparent">
-              <CategorySidebar activeCategory={activeCategory} onSelectCategory={handleCategoryChange} />
+              <CategorySidebar bounties={bounties} activeCategory={activeCategory} onSelectCategory={handleCategoryChange} />
             </div>
           </nav>
         </div>
@@ -144,8 +146,18 @@ export default function CreatorBounties() {
                 </button>
               ))}
             </div>
+            {subscriptionError && (
+              <div role="alert" style={{ marginTop: '16px', color: '#b91c1c', fontSize: '14px' }}>{subscriptionError}</div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginTop: '24px' }}>
-              {displayedBounties.map(bounty => {
+              {isLoading && <div style={{ padding: '48px', textAlign: 'center', color: 'var(--portal-muted)' }}>Loading bounties...</div>}
+              {error && !isLoading && (
+                <div role="alert" style={{ padding: '48px', textAlign: 'center', color: '#b91c1c' }}>
+                  <p>{error}</p>
+                  <button className="btn btn--outline" type="button" onClick={() => void reload()}>Retry</button>
+                </div>
+              )}
+              {!isLoading && !error && displayedBounties.map(bounty => {
                 const s = StateStyles[bounty.state];
                 const SIcon = s.icon;
                 const isOpen = bounty.state === 'OPEN';
@@ -158,12 +170,8 @@ export default function CreatorBounties() {
                     onClick={() => navigate(`/bounties/${bounty.id}`)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <div className="bounty-card-cover">
-                      <img 
-                        src={`https://picsum.photos/seed/${bounty.id}/640/360`}
-                        alt="Bounty Cover" 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
+                    <div className="bounty-card-cover" style={{ display: 'grid', placeItems: 'center', background: 'var(--portal-soft, #f4f0fb)' }}>
+                      <Target size={42} color="var(--portal-purple)" aria-hidden="true" />
                     </div>
                     
                     <div className="bounty-card-content">
@@ -264,7 +272,7 @@ export default function CreatorBounties() {
                 );
               })}
               
-              {displayedBounties.length === 0 && (
+              {!isLoading && !error && displayedBounties.length === 0 && (
                 <div style={{ padding: '48px', textAlign: 'center', color: 'var(--portal-muted)', background: '#f9f9f9', borderRadius: '12px', border: '1px dashed var(--portal-border)' }}>
                   No bounties available in this category.
                 </div>

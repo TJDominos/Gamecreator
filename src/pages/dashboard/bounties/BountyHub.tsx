@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Target, Trophy, Clock, PlayCircle, Lock, Users, Activity, UserMinus, ArrowRight, CheckCircle2, RotateCcw, Sparkles } from 'lucide-react';
-import { MOCK_BOUNTIES, BountyState, getBountyScores, canUnsubscribeFromBounty } from './bountyData';
+import { BountyState, getBountyScores, canUnsubscribeFromBounty } from './bountyData';
 import { useBountySubscriptions } from './useBountySubscriptions';
+import { useBounties } from './useBounties';
 
 const StateStyles: Record<BountyState, { bg: string; color: string; icon: any; label: string }> = {
   OPEN: { bg: '#e6f6ec', color: '#1e874b', icon: Clock, label: 'Open for Subscription' },
@@ -16,10 +17,11 @@ export function BountyHub(): React.ReactElement {
   const [filter, setFilter] = useState<BountyState | 'ALL'>('ALL');
   const [toastMessage, setToastMessage] = useState<{ id: string; title: string } | null>(null);
 
-  const { isSubscribed, unsubscribe, subscribe } = useBountySubscriptions();
+  const { bounties, isLoading, error, reload } = useBounties();
+  const { isSubscribed, unsubscribe, subscribe, error: subscriptionError } = useBountySubscriptions();
 
   // Bounties currently subscribed by the user
-  const myParticipatedBounties = MOCK_BOUNTIES.filter(b => isSubscribed(b.id));
+  const myParticipatedBounties = bounties.filter(b => b.isSubscribed || isSubscribed(b.id));
 
   const filtered =
     filter === 'ALL'
@@ -29,9 +31,11 @@ export function BountyHub(): React.ReactElement {
   // Group by category
   const categories = Array.from(new Set(filtered.map(b => b.category)));
 
-  const handleUnsubscribe = (bounty: { id: string; title: string }) => {
-    unsubscribe(bounty.id);
-    setToastMessage({ id: bounty.id, title: bounty.title });
+  const handleUnsubscribe = async (bounty: { id: string; title: string }) => {
+    if (await unsubscribe(bounty.id)) {
+      setToastMessage({ id: bounty.id, title: bounty.title });
+      await reload();
+    }
   };
 
   const handleUndo = () => {
@@ -44,6 +48,14 @@ export function BountyHub(): React.ReactElement {
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', paddingBottom: '48px' }}>
       {/* Toast notification for Unsubscribe with Undo */}
+      {isLoading && <div style={{ padding: '48px', textAlign: 'center', color: 'var(--portal-muted)' }}>Loading your bounties...</div>}
+      {error && !isLoading && (
+        <div role="alert" style={{ padding: '24px', marginBottom: '20px', color: '#b91c1c' }}>
+          <p>{error}</p>
+          <button className="btn btn--outline" type="button" onClick={() => void reload()}>Retry</button>
+        </div>
+      )}
+      {subscriptionError && <div role="alert" style={{ marginBottom: '20px', color: '#b91c1c' }}>{subscriptionError}</div>}
       {toastMessage && (
         <div
           style={{
@@ -201,7 +213,7 @@ export function BountyHub(): React.ReactElement {
       </div>
 
       {/* Bounty list grouped by category */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+      {!isLoading && !error && <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
         {categories.map(cat => (
           <div key={cat}>
             <h2
@@ -596,7 +608,7 @@ export function BountyHub(): React.ReactElement {
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

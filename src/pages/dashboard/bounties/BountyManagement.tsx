@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { TipTapEditor } from '../../../components/TipTapEditor';
 import { Target, Plus, Search, Filter, ShieldCheck, ArrowRight, ArrowLeft, Image as ImageIcon, Trash2, Upload, X, Loader2, AlertCircle, Save } from 'lucide-react';
-import { MOCK_BOUNTIES, Bounty, Category } from './bountyData';
+import { Bounty, Category } from './bountyData';
+import { mapBounty } from '../../../services/bountyApi';
 
 const countWords = (str: string) => str.trim().split(/\s+/).filter(Boolean).length;
 
@@ -17,13 +18,13 @@ export function BountyManagement(): React.ReactElement {
 
   const fetchBounties = async () => {
     try {
-      const token = localStorage.getItem("randseed_custom_token");
+      const token = localStorage.getItem("randseed_custom_jwt");
       const res = await fetch("/api/admin/bounties", {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.bounties) setBounties(data.bounties);
+        if (data.bounties) setBounties(data.bounties.map(mapBounty));
       }
     } catch (err) {
       console.error(err);
@@ -89,7 +90,7 @@ export function BountyManagement(): React.ReactElement {
     setIsUploadingCover(true);
 
     try {
-      const token = localStorage.getItem("randseed_custom_token");
+      const token = localStorage.getItem("randseed_custom_jwt");
       const formData = new FormData();
       formData.append('file', file);
       
@@ -152,7 +153,7 @@ export function BountyManagement(): React.ReactElement {
     }
     
     setLoading(true);
-    const token = localStorage.getItem("randseed_custom_token");
+    const token = localStorage.getItem("randseed_custom_jwt");
     const isEdit = !!selectedBounty;
     const url = isEdit ? `/api/admin/bounties/${selectedBounty.id}` : "/api/admin/bounties";
     const method = isEdit ? "PUT" : "POST";
@@ -165,7 +166,13 @@ export function BountyManagement(): React.ReactElement {
       },
       body: JSON.stringify(form)
     })
-    .then(res => res.json())
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || data.message || "Failed to save bounty");
+      }
+      return data;
+    })
     .then(() => {
       fetchBounties();
       lastSavedFormRef.current = form;
@@ -181,7 +188,7 @@ export function BountyManagement(): React.ReactElement {
       if (isAutoSave) {
         setAutoSaveStatus("Auto-save failed");
       } else {
-        alert("Failed to save bounty");
+        alert(err instanceof Error ? err.message : "Failed to save bounty");
       }
       setLoading(false);
     });
@@ -395,8 +402,8 @@ export function BountyManagement(): React.ReactElement {
               <tbody>
                 {(selectedBounty.participants?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) || []).map((p, index) => {
                    const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
-                   const isWinner = selectedBounty.winners?.find(w => w.creator.id === p.id);
-                   const isPublished = selectedBounty.publishedGames?.find(pub => pub.creator.id === p.id);
+                   const winner = selectedBounty.winners?.find(w => w.creator.id === p.id);
+                   const publishedGame = selectedBounty.publishedGames?.find(pub => pub.creator.id === p.id);
                    let status = 'Subscribed';
                    let statusColor = '#6b7280';
                    let statusBg = '#f3f4f6';
@@ -404,25 +411,25 @@ export function BountyManagement(): React.ReactElement {
                    let amount = '-';
                    let gameId = '-';
                    
-                   if (isWinner) {
+                   if (winner) {
                      status = 'Winner';
                      statusColor = '#9a3412';
                      statusBg = '#ffedd5';
-                     score = '85%';
-                     amount = selectedBounty.currency === 'USD' ? '$15,000' : '50,000 WLT';
-                     gameId = 'game_001_v3';
-                   } else if (isPublished) {
+                     score = winner.performanceScore?.toLocaleString() || '-';
+                     amount = winner.prize || '-';
+                     gameId = winner.gameId || '-';
+                   } else if (publishedGame) {
                      status = 'Published';
                      statusColor = '#1e874b';
                      statusBg = '#e6f6ec';
-                     score = '62%';
-                     amount = selectedBounty.currency === 'USD' ? '$2,500' : '10,000 WLT';
-                     gameId = 'game_014_v1';
+                     score = publishedGame.performanceScore?.toLocaleString() || '-';
+                     amount = publishedGame.prize || '-';
+                     gameId = publishedGame.gameId || '-';
                    }
 
-                   // Generate a mock join date based on index
-                   const joinDate = new Date(Date.now() - (absoluteIndex * 86400000) - (absoluteIndex * 3600000));
-                   const joinDateString = joinDate.toLocaleDateString() + ' ' + joinDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                   const joinDateString = p.joinedAt
+                     ? new Date(p.joinedAt).toLocaleString()
+                     : '-';
 
                    return (
                     <tr key={p.id} style={{ borderBottom: '1px solid var(--portal-border)' }}>
@@ -444,7 +451,7 @@ export function BountyManagement(): React.ReactElement {
                       <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600 }}>
                         {score}
                       </td>
-                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600, color: isWinner ? '#9a3412' : (isPublished ? '#1e874b' : 'inherit') }}>
+                      <td style={{ padding: '16px', fontSize: '14px', fontWeight: 600, color: winner ? '#9a3412' : (publishedGame ? '#1e874b' : 'inherit') }}>
                         {amount}
                       </td>
                       <td style={{ padding: '16px', fontSize: '13px', fontFamily: 'monospace' }}>

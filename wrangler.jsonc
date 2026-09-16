@@ -63,7 +63,7 @@
 				"IC_GATEWAY_URL": "https://ic0.app",
 				"WL_USER_CANISTER_ID": "b6m3r-zqaaa-aaaac-aacra-cai",
 				"MAIN_SITE_URL": "https://devcreator.randseed.org",
-				"ADMIN_EMAILS": "sns.bruce@gmail.com",
+				"ADMIN_EMAILS": "sns.bruce@gmail.com,tj@randseed.org",
 				"GITHUB_APP_SLUG": "RDcreatordev",
 				"SANDBOX_BASE_URL": "https://randseed.org",
 				"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org",
