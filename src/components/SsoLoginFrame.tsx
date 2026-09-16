@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 
 export function SsoLoginFrame(): React.ReactElement | null {
-  const { closeSsoFrame, isSsoFrameOpen } = useAuth();
+  const { closeSsoFrame, isSignedIn, isSsoFrameOpen } = useAuth();
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
   const [frameHeight, setFrameHeight] = useState(560);
   const [isFrameLoaded, setIsFrameLoaded] = useState(false);
@@ -21,6 +21,12 @@ export function SsoLoginFrame(): React.ReactElement | null {
   }, []);
 
   useEffect(() => {
+    if (!isSsoFrameOpen || !isSignedIn) return;
+    setTargetUrl(null);
+    closeSsoFrame();
+  }, [closeSsoFrame, isSignedIn, isSsoFrameOpen]);
+
+  useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
       if (event.origin !== new URL(targetUrl || window.location.href).origin) return;
       if (event.data?.type === "RANDSEED_SSO_RESIZE") {
@@ -36,8 +42,7 @@ export function SsoLoginFrame(): React.ReactElement | null {
         return;
       }
       if (
-        event.data?.type === "RANDSEED_SSO_SUCCESS"
-        || event.data?.type === "RANDSEED_SSO_CANCEL"
+        event.data?.type === "RANDSEED_SSO_CANCEL"
         || event.data?.type === "RANDSEED_SSO_FAILURE"
       ) {
         setTargetUrl(null);

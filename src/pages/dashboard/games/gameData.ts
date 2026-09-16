@@ -54,106 +54,24 @@ export interface Game {
   createdAt?: number;
 }
 
-export const INITIAL_GAMES: Game[] = [
-  { 
-    id: "g_101", 
-    name: "Neon Dash", 
-    status: "PUBLIC_ACTIVE", 
-    players: "1,204", 
-    version: "v1.2.0", 
-    visitors: "2,500", 
-    revenue: "$342.00", 
-    availableBalance: "$120.00", 
-    escrowedBalance: "$50.00",
-    profile: {
-      description: "A fast-paced neon cyberpunk platformer with dynamic synthwave music and procedural level generation. Avoid high-voltage hazards, chain momentum leaps, and climb global leaderboards.",
-      coverImage: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80",
-      animationUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-    },
-    repoInfo: {
-      repository: "TJDominos/Gamecreator",
-      branch: "main",
-      lastCommitSha: "a4f29cb",
-      lastCommitMessage: "Fix collision bugs and particle effects",
-      lastSyncedAt: "2 mins ago",
-      isSynced: true,
-      syncMethod: "github_action",
-      sandboxUrl: "https://randseed.org/g_101"
-    }
-  },
-  { 
-    id: "g_102", 
-    name: "Space Miner", 
-    status: "DEVELOPMENT", 
-    players: "12", 
-    version: "sandbox-a4f2", 
-    visitors: "20", 
-    revenue: "$0.00", 
-    availableBalance: "$45.50", 
-    escrowedBalance: "$0.00",
-    profile: {
-      description: "Deep space extraction simulator with realistic laser drilling physics and galactic trade economy. Manage asteroid claim permits and defend mining rigs.",
-      coverImage: "https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?w=600&auto=format&fit=crop&q=80",
-      animationUrl: ""
-    },
-    repoInfo: {
-      repository: "RandseedStudio/space-miner",
-      branch: "main",
-      lastCommitSha: "7b1c3a8",
-      lastCommitMessage: "Update laser drill physics",
-      lastSyncedAt: "15 mins ago",
-      isSynced: true,
-      syncMethod: "github_action",
-      sandboxUrl: "https://randseed.org/g_102"
-    }
-  },
-  { 
-    id: "g_999", 
-    name: "Cosmic Wars", 
-    status: "PENDING_REVIEW", 
-    players: "42", 
-    version: "rc-1.0", 
-    visitors: "100", 
-    revenue: "$0.00", 
-    availableBalance: "$0.00", 
-    escrowedBalance: "$0.00",
-    profile: {
-      description: "Tactical multiplayer fleet battle game built on decentralized state channels. Deploy dreadnoughts, capture hyperlanes, and outsmart opposing commanders.",
-      coverImage: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=600&auto=format&fit=crop&q=80",
-      animationUrl: ""
-    },
-    repoInfo: {
-      repository: "RandseedStudio/cosmic-wars",
-      branch: "release/1.0",
-      lastCommitSha: "9f0d1e2",
-      lastCommitMessage: "Initial release candidate audit",
-      lastSyncedAt: "2 hours ago",
-      isSynced: true,
-      syncMethod: "webhook",
-      sandboxUrl: "https://randseed.org/g_999"
-    }
-  }
-];
+const LEGACY_MOCK_GAME_IDS = new Set(["g_101", "g_102", "g_999"]);
 
 export const STORAGE_KEY = "randseed_creator_games";
 export const GAMES_UPDATED_EVENT = "randseed_games_updated";
 
 export function getStoredGames(): Game[] {
-  if (typeof window === "undefined") return INITIAL_GAMES;
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_GAMES));
-      return INITIAL_GAMES;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      return parsed.filter((game): game is Game => game && !LEGACY_MOCK_GAME_IDS.has(game.id));
     }
-    return INITIAL_GAMES;
+    return [];
   } catch (err) {
     console.error("Failed to load stored games", err);
-    return INITIAL_GAMES;
+    return [];
   }
 }
 
@@ -210,12 +128,11 @@ export function getNextNewGameName(): string {
 export async function syncGamesWithBackend(): Promise<Game[]> {
   try {
     const backendGames = await gameApi.getGames();
-    if (Array.isArray(backendGames) && backendGames.length > 0) {
-      saveStoredGames(backendGames);
-      return backendGames;
-    }
+    const games = Array.isArray(backendGames) ? backendGames : [];
+    saveStoredGames(games);
+    return games;
   } catch (err) {
-    console.warn("Backend games sync offline or unauthenticated, keeping local cache:", err);
+    console.warn("Backend games sync failed, keeping local cache:", err);
   }
   return getStoredGames();
 }
@@ -404,5 +321,3 @@ export function validateGameForPrivatePublish(game: Game): { valid: boolean; err
     errors
   };
 }
-
-export const MOCK_GAMES: Game[] = getStoredGames();

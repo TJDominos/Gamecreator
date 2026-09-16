@@ -56,13 +56,6 @@ const navigation = [
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-const dashboardStats = [
-  { label: "Games", value: "0", note: "Create your first game" },
-  { label: "Players today", value: "0", note: "No activity yet" },
-  { label: "30-day GMV", value: "$0.00", note: "Real-time estimate" },
-  { label: "Available balance", value: "$0.00", note: "Ready to withdraw" },
-];
-
 interface RouteGuardProps {
   children: React.ReactNode;
 }
@@ -445,13 +438,6 @@ function PortalShell(): React.ReactElement {
 }
 
 
-const mockGames = [
-  { id: "1", name: "Neon Dash", players: "1,204", visitors: "2,500", availableBalance: "$120.00", revenue: "$342.00", status: "Active" },
-  { id: "2", name: "Space Miner", players: "840", visitors: "1,120", availableBalance: "$45.50", revenue: "$128.50", status: "Active" },
-  { id: "3", name: "Puzzle Quest", players: "0", visitors: "0", availableBalance: "$0.00", revenue: "$0.00", status: "In Review" },
-];
-
-
 function getStatusStyles(status: string) {
   switch (status) {
     case 'PUBLIC_ACTIVE': return { background: '#e6f6ec', color: '#1e874b', borderColor: '#d1f0db' };
@@ -471,6 +457,15 @@ function formatBonus(value: number): string {
   if (value >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
   if (value >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
   return value.toFixed(2);
+}
+
+function parseGameMetric(value: string | undefined): number {
+  const parsed = Number((value || '').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatGameMetric(value: number): string {
+  return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 function Dashboard(): React.ReactElement {
@@ -495,6 +490,11 @@ function Dashboard(): React.ReactElement {
     window.addEventListener(GAMES_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(GAMES_UPDATED_EVENT, handleUpdate);
   }, []);
+
+  const totalPlayers = games.reduce((total, game) => total + parseGameMetric(game.players), 0);
+  const totalRevenue = games.reduce((total, game) => total + parseGameMetric(game.revenue), 0);
+  const availableBalance = games.reduce((total, game) => total + parseGameMetric(game.availableBalance), 0);
+  const escrowedBalance = games.reduce((total, game) => total + parseGameMetric(game.escrowedBalance), 0);
 
   const handleCreateGame = async () => {
     if (isCreatingGame) return;
@@ -530,18 +530,18 @@ function Dashboard(): React.ReactElement {
         </article>
         <article>
           <span>Players (Since Inception)</span>
-          <strong>0</strong>
-          <small>Visitors: 0</small>
+          <strong>{formatGameMetric(totalPlayers)}</strong>
+          <small>Visitors: {formatGameMetric(games.reduce((total, game) => total + parseGameMetric(game.visitors), 0))}</small>
         </article>
         <article>
           <span>Revenue Since Inception</span>
-          <strong>$0.00</strong>
+          <strong>${formatGameMetric(totalRevenue)}</strong>
           <small>Withdrawn: $0.00</small>
         </article>
         <article>
           <span>Available balance</span>
-          <strong>$0.00</strong>
-          <small>Gcoin: 0 | Bonus: {formatBonus(0)}</small>
+          <strong>${formatGameMetric(availableBalance)}</strong>
+          <small>Escrowed: ${formatGameMetric(escrowedBalance)} | Bonus: {formatBonus(0)}</small>
         </article>
       </section>
       <section className="portal-panel games-performance" style={{ marginTop: '24px' }}>
