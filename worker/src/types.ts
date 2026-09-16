@@ -10,7 +10,6 @@ export interface Env {
   IC_GATEWAY_URL?: string;
   WL_USER_CANISTER_ID?: string;
   MAIN_SITE_URL?: string;
-  SSO_REDIRECT_ORIGINS?: string;
   ADMIN_EMAILS?: string;
   CORS_ORIGINS?: string;
   GITHUB_APP_ID?: string;

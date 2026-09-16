@@ -27,25 +27,6 @@ interface UpdateProfilePayload {
   withdrawal_address?: string | null;
 }
 
-function isAllowedSsoRedirectOrigin(redirectUri: URL, env: Env): boolean {
-  const configuredOrigins = [
-    env.MAIN_SITE_URL,
-    ...(env.SSO_REDIRECT_ORIGINS || "").split(","),
-  ]
-    .map((origin) => origin?.trim())
-    .filter((origin): origin is string => Boolean(origin))
-    .map((origin) => {
-      try {
-        return new URL(origin).origin;
-      } catch {
-        return null;
-      }
-    })
-    .filter((origin): origin is string => Boolean(origin));
-
-  return configuredOrigins.includes(redirectUri.origin);
-}
-
 export async function handleAuthRoutes(
   request: Request,
   env: Env,
@@ -111,7 +92,7 @@ async function handleSsoExchange(
     let redirectUri: URL;
     try {
       redirectUri = new URL(body.redirect_uri);
-      if (!isAllowedSsoRedirectOrigin(redirectUri, env)) {
+      if (!env.MAIN_SITE_URL || redirectUri.origin !== new URL(env.MAIN_SITE_URL).origin) {
         return errorResponse("Invalid SSO redirect URI", 401, "INVALID_REDIRECT_URI", request, env);
       }
     } catch {
