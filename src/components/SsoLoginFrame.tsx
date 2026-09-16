@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 
 export function SsoLoginFrame(): React.ReactElement | null {
@@ -53,6 +54,11 @@ export function SsoLoginFrame(): React.ReactElement | null {
     return () => window.clearTimeout(slowConnectionTimer);
   }, [isFrameLoaded, targetUrl]);
 
+  const closeLoadingFrame = (): void => {
+    setTargetUrl(null);
+    closeSsoFrame();
+  };
+
   if (!isSsoFrameOpen || !targetUrl) return null;
 
   return (
@@ -63,6 +69,15 @@ export function SsoLoginFrame(): React.ReactElement | null {
             <span style={ssoLoadingDotStyle} />
             <strong>{isFrameSlow ? "Still connecting..." : "Opening secure sign-in..."}</strong>
             <span className="sso-loading-bar" style={ssoLoadingBarStyle}><span /></span>
+            <button
+              type="button"
+              aria-label="Close sign-in loading"
+              title="Close sign-in loading"
+              onClick={closeLoadingFrame}
+              style={frameLoadingCloseStyle}
+            >
+              <X size={18} strokeWidth={1.8} />
+            </button>
           </div>
         )}
         <iframe
@@ -95,6 +110,13 @@ const frameLoadingStyle: React.CSSProperties = {
   position: "absolute", inset: 0, zIndex: 1, display: "grid", placeItems: "center",
   alignContent: "center", gap: "14px", color: "#e2e8f0", background: "#101820",
   fontSize: "13px", fontFamily: "system-ui, sans-serif",
+};
+
+const frameLoadingCloseStyle: React.CSSProperties = {
+  position: "absolute", top: "14px", right: "14px", zIndex: 2, display: "grid",
+  placeItems: "center", width: "36px", height: "36px", padding: 0, border: 0,
+  borderRadius: "50%", color: "#e2e8f0", background: "rgba(255, 255, 255, 0.12)",
+  cursor: "pointer",
 };
 
 const ssoLoadingDotStyle: React.CSSProperties = {
