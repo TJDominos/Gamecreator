@@ -5,10 +5,12 @@ export function SsoLoginFrame(): React.ReactElement | null {
   const { closeSsoFrame, isSsoFrameOpen } = useAuth();
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
   const [frameHeight, setFrameHeight] = useState(560);
+  const [isFrameLoaded, setIsFrameLoaded] = useState(false);
 
   useEffect(() => {
     const handleTarget = (event: Event): void => {
       const target = (event as CustomEvent<string>).detail;
+      setIsFrameLoaded(false);
       setTargetUrl(typeof target === "string" ? target : null);
     };
     window.addEventListener("randseed:sso-target", handleTarget);
