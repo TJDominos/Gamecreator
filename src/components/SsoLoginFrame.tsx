@@ -108,14 +108,14 @@ const frameStyle: React.CSSProperties = {
 
 const frameLoadingStyle: React.CSSProperties = {
   position: "absolute", inset: 0, zIndex: 1, display: "grid", placeItems: "center",
-  alignContent: "center", gap: "14px", color: "#e2e8f0", background: "#101820",
+  alignContent: "center", gap: "14px", color: "#111827", background: "#fff",
   fontSize: "13px", fontFamily: "system-ui, sans-serif",
 };
 
 const frameLoadingCloseStyle: React.CSSProperties = {
   position: "absolute", top: "14px", right: "14px", zIndex: 2, display: "grid",
   placeItems: "center", width: "36px", height: "36px", padding: 0, border: 0,
-  borderRadius: "50%", color: "#e2e8f0", background: "rgba(255, 255, 255, 0.12)",
+  borderRadius: "50%", color: "#111827", background: "rgba(17, 24, 39, 0.08)",
   cursor: "pointer",
 };
 
@@ -127,5 +127,5 @@ const ssoLoadingDotStyle: React.CSSProperties = {
 
 const ssoLoadingBarStyle: React.CSSProperties = {
   width: "min(180px, 65vw)", height: "3px", overflow: "hidden", borderRadius: "99px",
-  background: "rgba(255, 255, 255, 0.16)",
+  background: "rgba(17, 24, 39, 0.14)",
 };
