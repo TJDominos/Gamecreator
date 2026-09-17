@@ -91,7 +91,7 @@ export function mapBounty(raw: RawBounty): Bounty {
     title: raw.title,
     description: raw.description,
     fullDescription: raw.full_description || undefined,
-    state: raw.state,
+    state: String(raw.state || "DRAFT").trim().toUpperCase() as BountyState,
     category: raw.category,
     prizePool: Number(raw.prize_pool || 0),
     currency: raw.currency,

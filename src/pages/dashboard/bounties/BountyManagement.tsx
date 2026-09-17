@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TipTapEditor } from '../../../components/TipTapEditor';
-import { Target, Plus, Search, Filter, ArrowRight, ArrowLeft, Trash2, Save, Edit2 } from 'lucide-react';
+import { Target, Plus, Search, ArrowRight, ArrowLeft, Trash2, Save, Edit2 } from 'lucide-react';
 import { Bounty, Category } from './bountyData';
 import { GAME_CATEGORIES } from '../games/gameData';
 import { bountyApi, mapBounty } from '../../../services/bountyApi';
@@ -25,14 +25,23 @@ export function BountyManagement(): React.ReactElement {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.bounties) {
-          const nextBounties = data.bounties.map(mapBounty);
+        const rawBounties = data.bounties || data.data?.bounties;
+        if (Array.isArray(rawBounties)) {
+          const nextBounties = rawBounties.map(mapBounty);
           setBounties(nextBounties);
           return nextBounties;
         }
+        throw new Error(data.error || data.message || 'Bounty list response was invalid');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || data.message || `Failed to load bounties (${res.status})`);
       }
     } catch (err) {
       console.error(err);
+      setToast({
+        message: err instanceof Error ? err.message : 'Failed to load bounties',
+        tone: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -536,7 +545,6 @@ export function BountyManagement(): React.ReactElement {
                   />
                 </div>
                 <div className="admin-bounty-tabs" role="tablist" aria-label="Bounty state">
-                  <Filter size={16} color="var(--portal-muted)" aria-hidden="true" />
                   {(['ACTIVE', 'CLOSED', 'DRAFT'] as const).map((tab) => (
                     <button
                       key={tab}
