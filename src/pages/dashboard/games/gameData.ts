@@ -22,7 +22,21 @@ export interface GameRepoInfo {
   sandboxUrl: string;
 }
 
-export type GameCategory = 'Arcade' | 'Card & Board' | 'Casino' | 'Music' | 'Puzzle' | 'Role-Playing' | 'Simulation' | 'Sports' | 'Strategy' | 'Trivia' | 'Word';
+export const GAME_CATEGORIES = [
+  'Arcade',
+  'Card & Board',
+  'Casino',
+  'Music',
+  'Puzzle',
+  'Role-Playing',
+  'Simulation',
+  'Sports',
+  'Strategy',
+  'Trivia',
+  'Word',
+] as const;
+
+export type GameCategory = typeof GAME_CATEGORIES[number];
 export type AgeRating = 'All Ages' | '18+' | 'NSFW';
 export type DeviceSupport = 'PC' | 'Mobile' | 'Responsive';
 

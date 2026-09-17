@@ -1,88 +1,115 @@
 import React from "react";
-import { Routes, Route, Navigate, NavLink, Outlet } from "react-router";
-import { LayoutDashboard, Gamepad2, Users, ArrowLeft } from "lucide-react";
+import { Routes, Route, Navigate, NavLink, Outlet, useLocation } from "react-router";
+import { LayoutDashboard, Gamepad2, Users, ArrowLeft, X } from "lucide-react";
 import { BountyManagement } from "./dashboard/bounties/BountyManagement";
 import { RequireAdmin } from "../auth/RequireAdmin";
 import { UserAdmin } from "./admin/UserAdmin";
+import { PortalHeader } from "../components/PortalHeader";
+import "./dashboard/DeveloperPortal.css";
 
 // Placeholders for the new admin pages
 function GameAdmin() {
   return (
-    <div style={{ padding: "32px 40px" }}>
-      <h1 style={{ fontSize: "24px", fontWeight: 700, margin: "0 0 8px 0" }}>Game Management</h1>
-      <p style={{ color: "#6b7280" }}>Manage all games on the platform.</p>
+    <div className="admin-page">
+      <header className="admin-page-header">
+        <h1 style={{ fontSize: "24px" }}>Game Management</h1>
+        <p>Manage all games on the platform.</p>
+      </header>
     </div>
   );
 }
 
 
 function AdminShell() {
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [sidebarPinned, setSidebarPinned] = React.useState(true);
+
+  React.useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  const pageName = location.pathname.endsWith("/gameadmin")
+    ? "Game Admin"
+    : location.pathname.endsWith("/users")
+      ? "User Roles"
+      : "Bounty Review";
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f9fafb" }}>
+    <div className="portal-layout admin-shell">
       {/* Sidebar */}
-      <aside style={{ width: "240px", background: "#111827", color: "#fff", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "24px 20px" }}>
-          <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>RandSeed Admin</h2>
+      <aside className={`portal-sidebar ${menuOpen ? "is-open" : ""} ${!sidebarPinned ? "is-unpinned" : ""}`}>
+        <div className="sidebar-heading">
+          <h2 className="portal-brand">RandSeed <b>Admin</b></h2>
+          <button
+            className="sidebar-close"
+            type="button"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X />
+          </button>
         </div>
         
-        <nav style={{ padding: "0 12px", display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
+        <nav className="portal-nav" aria-label="Admin Portal">
           <NavLink
             to="/admin/bountyadmin"
-            className={({ isActive }) => `admin-nav-link ${isActive ? "active" : ""}`}
-            style={({ isActive }) => ({
-              display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", 
-              borderRadius: "8px", color: isActive ? "#fff" : "#9ca3af", textDecoration: "none",
-              background: isActive ? "rgba(255,255,255,0.1)" : "transparent", transition: "all 0.2s"
-            })}
+            className={({ isActive }) => isActive ? "is-active" : ""}
           >
             <LayoutDashboard size={18} />
-            <span style={{ fontSize: "14px", fontWeight: 500 }}>Bounty Admin</span>
+            <span>Bounty Review</span>
           </NavLink>
           
           <NavLink
             to="/admin/gameadmin"
-            style={({ isActive }) => ({
-              display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", 
-              borderRadius: "8px", color: isActive ? "#fff" : "#9ca3af", textDecoration: "none",
-              background: isActive ? "rgba(255,255,255,0.1)" : "transparent", transition: "all 0.2s"
-            })}
           >
             <Gamepad2 size={18} />
-            <span style={{ fontSize: "14px", fontWeight: 500 }}>Game Admin</span>
+            <span>Game Admin</span>
           </NavLink>
 
           <NavLink
             to="/admin/users"
-            style={({ isActive }) => ({
-              display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", 
-              borderRadius: "8px", color: isActive ? "#fff" : "#9ca3af", textDecoration: "none",
-              background: isActive ? "rgba(255,255,255,0.1)" : "transparent", transition: "all 0.2s"
-            })}
+            className={({ isActive }) => isActive ? "is-active" : ""}
           >
             <Users size={18} />
-            <span style={{ fontSize: "14px", fontWeight: 500 }}>User Roles</span>
+            <span>User Roles</span>
           </NavLink>
         </nav>
 
-        <div style={{ padding: "20px" }}>
+        <div className="sidebar-help">
           <NavLink
-            to="/dashboard"
-            style={{
-              display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", 
-              borderRadius: "8px", color: "#9ca3af", textDecoration: "none",
-              transition: "color 0.2s"
-            }}
+            to="/"
+            className="sidebar-help-row"
           >
             <ArrowLeft size={16} />
-            <span style={{ fontSize: "13px" }}>Back to Portal</span>
+            <span>Back to Home</span>
           </NavLink>
         </div>
       </aside>
 
+      {menuOpen && (
+        <button
+          className="portal-scrim"
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
-      <main style={{ flex: 1, overflowY: "auto", background: "#f9fafb" }}>
-        <Outlet />
-      </main>
+      <div className={`portal-main ${!sidebarPinned ? "is-unpinned" : ""}`}>
+        <PortalHeader
+          pageName={pageName}
+          onMenuClick={() => {
+            if (window.innerWidth > 900) {
+              setSidebarPinned(!sidebarPinned);
+            } else {
+              setMenuOpen(true);
+            }
+          }}
+        />
+        <main className="portal-content">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

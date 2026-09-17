@@ -531,10 +531,15 @@ async function handleServeMedia(key: string, request: Request, env: Env): Promis
   }
 
   try {
-    const match = key.match(/^games\/([^/]+)\/media\/(?:cover|animation)_[^/]+\.[a-z0-9]+$/i);
-    if (!match) return errorResponse("Invalid media key", 400, "INVALID_MEDIA_KEY", request, env);
-    const game = await env.DB.prepare(`SELECT id FROM games WHERE id = ?`).bind(match[1]).first<{ id: string }>();
-    if (!game) return errorResponse("Media not found", 404, "NOT_FOUND", request, env);
+    const gameMatch = key.match(/^games\/([^/]+)\/media\/(?:cover|animation)_[^/]+\.[a-z0-9]+$/i);
+    const bountyMatch = key.match(/^bounties\/media_[a-f0-9]+\.[a-z0-9]+$/i);
+    if (!gameMatch && !bountyMatch) {
+      return errorResponse("Invalid media key", 400, "INVALID_MEDIA_KEY", request, env);
+    }
+    if (gameMatch) {
+      const game = await env.DB.prepare(`SELECT id FROM games WHERE id = ?`).bind(gameMatch[1]).first<{ id: string }>();
+      if (!game) return errorResponse("Media not found", 404, "NOT_FOUND", request, env);
+    }
 
     const object = await env.ARTIFACTS.get(key);
     if (!object) {

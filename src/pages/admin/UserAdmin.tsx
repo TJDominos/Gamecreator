@@ -110,10 +110,10 @@ export function UserAdmin(): React.ReactElement {
   };
 
   return (
-    <div style={{ padding: "32px 40px", maxWidth: "1000px" }}>
+    <div className="admin-page" style={{ maxWidth: "1000px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "32px" }}>
         <div>
-          <h1 style={{ fontSize: "24px", fontWeight: 700, margin: "0 0 8px 0" }}>User Permissions</h1>
+          <h1 style={{ fontSize: "24px" }}>User Permissions</h1>
           <p style={{ color: "#6b7280", margin: 0 }}>Manage system roles and administrator access.</p>
         </div>
       </div>
@@ -126,13 +126,13 @@ export function UserAdmin(): React.ReactElement {
             placeholder="User Email Address" 
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
-            style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "14px" }}
+            style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "12px" }}
             required
           />
           <select 
             value={newRole}
             onChange={(e) => setNewRole(e.target.value)}
-            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "14px", background: "#fff" }}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "12px", background: "#fff" }}
           >
             <option value="admin">Administrator</option>
             <option value="creator">Creator</option>

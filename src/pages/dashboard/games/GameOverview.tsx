@@ -1,23 +1,20 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Users, 
   Activity, 
   CircleDollarSign, 
   Bell, 
-  Upload, 
-  X, 
   Check, 
   AlertCircle, 
-  Video, 
-  Image as ImageIcon,
   CheckCircle2,
   ExternalLink,
   Loader2,
   Save
 } from "lucide-react";
+import { MediaUploadField } from "../../../components/MediaUploadField";
 import { Link, useParams, useOutletContext } from "react-router";
 import { GameStatus, StatusLabels } from "./GameConsole";
-import { getGameById, updateGame, GAMES_UPDATED_EVENT } from "./gameData";
+import { GAME_CATEGORIES, getGameById, updateGame, GAMES_UPDATED_EVENT } from "./gameData";
 import { gameApi } from "../../../services/gameApi";
 
 export function GameOverview(): React.ReactElement {
@@ -42,14 +39,7 @@ export function GameOverview(): React.ReactElement {
   const [animSuccess, setAnimSuccess] = useState(false);
   const [metaSuccess, setMetaSuccess] = useState(false);
 
-  // Media upload progress states
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [isUploadingAnimation, setIsUploadingAnimation] = useState(false);
-
   const [formErrors, setFormErrors] = useState<{ description?: string; coverImage?: string; animation?: string; meta?: string }>({});
-
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // Sync when gameId or storage updates
   useEffect(() => {
@@ -74,102 +64,14 @@ export function GameOverview(): React.ReactElement {
   const wordCount = description.trim() ? description.trim().split(/\s+/).length : 0;
   const isWordCountExceeded = wordCount > 500;
 
-  // Handle production image upload with 1MB limit and 400x400 recommendation
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !gameId) return;
-
-    if (file.size > 1 * 1024 * 1024) {
-      setFormErrors(prev => ({
-        ...prev,
-        coverImage: `File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds the 1 MB limit.`
-      }));
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setFormErrors(prev => ({
-        ...prev,
-        coverImage: "Only image files (PNG, JPEG, WebP, GIF) are supported."
-      }));
-      return;
-    }
-
-    setFormErrors(prev => ({ ...prev, coverImage: undefined }));
-    setIsUploadingCover(true);
-
-    try {
-      const result = await gameApi.uploadMedia(gameId, file, 'cover');
-      if (result.url) {
-        setCoverImage(result.url);
-      }
-    } catch (err) {
-      // Fallback: local FileReader dataUrl preview if network upload is unavailable
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setCoverImage(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
-      setFormErrors(prev => ({
-        ...prev,
-        coverImage: err instanceof Error ? err.message : "Cloud upload failed, using local preview"
-      }));
-    } finally {
-      setIsUploadingCover(false);
-      if (e.target) e.target.value = '';
-    }
+  const uploadGameCover = (file: File) => {
+    if (!gameId) return Promise.reject(new Error("Game is not selected"));
+    return gameApi.uploadMedia(gameId, file, "cover");
   };
 
-  // Handle production video upload with 10MB limit and MP4 format check
-  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !gameId) return;
-
-    // Check format
-    if (!file.type.includes('mp4') && !file.name.toLowerCase().endsWith('.mp4')) {
-      setFormErrors(prev => ({
-        ...prev,
-        animation: "Invalid format. Only MP4 videos are supported."
-      }));
-      return;
-    }
-
-    // Check size limit (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setFormErrors(prev => ({
-        ...prev,
-        animation: `Video size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds the 10 MB limit.`
-      }));
-      return;
-    }
-
-    setFormErrors(prev => ({ ...prev, animation: undefined }));
-    setIsUploadingAnimation(true);
-
-    try {
-      const result = await gameApi.uploadMedia(gameId, file, 'animation');
-      if (result.url) {
-        setAnimationUrl(result.url);
-      }
-    } catch (err) {
-      // Fallback: local FileReader dataUrl preview if network upload is unavailable
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setAnimationUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
-      setFormErrors(prev => ({
-        ...prev,
-        animation: err instanceof Error ? err.message : "Cloud upload failed, using local preview"
-      }));
-    } finally {
-      setIsUploadingAnimation(false);
-      if (e.target) e.target.value = '';
-    }
+  const uploadGameAnimation = (file: File) => {
+    if (!gameId) return Promise.reject(new Error("Game is not selected"));
+    return gameApi.uploadMedia(gameId, file, "animation");
   };
 
   // --- Independent Save Handlers ---
@@ -475,17 +377,9 @@ export function GameOverview(): React.ReactElement {
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: formErrors.meta && !category ? '1px solid #ef4444' : '1px solid #dcd7e0', fontSize: '13px', background: '#fff' }}
                   >
                     <option value="" disabled>Select category...</option>
-                    <option value="Arcade">Arcade</option>
-                    <option value="Card & Board">Card & Board</option>
-                    <option value="Casino">Casino</option>
-                    <option value="Music">Music</option>
-                    <option value="Puzzle">Puzzle</option>
-                    <option value="Role-Playing">Role-Playing</option>
-                    <option value="Simulation">Simulation</option>
-                    <option value="Sports">Sports</option>
-                    <option value="Strategy">Strategy</option>
-                    <option value="Trivia">Trivia</option>
-                    <option value="Word">Word</option>
+                    {GAME_CATEGORIES.map((gameCategory) => (
+                      <option key={gameCategory} value={gameCategory}>{gameCategory}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -657,108 +551,24 @@ export function GameOverview(): React.ReactElement {
                   </div>
                 </div>
 
-                {isUploadingCover ? (
-                  <div style={{ padding: '36px 16px', textAlign: 'center', background: '#fff', borderRadius: '8px', border: '1px dashed var(--portal-purple)', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                    <Loader2 size={24} className="animate-spin" color="var(--portal-purple)" />
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--portal-purple)' }}>Uploading to Cloud Storage...</span>
-                    <span style={{ fontSize: '11px', color: 'var(--portal-muted)' }}>Generating CDN public URL</span>
-                  </div>
-                ) : coverImage ? (
-                  <div style={{ padding: '12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
-                      <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #d1d5db', background: '#000', flexShrink: 0 }}>
-                        <img 
-                          src={coverImage} 
-                          alt="Cover preview" 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/400x400?text=Invalid+Image';
-                          }}
-                        />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Cover Ready</div>
-                        <div style={{ fontSize: '11px', color: 'var(--portal-muted)', wordBreak: 'break-all', marginTop: '2px' }}>
-                          {coverImage.startsWith('data:') ? 'Local preview' : coverImage.slice(0, 45) + (coverImage.length > 45 ? '...' : '')}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        type="button" 
-                        onClick={() => imageInputRef.current?.click()}
-                        style={{ padding: '6px 10px', fontSize: '12px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <Upload size={12} /> Replace
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => setCoverImage('')}
-                        style={{ padding: '6px 10px', fontSize: '12px', background: '#fff', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <X size={12} /> Remove
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div 
-                    onClick={() => imageInputRef.current?.click()}
-                    style={{ 
-                      border: formErrors.coverImage ? '2px dashed #ef4444' : '2px dashed #d1d5db', 
-                      borderRadius: '8px', 
-                      padding: '24px 16px', 
-                      textAlign: 'center', 
-                      cursor: 'pointer',
-                      background: '#fff',
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--portal-purple)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = formErrors.coverImage ? '#ef4444' : '#d1d5db')}
-                  >
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--portal-purple-soft)', color: 'var(--portal-purple)', display: 'grid', placeItems: 'center', marginBottom: '8px' }}>
-                      <ImageIcon size={20} />
-                    </div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', marginBottom: '2px' }}>
-                      Upload Cover Image
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--portal-muted)' }}>
-                      PNG, JPG, WebP up to 1 MB
-                    </div>
-                  </div>
-                )}
-
-                <input 
-                  ref={imageInputRef} 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleImageUpload} 
-                  style={{ display: 'none' }} 
+                <MediaUploadField
+                  value={coverImage}
+                  onChange={setCoverImage}
+                  onError={(coverImageError) => setFormErrors((previous) => ({ ...previous, coverImage: coverImageError }))}
+                  error={formErrors.coverImage}
+                  label="Cover Image"
+                  helperText="Recommended 400×400px · PNG, JPG, WebP, or GIF · Max 1 MB"
+                  emptyLabel="Upload Cover Image"
+                  accept="image/*"
+                  mediaKind="image"
+                  maxBytes={1 * 1024 * 1024}
+                  uploadFile={uploadGameCover}
+                  allowLocalPreview
+                  allowUrlInput
+                  urlPlaceholder="Or paste image URL"
+                  previewAspectRatio="1 / 1"
+                  showLabel={false}
                 />
-
-                {/* Alternative URL input */}
-                <div style={{ marginTop: '8px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Or paste image URL" 
-                    value={coverImage.startsWith('data:') ? '' : coverImage} 
-                    onChange={(e) => {
-                      setCoverImage(e.target.value);
-                      if (formErrors.coverImage) setFormErrors(prev => ({ ...prev, coverImage: undefined }));
-                    }}
-                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #dcd7e0', borderRadius: '6px', fontSize: '12px' }}
-                  />
-                </div>
-
-                {formErrors.coverImage && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontSize: '11px', marginTop: '6px' }}>
-                    <AlertCircle size={12} /> {formErrors.coverImage}
-                  </div>
-                )}
               </div>
 
               {/* Right Column: Game Animation (Optional, 480x480, max 10MB, MP4, Independent Save) */}
@@ -811,104 +621,24 @@ export function GameOverview(): React.ReactElement {
                   </div>
                 </div>
 
-                {isUploadingAnimation ? (
-                  <div style={{ padding: '36px 16px', textAlign: 'center', background: '#fff', borderRadius: '8px', border: '1px dashed var(--portal-purple)', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                    <Loader2 size={24} className="animate-spin" color="var(--portal-purple)" />
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--portal-purple)' }}>Uploading to Cloud Storage...</span>
-                    <span style={{ fontSize: '11px', color: 'var(--portal-muted)' }}>Processing MP4 stream</span>
-                  </div>
-                ) : animationUrl ? (
-                  <div style={{ padding: '12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
-                      <div style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #d1d5db', background: '#000', flexShrink: 0 }}>
-                        <video 
-                          src={animationUrl} 
-                          controls 
-                          muted 
-                          loop 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>Animation Ready</div>
-                        <div style={{ fontSize: '11px', color: 'var(--portal-muted)', wordBreak: 'break-all', marginTop: '2px' }}>
-                          {animationUrl.startsWith('data:') ? 'Local MP4 preview' : animationUrl.slice(0, 45) + (animationUrl.length > 45 ? '...' : '')}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        type="button" 
-                        onClick={() => videoInputRef.current?.click()}
-                        style={{ padding: '6px 10px', fontSize: '12px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <Upload size={12} /> Replace
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => setAnimationUrl('')}
-                        style={{ padding: '6px 10px', fontSize: '12px', background: '#fff', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <X size={12} /> Remove
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div 
-                    onClick={() => videoInputRef.current?.click()}
-                    style={{ 
-                      border: formErrors.animation ? '2px dashed #ef4444' : '2px dashed #d1d5db', 
-                      borderRadius: '8px', 
-                      padding: '24px 16px', 
-                      textAlign: 'center', 
-                      cursor: 'pointer',
-                      background: '#fff',
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--portal-purple)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = formErrors.animation ? '#ef4444' : '#d1d5db')}
-                  >
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#ede9fe', color: 'var(--portal-purple)', display: 'grid', placeItems: 'center', marginBottom: '8px' }}>
-                      <Video size={20} />
-                    </div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', marginBottom: '2px' }}>
-                      Upload MP4 Video
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--portal-muted)' }}>
-                      MP4 video only, up to 10 MB
-                    </div>
-                  </div>
-                )}
-
-                <input 
-                  ref={videoInputRef} 
-                  type="file" 
-                  accept="video/mp4,video/*" 
-                  onChange={handleVideoUpload} 
-                  style={{ display: 'none' }} 
+                <MediaUploadField
+                  value={animationUrl}
+                  onChange={setAnimationUrl}
+                  onError={(animationError) => setFormErrors((previous) => ({ ...previous, animation: animationError }))}
+                  error={formErrors.animation}
+                  label="Game Animation"
+                  helperText="Recommended 480×480px · MP4 only · Max 10 MB"
+                  emptyLabel="Upload MP4 Video"
+                  accept="video/mp4"
+                  mediaKind="video"
+                  maxBytes={10 * 1024 * 1024}
+                  uploadFile={uploadGameAnimation}
+                  allowLocalPreview
+                  allowUrlInput
+                  urlPlaceholder="Or paste MP4 video URL"
+                  previewAspectRatio="1 / 1"
+                  showLabel={false}
                 />
-
-                {/* Alternative video URL */}
-                <div style={{ marginTop: '8px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Or paste MP4 video URL" 
-                    value={animationUrl.startsWith('data:') ? '' : animationUrl} 
-                    onChange={(e) => setAnimationUrl(e.target.value)}
-                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #dcd7e0', borderRadius: '6px', fontSize: '12px' }}
-                  />
-                </div>
-
-                {formErrors.animation && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontSize: '11px', marginTop: '6px' }}>
-                    <AlertCircle size={12} /> {formErrors.animation}
-                  </div>
-                )}
               </div>
             </div>
           </div>

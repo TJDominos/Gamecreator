@@ -12,14 +12,14 @@ export async function handleBountyRoutes(request: Request, env: Env): Promise<Re
   if (url.pathname === "/api/admin/bounties" && request.method === "POST") {
     return handleCreateBounty(request, env);
   }
+  if (url.pathname === "/api/admin/bounties/media" && request.method === "PUT") {
+    return handleUploadMedia(request, env);
+  }
   if (url.pathname.startsWith("/api/admin/bounties/") && request.method === "PUT") {
     return handleUpdateBounty(request, env);
   }
   if (url.pathname.startsWith("/api/admin/bounties/") && request.method === "DELETE") {
     return handleDeleteBounty(request, env);
-  }
-  if (url.pathname === "/api/admin/bounties/media" && request.method === "PUT") {
-    return handleUploadMedia(request, env);
   }
 
   // Public/Creator routes
@@ -120,7 +120,7 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
 
     await env.DB.prepare(`
       UPDATE bounties SET 
-        title = ?, description = ?, full_description = ?, state = ?, category = ?, 
+        title = ?, description = ?, full_description = ?, state = COALESCE(?, state), category = ?,
         prize_pool = ?, currency = ?, tags = ?, deadline = ?, battle_end = ?, video_url = ?, 
         updated_at = ?
       WHERE id = ?
@@ -392,16 +392,18 @@ async function handleUploadMedia(request: Request, env: Env): Promise<Response> 
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("")
       .substring(0, 16);
-    const ext = mimeType === "video/mp4" ? "mp4" : mimeType.split("/")[1] || "png";
+    if (!env.ARTIFACTS) {
+      return errorResponse("Artifact storage is not configured", 503, "STORAGE_UNAVAILABLE", request, env);
+    }
+
+    const ext = mimeType === "video/mp4" ? "mp4" : mimeType.split("/")[1]?.replace("+xml", "") || "png";
     const objectKey = `bounties/media_${fileHash}.${ext}`;
 
-    await env.R2.put(objectKey, fileBuffer, {
+    await env.ARTIFACTS.put(objectKey, fileBuffer, {
       httpMetadata: { contentType: mimeType },
     });
 
-    const publicUrl = env.STORAGE_PUBLIC_URL 
-      ? `${env.STORAGE_PUBLIC_URL}/${objectKey}` 
-      : `/${objectKey}`;
+    const publicUrl = `/api/media/${encodeURIComponent(objectKey)}`;
 
     return jsonResponse({ success: true, url: publicUrl }, 200, request, env);
   } catch (err: any) {

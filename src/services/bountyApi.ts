@@ -108,6 +108,22 @@ export function mapBounty(raw: RawBounty): Bounty {
 }
 
 export const bountyApi = {
+  async uploadMedia(file: File): Promise<{ url: string }> {
+    const token = localStorage.getItem("randseed_custom_jwt");
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch("/api/admin/bounties/media", {
+      method: "PUT",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.success === false || !payload.url) {
+      throw new Error(payload.error || payload.message || `Upload failed with status ${response.status}`);
+    }
+    return { url: payload.url };
+  },
+
   async list(): Promise<Bounty[]> {
     const response = await request<{ success: boolean; bounties: RawBounty[] }>("/api/bounties");
     return (response.bounties || []).map(mapBounty);

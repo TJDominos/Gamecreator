@@ -418,6 +418,66 @@
   width: 16px;
 }
 
+.admin-bounty-page__inner {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.admin-shell {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-shell .portal-brand {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.admin-page {
+  padding: 32px 40px;
+}
+
+.admin-page h1,
+.admin-page-header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(32px, 4vw, 46px);
+  letter-spacing: -0.05em;
+}
+
+.admin-page p,
+.admin-page-header p {
+  margin: 8px 0 0;
+  color: var(--portal-muted);
+  font-size: 13px;
+}
+
+.admin-shell .portal-sidebar {
+  width: 270px;
+}
+
+.admin-shell .portal-main {
+  background: #f7f6f8;
+}
+
+.admin-shell .sidebar-help {
+  padding: 13px;
+}
+
+.admin-shell .sidebar-help-row {
+  align-items: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.admin-shell .sidebar-help-row:hover {
+  color: #fff;
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -664,7 +724,8 @@
 }
 
 .field input:not([type="file"]),
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   padding: 11px 12px;
   color: var(--portal-ink);
@@ -682,9 +743,16 @@
 }
 
 .field input:focus,
-.field textarea:focus {
+.field textarea:focus,
+.field select:focus {
   border-color: var(--portal-purple);
   box-shadow: 0 0 0 3px rgba(97, 54, 154, 0.1);
+}
+
+.admin-bounty-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
 }
 
 .field small {
@@ -839,7 +907,8 @@
 
   .stat-grid,
   .dashboard-grid,
-  .onboarding-form {
+  .onboarding-form,
+  .admin-bounty-form {
     grid-template-columns: 1fr;
   }
 

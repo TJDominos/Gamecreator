@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { TipTapEditor } from '../../../components/TipTapEditor';
-import { Target, Plus, Search, Filter, ShieldCheck, ArrowRight, ArrowLeft, Image as ImageIcon, Trash2, Upload, X, Loader2, AlertCircle, Save } from 'lucide-react';
+import { Target, Plus, Search, Filter, ArrowRight, ArrowLeft, Trash2, Save } from 'lucide-react';
 import { Bounty, Category } from './bountyData';
-import { mapBounty } from '../../../services/bountyApi';
+import { GAME_CATEGORIES } from '../games/gameData';
+import { bountyApi, mapBounty } from '../../../services/bountyApi';
+import { MediaUploadField } from '../../../components/MediaUploadField';
 
 const countWords = (str: string) => str.trim().split(/\s+/).filter(Boolean).length;
-
-const CATEGORIES: Category[] = ['Casino', 'Puzzle', 'Card & Board', 'Simulation', 'Arcade', 'Strategy', 'Word', 'Trivia', 'Role-Playing', 'Sports', 'Music'];
 
 export function BountyManagement(): React.ReactElement {
   const [bounties, setBounties] = useState<Bounty[]>([]);
@@ -47,10 +47,10 @@ export function BountyManagement(): React.ReactElement {
     examples: [{ type: 'image', name: '', url: '', thumbnail: '' }] as { type: string; name?: string; url: string; thumbnail: string; }[]
   });
 
-  const imageInputRef = React.useRef<HTMLInputElement>(null);
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [formErrors, setFormErrors] = useState<{ coverImage?: string }>({});
+  const [formErrors, setFormErrors] = useState<{ thumbnail?: string }>({});
   const [autoSaveStatus, setAutoSaveStatus] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = React.useRef(false);
   
   const lastSavedFormRef = React.useRef(form);
   const formRef = React.useRef(form);
@@ -59,75 +59,14 @@ export function BountyManagement(): React.ReactElement {
     formRef.current = form;
   }, [form]);
 
-  // Auto-save logic
-  React.useEffect(() => {
-    if (view === 'edit' && selectedBounty) {
-      // 3 minutes = 180000 ms
-      const intervalId = setInterval(() => {
-        if (JSON.stringify(formRef.current) !== JSON.stringify(lastSavedFormRef.current)) {
-           handleSave(true);
-        }
-      }, 180000);
-      return () => clearInterval(intervalId);
-    }
-  }, [view, selectedBounty]);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-      setFormErrors(prev => ({ ...prev, coverImage: "File size exceeds the 10 MB limit." }));
-      return;
-    }
-
-    if (!file.type.startsWith('image/') && file.type !== 'video/mp4') {
-      setFormErrors(prev => ({ ...prev, coverImage: "Only PNG, JPEG, WebP, and MP4 files are supported." }));
-      return;
-    }
-
-    setFormErrors(prev => ({ ...prev, coverImage: undefined }));
-    setIsUploadingCover(true);
-
-    try {
-      const token = localStorage.getItem("randseed_custom_jwt");
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const res = await fetch("/api/admin/bounties/media", {
-        method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` },
-        body: formData
-      });
-      
-      const result = await res.json();
-      if (result.url) {
-        setForm({...formRef.current, thumbnailUrl: result.url});
-      } else {
-        throw new Error(result.error || "Upload failed");
-      }
-    } catch (err) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setForm({...formRef.current, thumbnailUrl: reader.result});
-        }
-      };
-      reader.readAsDataURL(file);
-      setFormErrors(prev => ({ ...prev, coverImage: err instanceof Error ? err.message : "Cloud upload failed, using local preview" }));
-    } finally {
-      setIsUploadingCover(false);
-    }
-  };
-
   const handleEdit = (b: Bounty) => {
     setSelectedBounty(b);
-    setForm({
+    const nextForm = {
       title: b.title,
       category: b.category,
       shortDesc: b.description,
       fullDesc: b.fullDescription || '',
-      thumbnailUrl: '', // Mock data doesn't have it directly mapped to a thumbnail field on root yet
+      thumbnailUrl: b.videoUrl || '',
       poolAmount: b.prizePool,
       currency: b.currency,
       maxParticipants: 100, // Default mock
@@ -136,11 +75,15 @@ export function BountyManagement(): React.ReactElement {
       distributionDate: b.battleEnd ? b.battleEnd.split('T')[0] : '',
       settlementRules: 'Default Distribution Algorithm',
       examples: b.examples ? b.examples.map(ex => ({ type: 'web', url: ex.url, thumbnail: ex.thumbnail })) : []
-    });
+    };
+    setForm(nextForm);
+    formRef.current = nextForm;
+    lastSavedFormRef.current = nextForm;
     setView('edit');
   };
 
-  const handleSave = (isAutoSave: boolean = false) => {
+  const handleSave = async (isAutoSave: boolean = false, stateOverride?: string) => {
+    if (savingRef.current) return;
     if (isAutoSave) setAutoSaveStatus("Saving...");
     // Word limit checks
     if (form.title.split(' ').length > 10) {
@@ -152,46 +95,58 @@ export function BountyManagement(): React.ReactElement {
       return;
     }
     
-    setLoading(true);
+    savingRef.current = true;
+    setIsSaving(true);
     const token = localStorage.getItem("randseed_custom_jwt");
     const isEdit = !!selectedBounty;
     const url = isEdit ? `/api/admin/bounties/${selectedBounty.id}` : "/api/admin/bounties";
     const method = isEdit ? "PUT" : "POST";
-    
-    fetch(url, {
-      method,
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(form)
-    })
-    .then(async res => {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ ...form, state: stateOverride || selectedBounty?.state || "OPEN" })
+      });
       const data = await res.json();
       if (!res.ok || data.success === false) {
         throw new Error(data.error || data.message || "Failed to save bounty");
       }
-      return data;
-    })
-    .then(() => {
-      fetchBounties();
+      await fetchBounties();
       lastSavedFormRef.current = form;
       if (isAutoSave) {
         setAutoSaveStatus("Saved at " + new Date().toLocaleTimeString());
-        setLoading(false);
       } else {
         setView('list');
       }
-    })
-    .catch(err => {
+    } catch (err) {
       console.error(err);
       if (isAutoSave) {
         setAutoSaveStatus("Auto-save failed");
       } else {
         alert(err instanceof Error ? err.message : "Failed to save bounty");
       }
-      setLoading(false);
-    });
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (view !== 'edit' || !selectedBounty || JSON.stringify(form) === JSON.stringify(lastSavedFormRef.current)) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => void handleSave(true), 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, [form, view, selectedBounty]);
+
+  const handleCancelBounty = () => {
+    if (!selectedBounty || selectedBounty.state === 'CLOSED') return;
+    if (window.confirm(`Cancel bounty "${selectedBounty.title}"? This will close participation and cannot be undone.`)) {
+      void handleSave(false, 'CLOSED');
+    }
   };
 
   const filteredBounties = bounties.filter(b => {
@@ -201,17 +156,16 @@ export function BountyManagement(): React.ReactElement {
   });
 
   return (
-    <div style={{ background: '#f9fafb', minHeight: '100vh', padding: '32px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="admin-bounty-page">
+      <div className="admin-bounty-page__inner">
         
         {/* Header */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+          <header className="admin-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ fontSize: '24px', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <ShieldCheck size={28} color="var(--portal-purple)" />
-              Platform Admin - Bounty Management
+            <h1 style={{ fontSize: '24px', margin: '0 0 8px' }}>
+              Bounty Management
             </h1>
-            <p style={{ color: 'var(--portal-muted)', margin: 0, fontSize: '14px' }}>
+            <p style={{ color: 'var(--portal-muted)', margin: 0 }}>
               Create, modify, and finalize Creator Bounties.
             </p>
           </div>
@@ -228,7 +182,7 @@ export function BountyManagement(): React.ReactElement {
                 });
                 setView('create');
               }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', background: '#111827', border: 'none', borderRadius: '8px', padding: '10px 16px', fontWeight: 700, cursor: 'pointer' }}
             >
               <Plus size={16} /> Create New Bounty
             </button>
@@ -241,33 +195,56 @@ export function BountyManagement(): React.ReactElement {
               <ArrowLeft size={16} /> Back to List
             </button>
             <h2 style={{ fontSize: '20px', margin: '0 0 24px' }}>{view === 'create' ? 'Create New Bounty' : 'Edit Bounty'}</h2>
+            <div style={{ position: 'sticky', top: '12px', zIndex: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', padding: '10px 12px', marginBottom: '24px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 14px rgba(17, 24, 39, 0.08)' }}>
+              <span style={{ marginRight: 'auto', color: '#6b7280', fontSize: '12px' }} aria-live="polite">
+                {view === 'edit' ? (autoSaveStatus || 'Changes save automatically') : 'Complete the form before publishing'}
+              </span>
+              <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '10px 16px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
+              <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} style={{ padding: '10px 18px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>
+                {isSaving ? 'Saving...' : view === 'create' ? 'Publish Bounty' : 'Save Changes'}
+              </button>
+            </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div className="admin-bounty-form">
               
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Bounty Title <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Max 10 words)</small></span>
-                <input type="text" value={form.title} onChange={e => { if (countWords(e.target.value) <= 10 || e.target.value.length < form.title.length) setForm({...form, title: e.target.value}) }} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <span style={{ fontWeight: 600 }}>Bounty Title <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Max 10 words)</small></span>
+                <input type="text" value={form.title} onChange={e => { if (countWords(e.target.value) <= 10 || e.target.value.length < form.title.length) setForm({...form, title: e.target.value}) }} />
               </div>
               
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Game Category</span>
-                <select value={form.category} onChange={e => setForm({...form, category: e.target.value as Category})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px', backgroundColor: '#fff' }}>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <span style={{ fontWeight: 600 }}>Game Category</span>
+                <select value={form.category} onChange={e => setForm({...form, category: e.target.value as Category})}>
+                  {GAME_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
                 </select>
               </div>
 
               <div className="field field--wide" style={{ gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Short Description <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Max 50 words)</small></span>
-                <textarea rows={2} value={form.shortDesc} onChange={e => { if (countWords(e.target.value) <= 50 || e.target.value.length < form.shortDesc.length) setForm({...form, shortDesc: e.target.value}) }} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }}></textarea>
+                <span style={{ fontWeight: 600 }}>Short Description <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Max 50 words)</small></span>
+                <textarea rows={2} value={form.shortDesc} onChange={e => { if (countWords(e.target.value) <= 50 || e.target.value.length < form.shortDesc.length) setForm({...form, shortDesc: e.target.value}) }}></textarea>
               </div>
 
               <div className="field field--wide" style={{ gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Thumbnail URL <small style={{ fontWeight: 'normal', color: 'var(--portal-muted)' }}>(Supports .png, .jpg, .webp, .mp4 | 480x270 or 1920x1080)</small></span>
-                <input type="url" placeholder="https://" value={form.thumbnailUrl} onChange={e => setForm({...form, thumbnailUrl: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <MediaUploadField
+                  value={form.thumbnailUrl}
+                  onChange={(thumbnailUrl) => setForm({ ...formRef.current, thumbnailUrl })}
+                  onError={(thumbnail) => setFormErrors((previous) => ({ ...previous, thumbnail }))}
+                  error={formErrors.thumbnail}
+                  label="Thumbnail Media"
+                  helperText="Recommended 16:9 ratio · 480×270 or 1920×1080 · Max 10 MB"
+                  emptyLabel="Upload image or MP4"
+                  accept="image/*,video/mp4"
+                  mediaKind="mixed"
+                  maxBytes={10 * 1024 * 1024}
+                  uploadFile={bountyApi.uploadMedia}
+                  allowUrlInput
+                  urlPlaceholder="Or paste image or MP4 URL"
+                  showLabel
+                />
               </div>
 
               <div className="field field--wide" style={{ gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Full Description</span>
+                <span style={{ fontWeight: 600 }}>Full Description</span>
                 <TipTapEditor 
                   value={form.fullDesc} 
                   onChange={(val) => setForm({...form, fullDesc: val})} 
@@ -275,47 +252,47 @@ export function BountyManagement(): React.ReactElement {
               </div>
 
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Bounty Pool Amount</span>
-                <input type="number" value={form.poolAmount} onChange={e => setForm({...form, poolAmount: Number(e.target.value)})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <span style={{ fontWeight: 600 }}>Bounty Pool Amount</span>
+                <input type="number" value={form.poolAmount} onChange={e => setForm({...form, poolAmount: Number(e.target.value)})} />
               </div>
               
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Currency</span>
-                <select value={form.currency} onChange={e => setForm({...form, currency: e.target.value as 'WLT' | 'USD'})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px', backgroundColor: '#fff' }}>
+                <span style={{ fontWeight: 600 }}>Currency</span>
+                <select value={form.currency} onChange={e => setForm({...form, currency: e.target.value as 'WLT' | 'USD'})}>
                   <option value="WLT">WLT</option>
                   <option value="USD">USD</option>
                 </select>
               </div>
 
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Max Participants</span>
-                <input type="number" value={form.maxParticipants} onChange={e => setForm({...form, maxParticipants: Number(e.target.value)})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <span style={{ fontWeight: 600 }}>Max Participants</span>
+                <input type="number" value={form.maxParticipants} onChange={e => setForm({...form, maxParticipants: Number(e.target.value)})} />
               </div>
 
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Participation End Date</span>
-                <input type="date" value={form.participationEndDate} onChange={e => setForm({...form, participationEndDate: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <span style={{ fontWeight: 600 }}>Participation End Date</span>
+                <input type="date" value={form.participationEndDate} onChange={e => setForm({...form, participationEndDate: e.target.value})} />
               </div>
               
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Release Date</span>
-                <input type="date" value={form.releaseDate} onChange={e => setForm({...form, releaseDate: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <span style={{ fontWeight: 600 }}>Release Date</span>
+                <input type="date" value={form.releaseDate} onChange={e => setForm({...form, releaseDate: e.target.value})} />
               </div>
               
               <div className="field">
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Distribution Date</span>
-                <input type="date" value={form.distributionDate} onChange={e => setForm({...form, distributionDate: e.target.value})} style={{ width: '100%', padding: '12px', border: '1px solid #dcd7e0', borderRadius: '8px' }} />
+                <span style={{ fontWeight: 600 }}>Distribution Date</span>
+                <input type="date" value={form.distributionDate} onChange={e => setForm({...form, distributionDate: e.target.value})} />
               </div>
 
               <div className="field--wide" style={{ gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600 }}>Settlement Rules</span>
+                <span style={{ fontWeight: 600 }}>Settlement Rules</span>
                 <div style={{ width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb', color: 'var(--portal-muted)', fontSize: '14px' }}>
                   Default Distribution Algorithm (Auto-managed by platform, cannot be modified)
                 </div>
               </div>
 
               <div className="field--wide" style={{ gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   Game Examples
                   <button type="button" onClick={() => setForm({...form, examples: [...form.examples, { type: 'web', name: '', url: '', thumbnail: '' }]})} style={{ background: 'none', border: 'none', color: 'var(--portal-purple)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Plus size={14} /> Add Example
@@ -363,13 +340,13 @@ export function BountyManagement(): React.ReactElement {
             
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--portal-border)' }}>
               {view === 'edit' && (
-                 <button style={{ padding: '12px 24px', background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                   Force End Bounty
+                 <button type="button" onClick={handleCancelBounty} disabled={isSaving || selectedBounty?.state === 'CLOSED'} style={{ padding: '12px 24px', background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '8px', cursor: isSaving || selectedBounty?.state === 'CLOSED' ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving || selectedBounty?.state === 'CLOSED' ? 0.6 : 1 }}>
+                   Cancel Bounty
                  </button>
               )}
               <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
-                <button onClick={() => setView('list')} style={{ padding: '12px 24px', background: 'transparent', border: '1px solid var(--portal-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-                <button onClick={() => handleSave(false)} style={{ padding: '12px 24px', background: 'var(--portal-ink)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{view === 'create' ? 'Publish Bounty' : 'Save Changes'}</button>
+                <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '12px 24px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
+                <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} style={{ padding: '12px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving...' : view === 'create' ? 'Publish Bounty' : 'Save Changes'}</button>
               </div>
             </div>
           </div>

@@ -1,6 +1,5 @@
 import { BountyHub } from "./bounties/BountyHub";
 import { BountyDetail } from "./bounties/BountyDetail";
-import { BountyManagement } from "./bounties/BountyManagement";
 import { CreatorSettings } from "./CreatorSettings";
 import { NotFound } from "../NotFound";
 import {
@@ -295,7 +294,7 @@ function DeveloperOnboarding(): React.ReactNode {
 }
 
 function PortalShell(): React.ReactElement {
-  const { accountId, organization, profile, role, signOut, isSignedIn } = useAuth();
+  const { accountId, organization, profile, signOut, isSignedIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -305,17 +304,8 @@ function PortalShell(): React.ReactElement {
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   const navItems = React.useMemo(() => {
-    const items = [...navigation];
-    if (role === "admin") {
-      items.splice(2, 0, {
-        to: "/bounty-management",
-        end: false,
-        label: "Bounty Review (Admin)",
-        icon: ShieldCheck,
-      });
-    }
-    return items;
-  }, [role]);
+    return [...navigation];
+  }, []);
 
   const pageName =
     navItems.find((item) => location.pathname.startsWith(item.to))?.label ??
