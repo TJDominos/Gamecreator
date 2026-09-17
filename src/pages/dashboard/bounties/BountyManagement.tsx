@@ -8,6 +8,11 @@ import { MediaUploadField } from '../../../components/MediaUploadField';
 import { Toast } from '../../../components/Toast';
 
 const countWords = (str: string) => str.trim().split(/\s+/).filter(Boolean).length;
+type BountyExampleForm = { title: string; mediaUrl: string; linkUrl: string };
+
+const inferExampleType = (mediaUrl: string): 'image' | 'video' => {
+  return /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(mediaUrl.trim()) ? 'video' : 'image';
+};
 
 export function BountyManagement(): React.ReactElement {
   const [bounties, setBounties] = useState<Bounty[]>([]);
@@ -59,7 +64,7 @@ export function BountyManagement(): React.ReactElement {
     title: '', category: 'Arcade' as Category, shortDesc: '', fullDesc: '', thumbnailUrl: '',
     poolAmount: 0, currency: 'WLT' as 'WLT' | 'USD', maxParticipants: 100, participationEndDate: '',
     releaseDate: '', distributionDate: '', settlementRules: 'Default Distribution Algorithm',
-    examples: [{ type: 'image', name: '', url: '', thumbnail: '' }] as { type: string; name?: string; url: string; thumbnail: string; }[]
+    examples: [] as BountyExampleForm[]
   });
 
   const [formErrors, setFormErrors] = useState<{ thumbnail?: string }>({});
@@ -91,7 +96,11 @@ export function BountyManagement(): React.ReactElement {
       releaseDate: b.releaseDate || '',
       distributionDate: b.battleEnd ? b.battleEnd.split('T')[0] : '',
       settlementRules: b.settlementRules || 'Default Distribution Algorithm',
-      examples: b.examples ? b.examples.map(ex => ({ type: ex.type || 'web', name: ex.title, url: ex.url, thumbnail: ex.thumbnail })) : []
+      examples: b.examples ? b.examples.map(ex => ({
+        title: ex.title || '',
+        mediaUrl: ex.thumbnail || (ex.type === 'image' || ex.type === 'video' ? ex.url : ''),
+        linkUrl: ex.thumbnail ? ex.url : ex.type === 'web' ? ex.url : '',
+      })) : []
     };
     setForm(nextForm);
     formRef.current = nextForm;
@@ -118,6 +127,14 @@ export function BountyManagement(): React.ReactElement {
     const isEdit = !!selectedBounty;
     const url = isEdit ? `/api/admin/bounties/${selectedBounty.id}` : "/api/admin/bounties";
     const method = isEdit ? "PUT" : "POST";
+    const persistedExamples = form.examples
+      .filter((example) => example.mediaUrl.trim())
+      .map((example) => ({
+        type: inferExampleType(example.mediaUrl),
+        title: example.title.trim(),
+        thumbnail: example.mediaUrl.trim(),
+        url: example.linkUrl.trim(),
+      }));
     try {
       const res = await fetch(url, {
         method,
@@ -125,7 +142,7 @@ export function BountyManagement(): React.ReactElement {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ ...form, state: stateOverride || selectedBounty?.state || "DRAFT" })
+        body: JSON.stringify({ ...form, examples: persistedExamples, state: stateOverride || selectedBounty?.state || "DRAFT" })
       });
       const data = await res.json();
       if (!res.ok || data.success === false) {
@@ -157,11 +174,12 @@ export function BountyManagement(): React.ReactElement {
             releaseDate: form.releaseDate,
             settlementRules: form.settlementRules,
             videoUrl: form.thumbnailUrl,
-            examples: form.examples.map((example, index) => ({
+            examples: persistedExamples.map((example, index) => ({
               id: `${savedBountyId}-example-${index}`,
-              title: example.name || 'Game example',
+              title: example.title || 'Game example',
               thumbnail: example.thumbnail,
               url: example.url,
+              type: example.type,
             })),
           };
           setSelectedBounty(savedBounty);
@@ -252,7 +270,7 @@ export function BountyManagement(): React.ReactElement {
                   title: '', category: 'Arcade', shortDesc: '', fullDesc: '', thumbnailUrl: '',
                   poolAmount: 0, currency: 'WLT', maxParticipants: 100, participationEndDate: '',
                   releaseDate: '', distributionDate: '', settlementRules: 'Default Distribution Algorithm',
-                  examples: [{ type: 'image', url: '', thumbnail: '' }]
+                  examples: []
                 });
                 setView('create');
               }}
@@ -366,49 +384,52 @@ export function BountyManagement(): React.ReactElement {
 
               <div className="field--wide" style={{ gridColumn: 'span 2' }}>
                 <div className="bounty-examples-header">
-                  <span>Game Examples</span>
-                    <button className="btn bounty-text-action bounty-example-add" type="button" onClick={() => setForm({...form, examples: [...form.examples, { type: 'web', name: '', url: '', thumbnail: '' }]})}>
+                  <div>
+                    <span>Game Examples</span>
+                    <small className="bounty-examples-description">Optional. Add an image or video and an optional destination link.</small>
+                  </div>
+                    <button className="btn bounty-text-action bounty-example-add" type="button" onClick={() => setForm({...form, examples: [...form.examples, { title: '', mediaUrl: '', linkUrl: '' }]})}>
                     <Plus className="btn__icon" size={14} /> Add Example
                   </button>
                 </div>
                 
                 {form.examples.map((ex, i) => (
                   <div key={i} className="bounty-example-row">
-                    <select className="bounty-example-type" value={ex.type} onChange={e => {
-                      const newEx = [...form.examples];
-                      newEx[i].type = e.target.value;
-                      setForm({...form, examples: newEx});
-                    }}>
-                      <option value="image">Image</option>
-                      <option value="video">Video</option>
-                      <option value="web">Web Link</option>
-                    </select>
-                    <input className="bounty-example-name" type="text" placeholder="Game Name" value={(ex as any).name || ''} onChange={e => {
-                      const newEx = [...form.examples];
-                      (newEx[i] as any).name = e.target.value;
-                      setForm({...form, examples: newEx});
-                    }} />
-                    <div className="bounty-example-url-control">
-                      <input className="bounty-example-url" type="url" placeholder="URL Link" value={ex.url} onChange={e => {
+                    <label className="bounty-example-field bounty-example-title-field">
+                      <span>Title</span>
+                      <input className="bounty-example-title" type="text" placeholder="Game example title" value={ex.title} onChange={e => {
                         const newEx = [...form.examples];
-                        newEx[i].url = e.target.value;
+                        newEx[i].title = e.target.value;
                         setForm({...form, examples: newEx});
                       }} />
-                      <button
-                        className="btn btn--icon-only bounty-example-preview"
-                        type="button"
-                        aria-label={`Preview ${ex.name || 'game example'}`}
-                        disabled={!ex.url.trim()}
-                        onClick={() => setPreviewExample({ url: ex.url.trim(), type: ex.type, name: ex.name })}
-                      >
-                        <Eye size={16} />
-                      </button>
-                    </div>
-                    <input className="bounty-example-thumbnail" type="text" placeholder="Thumbnail URL" value={ex.thumbnail} onChange={e => {
-                      const newEx = [...form.examples];
-                      newEx[i].thumbnail = e.target.value;
-                      setForm({...form, examples: newEx});
-                    }} />
+                    </label>
+                    <label className="bounty-example-field bounty-example-media-field">
+                      <span>Image / Video URL <small>16:9 · 1280 × 720 recommended</small></span>
+                      <div className="bounty-example-url-control">
+                        <input className="bounty-example-media" type="url" placeholder="Paste an image or video URL" value={ex.mediaUrl} onChange={e => {
+                          const newEx = [...form.examples];
+                          newEx[i].mediaUrl = e.target.value;
+                          setForm({...form, examples: newEx});
+                        }} />
+                        <button
+                          className="btn btn--icon-only bounty-example-preview"
+                          type="button"
+                          aria-label={`Preview ${ex.title || 'game example'}`}
+                          disabled={!ex.mediaUrl.trim()}
+                          onClick={() => setPreviewExample({ url: ex.mediaUrl.trim(), type: inferExampleType(ex.mediaUrl), name: ex.title })}
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </div>
+                    </label>
+                    <label className="bounty-example-field bounty-example-link-field">
+                      <span>Destination URL <small>(Optional)</small></span>
+                      <input className="bounty-example-link" type="url" placeholder="Link to open when clicked" value={ex.linkUrl} onChange={e => {
+                        const newEx = [...form.examples];
+                        newEx[i].linkUrl = e.target.value;
+                        setForm({...form, examples: newEx});
+                      }} />
+                    </label>
                     <button className="btn btn--icon-only bounty-example-delete" type="button" aria-label="Remove game example" onClick={() => {
                       const newEx = [...form.examples];
                       newEx.splice(i, 1);

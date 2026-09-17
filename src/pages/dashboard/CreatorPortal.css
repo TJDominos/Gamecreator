@@ -852,8 +852,8 @@
 
 .bounty-example-row {
   display: grid;
-  grid-template-columns: minmax(100px, 0.8fr) repeat(3, minmax(0, 1fr)) 40px;
-  align-items: center;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 1.2fr) minmax(220px, 1.2fr) 40px;
+  align-items: start;
   gap: var(--space-sm);
   min-width: 0;
   margin-bottom: var(--space-sm);
@@ -873,13 +873,43 @@
   min-width: 0;
 }
 
+.bounty-examples-description {
+  display: block;
+  margin-top: var(--space-xxs);
+  color: var(--portal-muted);
+  font-weight: 400;
+}
+
 .bounty-example-row > * {
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
 }
 
+.bounty-example-field {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.bounty-example-field > span {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: flex-end;
+  line-height: 1.35;
+  color: var(--portal-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.bounty-example-field > span small {
+  font-weight: 400;
+}
+
 .bounty-example-row > .bounty-example-delete {
+  align-self: end;
   width: 2rem;
   color: var(--text-subtle);
   background: transparent;
@@ -892,8 +922,7 @@
   border-color: transparent;
 }
 
-.bounty-example-row input,
-.bounty-example-row select {
+.bounty-example-row input {
   min-width: 0;
   padding: 11px 12px;
   color: var(--portal-ink);
@@ -907,11 +936,18 @@
 .bounty-example-url-control {
   position: relative;
   min-width: 0;
+  width: 100%;
 }
 
 .bounty-example-url-control input {
   width: 100%;
   padding-right: 46px;
+}
+
+.bounty-example-title,
+.bounty-example-url-control,
+.bounty-example-link {
+  min-width: 0;
 }
 
 .bounty-example-url-control:focus-within {
@@ -1174,8 +1210,12 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  .bounty-example-type {
+  .bounty-example-title-field {
     grid-column: 1 / -1;
+  }
+
+  .bounty-example-link-field {
+    grid-column: 2;
   }
 
   .bounty-example-delete {
@@ -1218,10 +1258,9 @@
     gap: var(--space-xs);
   }
 
-  .bounty-example-type,
-  .bounty-example-name,
-  .bounty-example-url,
-  .bounty-example-thumbnail {
+  .bounty-example-title-field,
+  .bounty-example-media-field,
+  .bounty-example-link-field {
     grid-column: 1;
   }
 

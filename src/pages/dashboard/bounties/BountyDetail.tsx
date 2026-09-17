@@ -256,15 +256,32 @@ export function BountyDetail(): React.ReactElement {
             <div className="bg-white rounded-2xl p-5 md:p-8 border border-[var(--portal-border)]">
               <h2 style={{ fontSize: '20px', margin: '0 0 20px 0', color: 'var(--portal-ink)' }}>Games Examples</h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
-                {bounty.examples.map(ex => (
-                  <a key={ex.id} href={ex.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', display: 'block', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--portal-border)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-                    <img src={ex.thumbnail} alt={ex.title} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
-                    <div style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--portal-ink)' }}>{ex.title}</span>
-                      <ExternalLink size={14} color="var(--portal-muted)" />
+                {bounty.examples.map(ex => {
+                  const cardStyle = { textDecoration: 'none', color: 'inherit', display: 'block', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--portal-border)', transition: 'transform 0.2s' } as const;
+                  const cardContent = (
+                    <>
+                      {ex.type === 'video' ? (
+                        <video src={ex.thumbnail} controls playsInline style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
+                      ) : (
+                        <img src={ex.thumbnail} alt={ex.title} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
+                      )}
+                      <div style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--portal-ink)' }}>{ex.title}</span>
+                        {ex.url && <ExternalLink size={14} color="var(--portal-muted)" />}
+                      </div>
+                    </>
+                  );
+
+                  return ex.url ? (
+                    <a key={ex.id} href={ex.url} target="_blank" rel="noopener noreferrer" style={cardStyle} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                      {cardContent}
+                    </a>
+                  ) : (
+                    <div key={ex.id} style={cardStyle}>
+                      {cardContent}
                     </div>
-                  </a>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

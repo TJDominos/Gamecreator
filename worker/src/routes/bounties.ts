@@ -170,6 +170,7 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
         `).bind(
           generateId(),
           id,
+          ex.type ?? "web",
           nullableText(ex.title ?? ex.name),
           nullableText(ex.thumbnail ?? ex.thumbnailUrl),
           nullableText(ex.url),

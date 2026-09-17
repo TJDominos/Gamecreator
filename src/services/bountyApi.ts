@@ -68,7 +68,7 @@ function mapExample(example: NonNullable<RawBounty["examples"]>[number]): GameEx
     type: example.type || "web",
     title: example.title || "Game example",
     thumbnail: example.thumbnail || "",
-    url: example.url || "#",
+    url: example.url || "",
   };
 }
 
