@@ -5,6 +5,7 @@ import { Bounty, Category } from './bountyData';
 import { GAME_CATEGORIES } from '../games/gameData';
 import { bountyApi, mapBounty } from '../../../services/bountyApi';
 import { MediaUploadField } from '../../../components/MediaUploadField';
+import { Toast } from '../../../components/Toast';
 
 const countWords = (str: string) => str.trim().split(/\s+/).filter(Boolean).length;
 
@@ -50,6 +51,7 @@ export function BountyManagement(): React.ReactElement {
   const [formErrors, setFormErrors] = useState<{ thumbnail?: string }>({});
   const [autoSaveStatus, setAutoSaveStatus] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
   const savingRef = React.useRef(false);
   
   const lastSavedFormRef = React.useRef(form);
@@ -119,6 +121,10 @@ export function BountyManagement(): React.ReactElement {
       if (isAutoSave) {
         setAutoSaveStatus("Saved at " + new Date().toLocaleTimeString());
       } else {
+        setToast({
+          message: stateOverride === 'OPEN' ? 'Bounty published.' : selectedBounty ? 'Bounty changes saved.' : 'Bounty draft saved.',
+          tone: 'success',
+        });
         setView('list');
       }
     } catch (err) {
@@ -126,7 +132,10 @@ export function BountyManagement(): React.ReactElement {
       if (isAutoSave) {
         setAutoSaveStatus("Auto-save failed");
       } else {
-        alert(err instanceof Error ? err.message : "Failed to save bounty");
+        setToast({
+          message: err instanceof Error ? err.message : "Failed to save bounty",
+          tone: 'error',
+        });
       }
     } finally {
       savingRef.current = false;
@@ -157,6 +166,7 @@ export function BountyManagement(): React.ReactElement {
 
   return (
     <div className="admin-bounty-page">
+      {toast && <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />}
       <div className="admin-bounty-page__inner">
         
         {/* Header */}
@@ -200,7 +210,7 @@ export function BountyManagement(): React.ReactElement {
                 {view === 'edit' ? (autoSaveStatus || 'Changes save automatically') : 'Save this bounty as a draft'}
               </span>
               <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '10px 16px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
-              <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} style={{ padding: '10px 18px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>
+              <button type="button" onClick={() => void handleSave(false, view === 'create' ? 'DRAFT' : undefined)} disabled={isSaving} style={{ padding: '10px 18px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>
                 {isSaving ? 'Saving...' : view === 'create' ? 'Save Draft' : 'Save Changes'}
               </button>
             </div>
@@ -346,7 +356,7 @@ export function BountyManagement(): React.ReactElement {
               )}
               <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
                 <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '12px 24px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
-                <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} style={{ padding: '12px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving...' : view === 'create' ? 'Save Draft' : 'Save Changes'}</button>
+                <button type="button" onClick={() => void handleSave(false, view === 'create' || selectedBounty?.state === 'DRAFT' ? 'OPEN' : undefined)} disabled={isSaving} style={{ padding: '12px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving...' : view === 'create' || selectedBounty?.state === 'DRAFT' ? 'Publish Bounty' : 'Save Changes'}</button>
               </div>
             </div>
           </div>

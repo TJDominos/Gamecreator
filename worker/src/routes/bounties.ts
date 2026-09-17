@@ -42,6 +42,9 @@ export async function handleBountyRoutes(request: Request, env: Env): Promise<Re
 // Generate an ID for new bounties
 const generateId = () => `bty_${crypto.randomUUID().replace(/-/g, "").slice(0, 18)}`;
 
+const nullableText = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value : null;
+
 async function handleAdminListBounties(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
   if (!authUser || authUser.role !== "admin") {
@@ -74,6 +77,12 @@ async function handleCreateBounty(request: Request, env: Env): Promise<Response>
     const body: any = await request.json();
     const id = generateId();
     const now = Date.now();
+    const description = body.shortDesc ?? body.description ?? "";
+    const fullDescription = nullableText(body.fullDesc ?? body.fullDescription);
+    const prizePool = body.poolAmount ?? body.prizePool ?? 0;
+    const deadline = nullableText(body.participationEndDate ?? body.deadline);
+    const battleEnd = nullableText(body.distributionDate ?? body.battleEnd);
+    const videoUrl = nullableText(body.videoUrl ?? body.thumbnailUrl);
 
     await env.DB.prepare(`
       INSERT INTO bounties (
@@ -82,10 +91,10 @@ async function handleCreateBounty(request: Request, env: Env): Promise<Response>
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      id, body.title, body.shortDesc || body.description, body.fullDesc || body.fullDescription,
-      body.state || 'OPEN', body.category, body.poolAmount || body.prizePool, body.currency,
-      JSON.stringify(body.tags || []), body.participationEndDate || body.deadline, 
-      body.distributionDate || body.battleEnd, body.videoUrl || body.thumbnailUrl || null, now, now
+      id, body.title ?? "", description, fullDescription,
+      body.state ?? 'OPEN', body.category ?? "", prizePool, body.currency ?? "WLT",
+      JSON.stringify(body.tags ?? []), deadline,
+      battleEnd, videoUrl, now, now
     ).run();
 
     // Insert examples if any
@@ -94,7 +103,13 @@ async function handleCreateBounty(request: Request, env: Env): Promise<Response>
         await env.DB.prepare(`
           INSERT INTO bounty_examples (id, bounty_id, title, thumbnail, url)
           VALUES (?, ?, ?, ?, ?)
-        `).bind(generateId(), id, ex.title || ex.name, ex.thumbnail || ex.thumbnailUrl, ex.url).run();
+        `).bind(
+          generateId(),
+          id,
+          nullableText(ex.title ?? ex.name),
+          nullableText(ex.thumbnail ?? ex.thumbnailUrl),
+          nullableText(ex.url),
+        ).run();
       }
     }
 
@@ -117,6 +132,12 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
     
     const body: any = await request.json();
     const now = Date.now();
+    const description = body.shortDesc ?? body.description ?? "";
+    const fullDescription = nullableText(body.fullDesc ?? body.fullDescription);
+    const prizePool = body.poolAmount ?? body.prizePool ?? 0;
+    const deadline = nullableText(body.participationEndDate ?? body.deadline);
+    const battleEnd = nullableText(body.distributionDate ?? body.battleEnd);
+    const videoUrl = nullableText(body.videoUrl ?? body.thumbnailUrl);
 
     await env.DB.prepare(`
       UPDATE bounties SET 
@@ -125,10 +146,10 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
         updated_at = ?
       WHERE id = ?
     `).bind(
-      body.title, body.shortDesc || body.description, body.fullDesc || body.fullDescription, 
-      body.state, body.category, body.poolAmount || body.prizePool, body.currency, 
-      JSON.stringify(body.tags || []), body.participationEndDate || body.deadline, 
-      body.distributionDate || body.battleEnd, body.videoUrl || body.thumbnailUrl || null, now, id
+      body.title ?? "", description, fullDescription,
+      body.state ?? null, body.category ?? "", prizePool, body.currency ?? "WLT",
+      JSON.stringify(body.tags ?? []), deadline,
+      battleEnd, videoUrl, now, id
     ).run();
 
     // Recreate examples (naive approach: delete and insert)
@@ -138,7 +159,13 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
         await env.DB.prepare(`
           INSERT INTO bounty_examples (id, bounty_id, title, thumbnail, url)
           VALUES (?, ?, ?, ?, ?)
-        `).bind(generateId(), id, ex.title || ex.name, ex.thumbnail || ex.thumbnailUrl, ex.url).run();
+        `).bind(
+          generateId(),
+          id,
+          nullableText(ex.title ?? ex.name),
+          nullableText(ex.thumbnail ?? ex.thumbnailUrl),
+          nullableText(ex.url),
+        ).run();
       }
     }
 

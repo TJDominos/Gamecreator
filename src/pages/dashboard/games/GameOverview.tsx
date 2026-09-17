@@ -16,6 +16,7 @@ import { Link, useParams, useOutletContext } from "react-router";
 import { GameStatus, StatusLabels } from "./GameConsole";
 import { GAME_CATEGORIES, getGameById, updateGame, GAMES_UPDATED_EVENT } from "./gameData";
 import { gameApi } from "../../../services/gameApi";
+import { Toast } from "../../../components/Toast";
 
 export function GameOverview(): React.ReactElement {
   const { gameId } = useParams();
@@ -38,6 +39,7 @@ export function GameOverview(): React.ReactElement {
   const [coverSuccess, setCoverSuccess] = useState(false);
   const [animSuccess, setAnimSuccess] = useState(false);
   const [metaSuccess, setMetaSuccess] = useState(false);
+  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
 
   const [formErrors, setFormErrors] = useState<{ description?: string; coverImage?: string; animation?: string; meta?: string }>({});
 
@@ -81,10 +83,12 @@ export function GameOverview(): React.ReactElement {
     if (!gameId) return;
     if (!description.trim()) {
       setFormErrors(prev => ({ ...prev, description: "Description is required." }));
+      setToast({ message: "Description is required.", tone: "error" });
       return;
     }
     if (isWordCountExceeded) {
       setFormErrors(prev => ({ ...prev, description: `Description exceeds the 500 words limit (${wordCount}/500).` }));
+      setToast({ message: `Description exceeds the 500 words limit (${wordCount}/500).`, tone: "error" });
       return;
     }
 
@@ -105,6 +109,7 @@ export function GameOverview(): React.ReactElement {
 
     setSavingField(null);
     setDescSuccess(true);
+    setToast({ message: "Game description saved.", tone: "success" });
     setTimeout(() => setDescSuccess(false), 3000);
   };
 
@@ -113,6 +118,7 @@ export function GameOverview(): React.ReactElement {
     if (!gameId) return;
     if (!coverImage.trim()) {
       setFormErrors(prev => ({ ...prev, coverImage: "Cover image is required." }));
+      setToast({ message: "Cover image is required.", tone: "error" });
       return;
     }
 
@@ -134,6 +140,7 @@ export function GameOverview(): React.ReactElement {
 
     setSavingField(null);
     setCoverSuccess(true);
+    setToast({ message: "Cover image saved.", tone: "success" });
     setTimeout(() => setCoverSuccess(false), 3000);
   };
 
@@ -157,6 +164,7 @@ export function GameOverview(): React.ReactElement {
 
     setSavingField(null);
     setAnimSuccess(true);
+    setToast({ message: "Game animation saved.", tone: "success" });
     setTimeout(() => setAnimSuccess(false), 3000);
   };
 
@@ -166,6 +174,7 @@ export function GameOverview(): React.ReactElement {
     // Validate
     if (!category || !ageRating || !deviceSupport) {
       setFormErrors(prev => ({ ...prev, meta: "All meta fields are required." }));
+      setToast({ message: "Complete all meta fields before saving.", tone: "error" });
       return;
     }
 
@@ -186,6 +195,7 @@ export function GameOverview(): React.ReactElement {
 
     setSavingField(null);
     setMetaSuccess(true);
+    setToast({ message: "Game meta options saved.", tone: "success" });
     setTimeout(() => setMetaSuccess(false), 3000);
   };
 
@@ -193,6 +203,7 @@ export function GameOverview(): React.ReactElement {
 
   return (
     <div>
+      {toast && <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />}
       {/* Feedback Notification */}
       {['PRIVATE_TESTING', 'PUBLIC_ACTIVE'].includes(status) && (
         <a 

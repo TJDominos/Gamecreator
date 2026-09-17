@@ -21,6 +21,22 @@
   font-size: var(--font-size-xs) !important;
 }
 
+.toast-viewport.toast-viewport--portal {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: stretch;
+  padding: 0 0 20px;
+  pointer-events: none;
+}
+
+.toast-viewport.toast-viewport--portal > .toast {
+  align-self: center;
+  pointer-events: auto;
+}
+
 .portal-layout [style*="font-size: 9px"],
 .portal-layout [style*="font-size: 10px"],
 .portal-layout [style*="font-size: 11px"],
