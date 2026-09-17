@@ -6,6 +6,7 @@ import { useBountySubscriptions } from './useBountySubscriptions';
 import { useBounties } from './useBounties';
 
 const StateStyles: Record<BountyState, { bg: string; color: string; icon: any; label: string }> = {
+  DRAFT: { bg: '#f3f4f6', color: '#6b7280', icon: Lock, label: 'Draft' },
   OPEN: { bg: '#e6f6ec', color: '#1e874b', icon: Clock, label: 'Open for Subscription' },
   RUNNING: { bg: '#e0e7ff', color: '#4f46e5', icon: PlayCircle, label: 'Running / Development' },
   ONLINE: { bg: '#fff1d9', color: '#8a5314', icon: Activity, label: 'Online / Traffic Battle' },

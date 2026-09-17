@@ -1,4 +1,4 @@
-export type BountyState = "OPEN" | "RUNNING" | "ONLINE" | "CLOSED";
+export type BountyState = "DRAFT" | "OPEN" | "RUNNING" | "ONLINE" | "CLOSED";
 export type Category =
   | "Casino"
   | "Puzzle"

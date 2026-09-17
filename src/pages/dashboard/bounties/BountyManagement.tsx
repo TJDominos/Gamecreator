@@ -35,7 +35,7 @@ export function BountyManagement(): React.ReactElement {
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'participants'>('list');
   const [selectedBounty, setSelectedBounty] = useState<Bounty | null>(null);
   
-  const [filterState, setFilterState] = useState<'ALL' | 'OPEN' | 'RUNNING' | 'ONLINE' | 'CLOSED'>('ALL');
+  const [filterState, setFilterState] = useState<'ALL' | 'DRAFT' | 'OPEN' | 'RUNNING' | 'ONLINE' | 'CLOSED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -108,7 +108,7 @@ export function BountyManagement(): React.ReactElement {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ ...form, state: stateOverride || selectedBounty?.state || "OPEN" })
+        body: JSON.stringify({ ...form, state: stateOverride || selectedBounty?.state || "DRAFT" })
       });
       const data = await res.json();
       if (!res.ok || data.success === false) {
@@ -197,11 +197,11 @@ export function BountyManagement(): React.ReactElement {
             <h2 style={{ fontSize: '20px', margin: '0 0 24px' }}>{view === 'create' ? 'Create New Bounty' : 'Edit Bounty'}</h2>
             <div style={{ position: 'sticky', top: '12px', zIndex: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', padding: '10px 12px', marginBottom: '24px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 14px rgba(17, 24, 39, 0.08)' }}>
               <span className="portal-note" style={{ marginRight: 'auto', color: '#6b7280', fontSize: '12px' }} aria-live="polite">
-                {view === 'edit' ? (autoSaveStatus || 'Changes save automatically') : 'Complete the form before publishing'}
+                {view === 'edit' ? (autoSaveStatus || 'Changes save automatically') : 'Save this bounty as a draft'}
               </span>
               <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '10px 16px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
               <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} style={{ padding: '10px 18px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>
-                {isSaving ? 'Saving...' : view === 'create' ? 'Publish Bounty' : 'Save Changes'}
+                {isSaving ? 'Saving...' : view === 'create' ? 'Save Draft' : 'Save Changes'}
               </button>
             </div>
             
@@ -346,7 +346,7 @@ export function BountyManagement(): React.ReactElement {
               )}
               <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
                 <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '12px 24px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
-                <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} style={{ padding: '12px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving...' : view === 'create' ? 'Publish Bounty' : 'Save Changes'}</button>
+                <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} style={{ padding: '12px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving...' : view === 'create' ? 'Save Draft' : 'Save Changes'}</button>
               </div>
             </div>
           </div>
@@ -496,6 +496,7 @@ export function BountyManagement(): React.ReactElement {
                     style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 500, outline: 'none' }}
                   >
                     <option value="ALL">All States</option>
+                    <option value="DRAFT">Draft</option>
                     <option value="OPEN">Open</option>
                     <option value="RUNNING">Development</option>
                     <option value="ONLINE">Online</option>
@@ -533,8 +534,8 @@ export function BountyManagement(): React.ReactElement {
                           fontWeight: 600, 
                           padding: '4px 8px', 
                           borderRadius: '6px',
-                          background: b.state === 'OPEN' ? '#e6f6ec' : b.state === 'RUNNING' ? '#e0e7ff' : b.state === 'ONLINE' ? '#fff1d9' : '#f2f0f3',
-                          color: b.state === 'OPEN' ? '#1e874b' : b.state === 'RUNNING' ? '#4f46e5' : b.state === 'ONLINE' ? '#8a5314' : '#6b7280'
+                          background: b.state === 'DRAFT' ? '#f3f4f6' : b.state === 'OPEN' ? '#e6f6ec' : b.state === 'RUNNING' ? '#e0e7ff' : b.state === 'ONLINE' ? '#fff1d9' : '#f2f0f3',
+                          color: b.state === 'DRAFT' ? '#4b5563' : b.state === 'OPEN' ? '#1e874b' : b.state === 'RUNNING' ? '#4f46e5' : b.state === 'ONLINE' ? '#8a5314' : '#6b7280'
                         }}>
                           {b.state}
                         </span>

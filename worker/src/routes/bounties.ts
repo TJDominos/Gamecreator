@@ -179,6 +179,7 @@ async function handleListBounties(request: Request, env: Env): Promise<Response>
           WHERE p2.bounty_id = b.id AND p2.principal_id = ?
         ) END AS is_subscribed
       FROM bounties b
+      WHERE b.state != 'DRAFT'
       ORDER BY b.created_at DESC
     `).bind(authUser?.principal_id ?? null, authUser?.principal_id ?? null).all();
 
@@ -284,6 +285,7 @@ async function handleGetBounty(request: Request, env: Env): Promise<Response> {
     const authUser = await getAuthenticatedUser(request, env);
     const bounty = await getBountyRow(request, env, bountyId);
     if (!bounty) return errorResponse("Bounty not found", 404, "NOT_FOUND", request, env);
+    if (bounty.state === "DRAFT") return errorResponse("Bounty not found", 404, "NOT_FOUND", request, env);
     return jsonResponse(
       { success: true, bounty: await attachBountyDetails(bounty, env, authUser?.principal_id) },
       200,
