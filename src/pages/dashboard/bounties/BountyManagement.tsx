@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TipTapEditor } from '../../../components/TipTapEditor';
-import { Target, Plus, Search, ArrowRight, ArrowLeft, Trash2, Save, Edit2 } from 'lucide-react';
+import { Target, Plus, Search, ArrowRight, ArrowLeft, Trash2, Save, Edit2, Eye, X } from 'lucide-react';
 import { Bounty, Category } from './bountyData';
 import { GAME_CATEGORIES } from '../games/gameData';
 import { bountyApi, mapBounty } from '../../../services/bountyApi';
@@ -66,6 +66,7 @@ export function BountyManagement(): React.ReactElement {
   const [autoSaveStatus, setAutoSaveStatus] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
+  const [previewExample, setPreviewExample] = useState<{ url: string; type: string; name?: string } | null>(null);
   const savingRef = React.useRef(false);
   
   const lastSavedFormRef = React.useRef(form);
@@ -196,11 +197,27 @@ export function BountyManagement(): React.ReactElement {
     return () => window.clearTimeout(timeoutId);
   }, [form, view, selectedBounty]);
 
+  React.useEffect(() => {
+    if (!previewExample) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewExample(null);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [previewExample]);
+
   const handleCancelBounty = () => {
     if (!selectedBounty || selectedBounty.state === 'CLOSED') return;
-    if (window.confirm(`Cancel bounty "${selectedBounty.title}"? This will close participation and cannot be undone.`)) {
-      void handleSave(false, 'CLOSED');
-    }
+    const isDraft = selectedBounty.state === 'DRAFT';
+    const firstConfirmation = isDraft
+      ? window.confirm(`Cancel draft "${selectedBounty.title}"? It will be moved to Closed.`)
+      : window.confirm(`Cancel bounty "${selectedBounty.title}"? This will close participation and cannot be undone.`);
+    if (!firstConfirmation) return;
+
+    const secondConfirmation = isDraft
+      ? window.confirm('Please confirm again: move this draft to Closed?')
+      : true;
+    if (secondConfirmation) void handleSave(false, 'CLOSED');
   };
 
   const filteredBounties = bounties.filter(b => {
@@ -247,7 +264,7 @@ export function BountyManagement(): React.ReactElement {
 
         {(view === 'create' || view === 'edit') && (
           <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '32px', marginBottom: '32px' }}>
-            <button className="btn btn--outline btn--sm" onClick={() => setView('list')}>
+            <button className="btn bounty-text-action" onClick={() => setView('list')}>
               <ArrowLeft size={16} /> Back to List
             </button>
             <h2 style={{ fontSize: '20px', margin: '0 0 24px' }}>{view === 'create' ? 'Create New Bounty' : 'Edit Bounty'}</h2>
@@ -348,12 +365,12 @@ export function BountyManagement(): React.ReactElement {
               </div>
 
               <div className="field--wide" style={{ gridColumn: 'span 2' }}>
-                <span style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  Game Examples
-                  <button className="btn btn--outline btn--sm" type="button" onClick={() => setForm({...form, examples: [...form.examples, { type: 'web', name: '', url: '', thumbnail: '' }]})}>
+                <div className="bounty-examples-header">
+                  <span>Game Examples</span>
+                    <button className="btn bounty-text-action bounty-example-add" type="button" onClick={() => setForm({...form, examples: [...form.examples, { type: 'web', name: '', url: '', thumbnail: '' }]})}>
                     <Plus className="btn__icon" size={14} /> Add Example
                   </button>
-                </span>
+                </div>
                 
                 {form.examples.map((ex, i) => (
                   <div key={i} className="bounty-example-row">
@@ -371,17 +388,28 @@ export function BountyManagement(): React.ReactElement {
                       (newEx[i] as any).name = e.target.value;
                       setForm({...form, examples: newEx});
                     }} />
-                    <input className="bounty-example-url" type="text" placeholder="URL Link" value={ex.url} onChange={e => {
-                      const newEx = [...form.examples];
-                      newEx[i].url = e.target.value;
-                      setForm({...form, examples: newEx});
-                    }} />
+                    <div className="bounty-example-url-control">
+                      <input className="bounty-example-url" type="url" placeholder="URL Link" value={ex.url} onChange={e => {
+                        const newEx = [...form.examples];
+                        newEx[i].url = e.target.value;
+                        setForm({...form, examples: newEx});
+                      }} />
+                      <button
+                        className="btn btn--icon-only bounty-example-preview"
+                        type="button"
+                        aria-label={`Preview ${ex.name || 'game example'}`}
+                        disabled={!ex.url.trim()}
+                        onClick={() => setPreviewExample({ url: ex.url.trim(), type: ex.type, name: ex.name })}
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </div>
                     <input className="bounty-example-thumbnail" type="text" placeholder="Thumbnail URL" value={ex.thumbnail} onChange={e => {
                       const newEx = [...form.examples];
                       newEx[i].thumbnail = e.target.value;
                       setForm({...form, examples: newEx});
                     }} />
-                    <button className="btn btn--solid btn--accent btn--icon-only bounty-example-delete" type="button" aria-label="Remove game example" onClick={() => {
+                    <button className="btn btn--icon-only bounty-example-delete" type="button" aria-label="Remove game example" onClick={() => {
                       const newEx = [...form.examples];
                       newEx.splice(i, 1);
                       setForm({...form, examples: newEx});
@@ -396,7 +424,7 @@ export function BountyManagement(): React.ReactElement {
             
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--portal-border)' }}>
               {view === 'edit' && (
-                 <button type="button" onClick={handleCancelBounty} disabled={isSaving || selectedBounty?.state === 'CLOSED'} style={{ padding: '12px 24px', background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '8px', cursor: isSaving || selectedBounty?.state === 'CLOSED' ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving || selectedBounty?.state === 'CLOSED' ? 0.6 : 1 }}>
+                 <button className="btn btn--outline" type="button" onClick={handleCancelBounty} disabled={isSaving || selectedBounty?.state === 'CLOSED'}>
                    Cancel Bounty
                  </button>
               )}
@@ -405,12 +433,42 @@ export function BountyManagement(): React.ReactElement {
                 <button className="btn btn--solid" type="button" onClick={() => void handleSave(false, view === 'create' || selectedBounty?.state === 'DRAFT' ? 'OPEN' : undefined)} disabled={isSaving}>{isSaving ? 'Saving...' : view === 'create' || selectedBounty?.state === 'DRAFT' ? 'Publish Bounty' : 'Save Changes'}</button>
               </div>
             </div>
+
+            {previewExample && (
+              <div
+                className="bounty-preview-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="bounty-preview-title"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) setPreviewExample(null);
+                }}
+              >
+                <div className="bounty-preview-modal__content">
+                  <div className="bounty-preview-modal__header">
+                    <h2 id="bounty-preview-title">{previewExample.name || 'Game Example Preview'}</h2>
+                    <button className="btn btn--icon-only bounty-preview-modal__close" type="button" aria-label="Close preview" onClick={() => setPreviewExample(null)}>
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="bounty-preview-modal__body">
+                    {previewExample.type === 'image' ? (
+                      <img src={previewExample.url} alt={previewExample.name || 'Game example'} />
+                    ) : previewExample.type === 'video' ? (
+                      <video src={previewExample.url} controls playsInline />
+                    ) : (
+                      <iframe src={previewExample.url} title={previewExample.name || 'Game example preview'} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {view === 'participants' && selectedBounty && (
           <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '32px', marginBottom: '32px' }}>
-            <button onClick={() => { setView('list'); setCurrentPage(1); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--portal-muted)', marginBottom: '24px', padding: 0 }}>
+            <button className="btn bounty-text-action" onClick={() => { setView('list'); setCurrentPage(1); }}>
               <ArrowLeft size={16} /> Back to List
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -492,7 +550,7 @@ export function BountyManagement(): React.ReactElement {
                       </td>
                       <td style={{ padding: '16px' }}>
                         {status === 'Published' && selectedBounty.state === 'ONLINE' && (
-                           <button style={{ padding: '6px 12px', background: 'var(--portal-ink)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                           <button className="btn btn--solid btn--sm">
                              Mark as Winner
                            </button>
                         )}
@@ -506,20 +564,18 @@ export function BountyManagement(): React.ReactElement {
             {/* Pagination Controls */}
             {selectedBounty.participants && Math.ceil(selectedBounty.participants.length / itemsPerPage) > 1 && (
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
-                <button 
+                <button className="btn btn--outline btn--sm"
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--portal-border)', background: currentPage === 1 ? '#f9fafb' : '#fff', color: currentPage === 1 ? 'var(--portal-muted)' : 'var(--portal-ink)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600 }}
                 >
                   Previous
                 </button>
                 <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--portal-muted)' }}>
                   Page {currentPage} of {Math.ceil(selectedBounty.participants.length / itemsPerPage)}
                 </span>
-                <button 
+                <button className="btn btn--outline btn--sm"
                   onClick={() => setCurrentPage(p => Math.min(Math.ceil(selectedBounty.participants.length / itemsPerPage), p + 1))}
                   disabled={currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage)}
-                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--portal-border)', background: currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage) ? '#f9fafb' : '#fff', color: currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage) ? 'var(--portal-muted)' : 'var(--portal-ink)', cursor: currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage) ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 600 }}
                 >
                   Next
                 </button>

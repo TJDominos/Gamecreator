@@ -92,6 +92,11 @@
   background: transparent;
 }
 
+.bounty-example-add {
+  margin: 0;
+  padding: 0;
+}
+
 .game-profile-media-actions {
   flex-wrap: wrap;
 }
@@ -874,6 +879,19 @@
   box-sizing: border-box;
 }
 
+.bounty-example-row > .bounty-example-delete {
+  width: 2rem;
+  color: var(--text-subtle);
+  background: transparent;
+  border-color: transparent;
+}
+
+.bounty-example-row > .bounty-example-delete:hover {
+  color: var(--color-error-600, #b42318);
+  background: transparent;
+  border-color: transparent;
+}
+
 .bounty-example-row input,
 .bounty-example-row select {
   min-width: 0;
@@ -886,6 +904,50 @@
   font: inherit;
 }
 
+.bounty-example-url-control {
+  position: relative;
+  min-width: 0;
+}
+
+.bounty-example-url-control input {
+  width: 100%;
+  padding-right: 46px;
+}
+
+.bounty-example-url-control:focus-within {
+  border-radius: 9px;
+  box-shadow: 0 0 0 3px rgba(97, 54, 154, 0.1);
+}
+
+.bounty-example-url-control:focus-within input {
+  border-color: var(--portal-purple);
+  box-shadow: none;
+}
+
+.bounty-example-preview {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text-subtle);
+  background: transparent;
+  border: 0;
+  transform: translateY(-50%);
+}
+
+.bounty-example-preview:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.bounty-example-preview:disabled {
+  color: var(--text-disabled);
+  background: transparent;
+  cursor: not-allowed;
+}
+
 .bounty-example-row input:focus,
 .bounty-example-row select:focus {
   border-color: var(--portal-purple);
@@ -894,6 +956,81 @@
 
 .bounty-example-delete {
   justify-self: end;
+}
+
+.bounty-preview-modal {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  padding: var(--space-lg);
+  place-items: center;
+  background: rgba(23, 21, 29, 0.58);
+}
+
+.bounty-preview-modal__content {
+  display: flex;
+  width: min(960px, 100%);
+  max-height: min(760px, 90vh);
+  overflow: hidden;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--portal-border);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(23, 21, 29, 0.24);
+}
+
+.bounty-preview-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--portal-border);
+}
+
+.bounty-preview-modal__header h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--font-size-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bounty-preview-modal__close {
+  flex: 0 0 auto;
+  color: var(--text-subtle);
+  background: transparent;
+  border: 0;
+}
+
+.bounty-preview-modal__close:hover {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.bounty-preview-modal__body {
+  display: grid;
+  min-height: 260px;
+  overflow: auto;
+  place-items: center;
+  background: #f7f6f8;
+}
+
+.bounty-preview-modal__body img,
+.bounty-preview-modal__body video {
+  display: block;
+  width: 100%;
+  max-height: calc(90vh - 100px);
+  object-fit: contain;
+}
+
+.bounty-preview-modal__body iframe {
+  width: 100%;
+  height: min(680px, calc(90vh - 100px));
+  border: 0;
+  background: #fff;
 }
 
 .admin-bounty-row--draft {
@@ -981,7 +1118,7 @@
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .portal-sidebar {
     transform: translateX(-100%);
     transition: transform 200ms ease;
@@ -1034,7 +1171,7 @@
   }
 
   .bounty-example-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .bounty-example-type {
@@ -1042,8 +1179,8 @@
   }
 
   .bounty-example-delete {
-    grid-column: 3;
-    grid-row: 3;
+    grid-column: 2;
+    grid-row: auto;
   }
 }
 
@@ -1077,7 +1214,7 @@
   }
 
   .bounty-example-row {
-    grid-template-columns: minmax(0, 1fr) 40px;
+    grid-template-columns: minmax(0, 1fr) var(--space-xl);
     gap: var(--space-xs);
   }
 
@@ -1091,6 +1228,11 @@
   .bounty-example-delete {
     grid-column: 2;
     grid-row: 4;
+  }
+
+  .bounty-examples-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   .field--wide,

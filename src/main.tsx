@@ -10,7 +10,7 @@ import { SsoLoginFrame } from "./components/SsoLoginFrame";
 import "./index.css";
 
 const DeveloperLanding = React.lazy(() => import("./pages/home/DeveloperLanding"));
-const DeveloperPortal = React.lazy(() => import("./pages/dashboard/DeveloperPortal"));
+const CreatorPortal = React.lazy(() => import("./pages/dashboard/CreatorPortal"));
 const CreatorGuide = React.lazy(() => import("./pages/guides/CreatorGuide"));
 const CreatorBounties = React.lazy(() => import("./pages/bounties/CreatorBounties"));
 const PublicBountyDetail = React.lazy(() => import("./pages/bounties/PublicBountyDetail"));
@@ -113,7 +113,7 @@ function AppContent() {
 
   return (
     <>
-      <DeveloperPortal />
+      <CreatorPortal />
       <VersionUpdateBanner />
     </>
   );

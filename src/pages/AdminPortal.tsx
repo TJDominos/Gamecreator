@@ -5,7 +5,7 @@ import { BountyManagement } from "./dashboard/bounties/BountyManagement";
 import { RequireAdmin } from "../auth/RequireAdmin";
 import { UserAdmin } from "./admin/UserAdmin";
 import { PortalHeader } from "../components/PortalHeader";
-import "./dashboard/DeveloperPortal.css";
+import "./dashboard/CreatorPortal.css";
 
 // Placeholders for the new admin pages
 function GameAdmin() {

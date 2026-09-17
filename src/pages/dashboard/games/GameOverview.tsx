@@ -295,18 +295,9 @@ export function GameOverview(): React.ReactElement {
                 {game?.availableBalance && game.availableBalance !== '---' ? 'avail' : ''}
               </span>
             </div>
-            <button 
+            <button
+              className="btn btn--outline btn--accent btn--sm"
               disabled={!game?.availableBalance || game.availableBalance === '---' || game.availableBalance === '$0.00'}
-              style={{ 
-                padding: '6px 12px', 
-                fontSize: '12px', 
-                fontWeight: 600, 
-                color: (!game?.availableBalance || game.availableBalance === '---' || game.availableBalance === '$0.00') ? 'var(--portal-muted)' : 'var(--portal-purple)', 
-                background: (!game?.availableBalance || game.availableBalance === '---' || game.availableBalance === '$0.00') ? '#f3f4f6' : 'var(--portal-purple-soft)', 
-                border: 'none', 
-                borderRadius: '6px', 
-                cursor: (!game?.availableBalance || game.availableBalance === '---' || game.availableBalance === '$0.00') ? 'not-allowed' : 'pointer' 
-              }}
             >
               Withdraw
             </button>
@@ -352,23 +343,10 @@ export function GameOverview(): React.ReactElement {
                       <CheckCircle2 size={14} /> Saved
                     </span>
                   )}
-                  <button 
+                  <button
+                    className="btn btn--outline btn--accent btn--sm"
                     onClick={handleSaveMeta}
                     disabled={savingField === "meta"}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      background: '#fff',
-                      color: 'var(--portal-purple)',
-                      border: '1px solid var(--portal-purple)',
-                      borderRadius: '6px',
-                      cursor: savingField === "meta" ? 'not-allowed' : 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      opacity: savingField === "meta" ? 0.7 : 1
-                    }}
                   >
                     {savingField === "meta" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                     Save Meta Options
@@ -453,22 +431,10 @@ export function GameOverview(): React.ReactElement {
                 </div>
 
                 <button
+                  className="btn btn--outline btn--accent btn--sm"
                   type="button"
                   onClick={handleSaveDescription}
                   disabled={savingField === "desc"}
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    background: '#fff',
-                    color: 'var(--portal-purple)',
-                    border: '1px solid var(--portal-purple)',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
                 >
                   {savingField === "desc" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                   Save Description
@@ -521,7 +487,7 @@ export function GameOverview(): React.ReactElement {
                 display: 'flex',
                 flexDirection: 'column'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '12px' }}>
+                <div className="game-profile-media-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       Cover Image <strong style={{ color: '#ef4444' }}>*</strong>
@@ -538,23 +504,10 @@ export function GameOverview(): React.ReactElement {
                       </span>
                     )}
                     <button
+                      className="btn btn--outline btn--accent btn--sm"
                       type="button"
                       onClick={handleSaveCoverImage}
                       disabled={savingField === "cover"}
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background: '#fff',
-                        color: 'var(--portal-purple)',
-                        border: '1px solid var(--portal-purple)',
-                        borderRadius: '6px',
-                        cursor: savingField === "cover" ? 'not-allowed' : 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        opacity: savingField === "cover" ? 0.7 : 1
-                      }}
                     >
                       {savingField === "cover" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                       Save Cover
@@ -591,7 +544,7 @@ export function GameOverview(): React.ReactElement {
                 display: 'flex',
                 flexDirection: 'column'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '12px' }}>
+                <div className="game-profile-media-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       Game Animation <span style={{ fontWeight: 400, color: 'var(--portal-muted)' }}>(Optional)</span>
@@ -608,23 +561,10 @@ export function GameOverview(): React.ReactElement {
                       </span>
                     )}
                     <button
+                      className="btn btn--outline btn--accent btn--sm"
                       type="button"
                       onClick={handleSaveAnimation}
                       disabled={savingField === "anim"}
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background: '#fff',
-                        color: 'var(--portal-purple)',
-                        border: '1px solid var(--portal-purple)',
-                        borderRadius: '6px',
-                        cursor: savingField === "anim" ? 'not-allowed' : 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        opacity: savingField === "anim" ? 0.7 : 1
-                      }}
                     >
                       {savingField === "anim" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                       Save Animation
