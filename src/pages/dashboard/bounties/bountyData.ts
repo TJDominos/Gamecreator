@@ -21,6 +21,7 @@ export interface Creator {
 
 export interface GameExample {
   id: string;
+  type?: string;
   title: string;
   thumbnail: string;
   url: string;
@@ -58,6 +59,9 @@ export interface Bounty {
   publishedGames?: PublishedGame[];
   winners?: Winner[];
   videoUrl?: string;
+  maxParticipants?: number;
+  releaseDate?: string;
+  settlementRules?: string;
   totalScore?: number;
   myGameName?: string;
   myGameScore?: number;

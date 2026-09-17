@@ -16,9 +16,13 @@ interface RawBounty {
   deadline?: string | null;
   battle_end?: string | null;
   video_url?: string | null;
+  max_participants?: number | null;
+  release_date?: string | null;
+  settlement_rules?: string | null;
   is_subscribed?: boolean | number;
   examples?: Array<{
     id: string;
+    type?: string | null;
     title?: string | null;
     thumbnail?: string | null;
     url?: string | null;
@@ -61,6 +65,7 @@ function parseTags(tags: RawBounty["tags"]): string[] {
 function mapExample(example: NonNullable<RawBounty["examples"]>[number]): GameExample {
   return {
     id: example.id,
+    type: example.type || "web",
     title: example.title || "Game example",
     thumbnail: example.thumbnail || "",
     url: example.url || "#",
@@ -96,6 +101,9 @@ export function mapBounty(raw: RawBounty): Bounty {
     deadline: raw.deadline || "",
     battleEnd: raw.battle_end || undefined,
     videoUrl: raw.video_url || undefined,
+    maxParticipants: raw.max_participants ?? undefined,
+    releaseDate: raw.release_date || undefined,
+    settlementRules: raw.settlement_rules || undefined,
     isSubscribed: Boolean(raw.is_subscribed),
     examples: raw.examples?.map(mapExample),
     participants: raw.participants,

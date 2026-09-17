@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TipTapEditor } from '../../../components/TipTapEditor';
-import { Target, Plus, Search, Filter, ArrowRight, ArrowLeft, Trash2, Save } from 'lucide-react';
+import { Target, Plus, Search, Filter, ArrowRight, ArrowLeft, Trash2, Save, Edit2 } from 'lucide-react';
 import { Bounty, Category } from './bountyData';
 import { GAME_CATEGORIES } from '../games/gameData';
 import { bountyApi, mapBounty } from '../../../services/bountyApi';
@@ -17,7 +17,7 @@ export function BountyManagement(): React.ReactElement {
     fetchBounties();
   }, []);
 
-  const fetchBounties = async () => {
+  const fetchBounties = async (): Promise<Bounty[]> => {
     try {
       const token = localStorage.getItem("randseed_custom_jwt");
       const res = await fetch("/api/admin/bounties", {
@@ -25,18 +25,23 @@ export function BountyManagement(): React.ReactElement {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.bounties) setBounties(data.bounties.map(mapBounty));
+        if (data.bounties) {
+          const nextBounties = data.bounties.map(mapBounty);
+          setBounties(nextBounties);
+          return nextBounties;
+        }
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+    return [];
   };
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'participants'>('list');
   const [selectedBounty, setSelectedBounty] = useState<Bounty | null>(null);
   
-  const [filterState, setFilterState] = useState<'ALL' | 'DRAFT' | 'OPEN' | 'RUNNING' | 'ONLINE' | 'CLOSED'>('ALL');
+  const [filterState, setFilterState] = useState<'ACTIVE' | 'CLOSED' | 'DRAFT'>('ACTIVE');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -71,12 +76,12 @@ export function BountyManagement(): React.ReactElement {
       thumbnailUrl: b.videoUrl || '',
       poolAmount: b.prizePool,
       currency: b.currency,
-      maxParticipants: 100, // Default mock
+      maxParticipants: b.maxParticipants ?? 100,
       participationEndDate: b.deadline.split('T')[0],
-      releaseDate: '',
+      releaseDate: b.releaseDate || '',
       distributionDate: b.battleEnd ? b.battleEnd.split('T')[0] : '',
-      settlementRules: 'Default Distribution Algorithm',
-      examples: b.examples ? b.examples.map(ex => ({ type: 'web', url: ex.url, thumbnail: ex.thumbnail })) : []
+      settlementRules: b.settlementRules || 'Default Distribution Algorithm',
+      examples: b.examples ? b.examples.map(ex => ({ type: ex.type || 'web', name: ex.title, url: ex.url, thumbnail: ex.thumbnail })) : []
     };
     setForm(nextForm);
     formRef.current = nextForm;
@@ -116,16 +121,47 @@ export function BountyManagement(): React.ReactElement {
       if (!res.ok || data.success === false) {
         throw new Error(data.error || data.message || "Failed to save bounty");
       }
-      await fetchBounties();
+      const refreshedBounties = await fetchBounties();
       lastSavedFormRef.current = form;
       if (isAutoSave) {
         setAutoSaveStatus("Saved at " + new Date().toLocaleTimeString());
       } else {
+        const savedState = stateOverride || selectedBounty?.state || 'DRAFT';
+        const savedBountyId = isEdit ? selectedBounty?.id : data.id;
+        if (savedState === 'DRAFT' && savedBountyId) {
+          const savedBounty = refreshedBounties.find((bounty) => bounty.id === savedBountyId) || {
+            id: savedBountyId,
+            title: form.title,
+            description: form.shortDesc,
+            fullDescription: form.fullDesc,
+            state: 'DRAFT' as const,
+            category: form.category,
+            prizePool: form.poolAmount,
+            currency: form.currency,
+            tags: [],
+            subscriptions: 0,
+            onlineGames: 0,
+            deadline: form.participationEndDate,
+            battleEnd: form.distributionDate,
+            maxParticipants: form.maxParticipants,
+            releaseDate: form.releaseDate,
+            settlementRules: form.settlementRules,
+            videoUrl: form.thumbnailUrl,
+            examples: form.examples.map((example, index) => ({
+              id: `${savedBountyId}-example-${index}`,
+              title: example.name || 'Game example',
+              thumbnail: example.thumbnail,
+              url: example.url,
+            })),
+          };
+          setSelectedBounty(savedBounty);
+          setView('edit');
+        }
         setToast({
-          message: stateOverride === 'OPEN' ? 'Bounty published.' : selectedBounty ? 'Bounty changes saved.' : 'Bounty draft saved.',
+          message: savedState === 'OPEN' ? 'Bounty published.' : savedState === 'DRAFT' ? 'Bounty draft saved.' : 'Bounty changes saved.',
           tone: 'success',
         });
-        setView('list');
+        if (savedState !== 'DRAFT') setView('list');
       }
     } catch (err) {
       console.error(err);
@@ -159,7 +195,9 @@ export function BountyManagement(): React.ReactElement {
   };
 
   const filteredBounties = bounties.filter(b => {
-    const matchState = filterState === 'ALL' || b.state === filterState;
+    const matchState = filterState === 'ACTIVE'
+      ? b.state !== 'DRAFT' && b.state !== 'CLOSED'
+      : b.state === filterState;
     const matchSearch = b.title.toLowerCase().includes(searchQuery.toLowerCase()) || b.id.toLowerCase().includes(searchQuery.toLowerCase());
     return matchState && matchSearch;
   });
@@ -181,8 +219,8 @@ export function BountyManagement(): React.ReactElement {
           </div>
           
           {view === 'list' && (
-            <button 
-              className="primary-action" 
+            <button
+              className="btn btn--solid"
               onClick={() => {
                 setForm({
                   title: '', category: 'Arcade', shortDesc: '', fullDesc: '', thumbnailUrl: '',
@@ -192,16 +230,15 @@ export function BountyManagement(): React.ReactElement {
                 });
                 setView('create');
               }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', background: '#111827', border: 'none', borderRadius: '8px', padding: '10px 16px', fontWeight: 700, cursor: 'pointer' }}
             >
-              <Plus size={16} /> Create New Bounty
+              <Plus className="btn__icon" size={16} /> Create New Bounty
             </button>
           )}
         </header>
 
         {(view === 'create' || view === 'edit') && (
           <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '32px', marginBottom: '32px' }}>
-            <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--portal-muted)', marginBottom: '24px', padding: 0 }}>
+            <button className="btn btn--outline btn--sm" onClick={() => setView('list')}>
               <ArrowLeft size={16} /> Back to List
             </button>
             <h2 style={{ fontSize: '20px', margin: '0 0 24px' }}>{view === 'create' ? 'Create New Bounty' : 'Edit Bounty'}</h2>
@@ -209,8 +246,8 @@ export function BountyManagement(): React.ReactElement {
               <span className="portal-note" style={{ marginRight: 'auto', color: '#6b7280', fontSize: '12px' }} aria-live="polite">
                 {view === 'edit' ? (autoSaveStatus || 'Changes save automatically') : 'Save this bounty as a draft'}
               </span>
-              <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '10px 16px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
-              <button type="button" onClick={() => void handleSave(false, view === 'create' ? 'DRAFT' : undefined)} disabled={isSaving} style={{ padding: '10px 18px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>
+              <button className="btn btn--outline" type="button" onClick={() => setView('list')} disabled={isSaving}>Cancel</button>
+              <button className="btn btn--solid" type="button" onClick={() => void handleSave(false, view === 'create' ? 'DRAFT' : undefined)} disabled={isSaving}>
                 {isSaving ? 'Saving...' : view === 'create' ? 'Save Draft' : 'Save Changes'}
               </button>
             </div>
@@ -304,42 +341,42 @@ export function BountyManagement(): React.ReactElement {
               <div className="field--wide" style={{ gridColumn: 'span 2' }}>
                 <span style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   Game Examples
-                  <button type="button" onClick={() => setForm({...form, examples: [...form.examples, { type: 'web', name: '', url: '', thumbnail: '' }]})} style={{ background: 'none', border: 'none', color: 'var(--portal-purple)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Plus size={14} /> Add Example
+                  <button className="btn btn--outline btn--sm" type="button" onClick={() => setForm({...form, examples: [...form.examples, { type: 'web', name: '', url: '', thumbnail: '' }]})}>
+                    <Plus className="btn__icon" size={14} /> Add Example
                   </button>
                 </span>
                 
                 {form.examples.map((ex, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr 1fr 40px', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
-                    <select value={ex.type} onChange={e => {
+                  <div key={i} className="bounty-example-row">
+                    <select className="bounty-example-type" value={ex.type} onChange={e => {
                       const newEx = [...form.examples];
                       newEx[i].type = e.target.value;
                       setForm({...form, examples: newEx});
-                    }} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #dcd7e0', backgroundColor: '#fff' }}>
+                    }}>
                       <option value="image">Image</option>
                       <option value="video">Video</option>
                       <option value="web">Web Link</option>
                     </select>
-                    <input type="text" placeholder="Game Name" value={(ex as any).name || ''} onChange={e => {
+                    <input className="bounty-example-name" type="text" placeholder="Game Name" value={(ex as any).name || ''} onChange={e => {
                       const newEx = [...form.examples];
                       (newEx[i] as any).name = e.target.value;
                       setForm({...form, examples: newEx});
-                    }} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #dcd7e0' }} />
-                    <input type="text" placeholder="URL Link" value={ex.url} onChange={e => {
+                    }} />
+                    <input className="bounty-example-url" type="text" placeholder="URL Link" value={ex.url} onChange={e => {
                       const newEx = [...form.examples];
                       newEx[i].url = e.target.value;
                       setForm({...form, examples: newEx});
-                    }} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #dcd7e0' }} />
-                    <input type="text" placeholder="Thumbnail URL" value={ex.thumbnail} onChange={e => {
+                    }} />
+                    <input className="bounty-example-thumbnail" type="text" placeholder="Thumbnail URL" value={ex.thumbnail} onChange={e => {
                       const newEx = [...form.examples];
                       newEx[i].thumbnail = e.target.value;
                       setForm({...form, examples: newEx});
-                    }} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #dcd7e0' }} />
-                    <button type="button" onClick={() => {
+                    }} />
+                    <button className="btn btn--solid btn--accent btn--icon-only bounty-example-delete" type="button" aria-label="Remove game example" onClick={() => {
                       const newEx = [...form.examples];
                       newEx.splice(i, 1);
                       setForm({...form, examples: newEx});
-                    }} style={{ background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '6px', height: '38px', width: '38px', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+                    }}>
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -355,8 +392,8 @@ export function BountyManagement(): React.ReactElement {
                  </button>
               )}
               <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
-                <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '12px 24px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>
-                <button type="button" onClick={() => void handleSave(false, view === 'create' || selectedBounty?.state === 'DRAFT' ? 'OPEN' : undefined)} disabled={isSaving} style={{ padding: '12px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving...' : view === 'create' || selectedBounty?.state === 'DRAFT' ? 'Publish Bounty' : 'Save Changes'}</button>
+                <button className="btn btn--outline" type="button" onClick={() => setView('list')} disabled={isSaving}>Cancel</button>
+                <button className="btn btn--solid" type="button" onClick={() => void handleSave(false, view === 'create' || selectedBounty?.state === 'DRAFT' ? 'OPEN' : undefined)} disabled={isSaving}>{isSaving ? 'Saving...' : view === 'create' || selectedBounty?.state === 'DRAFT' ? 'Publish Bounty' : 'Save Changes'}</button>
               </div>
             </div>
           </div>
@@ -498,20 +535,20 @@ export function BountyManagement(): React.ReactElement {
                     style={{ padding: '8px 12px 8px 32px', border: '1px solid var(--portal-border)', borderRadius: '8px', fontSize: '13px', width: '200px' }}
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '4px' }}>
-                  <Filter size={16} color="var(--portal-muted)" style={{ margin: '0 4px' }} />
-                  <select 
-                    value={filterState} 
-                    onChange={(e) => setFilterState(e.target.value as any)}
-                    style={{ border: 'none', background: 'transparent', fontSize: '13px', fontWeight: 500, outline: 'none' }}
-                  >
-                    <option value="ALL">All States</option>
-                    <option value="DRAFT">Draft</option>
-                    <option value="OPEN">Open</option>
-                    <option value="RUNNING">Development</option>
-                    <option value="ONLINE">Online</option>
-                    <option value="CLOSED">Closed</option>
-                  </select>
+                <div className="admin-bounty-tabs" role="tablist" aria-label="Bounty state">
+                  <Filter size={16} color="var(--portal-muted)" aria-hidden="true" />
+                  {(['ACTIVE', 'CLOSED', 'DRAFT'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={filterState === tab}
+                      className={`admin-bounty-tab${filterState === tab ? ' is-active' : ''}`}
+                      onClick={() => setFilterState(tab)}
+                    >
+                      {tab === 'ACTIVE' ? 'Active' : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -530,7 +567,20 @@ export function BountyManagement(): React.ReactElement {
               <tbody>
                 {filteredBounties.length > 0 ? (
                   filteredBounties.map(b => (
-                    <tr key={b.id} style={{ borderBottom: '1px solid var(--portal-border)' }}>
+                    <tr
+                      key={b.id}
+                      className={b.state === 'DRAFT' ? 'admin-bounty-row--draft' : undefined}
+                      onClick={b.state === 'DRAFT' ? () => handleEdit(b) : undefined}
+                      onKeyDown={b.state === 'DRAFT' ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleEdit(b);
+                        }
+                      } : undefined}
+                      tabIndex={b.state === 'DRAFT' ? 0 : -1}
+                      aria-label={b.state === 'DRAFT' ? `Continue editing ${b.title}` : undefined}
+                      style={{ borderBottom: '1px solid var(--portal-border)' }}
+                    >
                       <td style={{ padding: '16px 24px' }}>
                         <div style={{ fontSize: '14px', fontWeight: 600 }}>{b.title}</div>
                         <div style={{ fontSize: '12px', color: 'var(--portal-muted)', fontFamily: 'monospace' }}>{b.id}</div>
@@ -558,12 +608,16 @@ export function BountyManagement(): React.ReactElement {
                       </td>
                       <td style={{ padding: '16px 24px' }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <button onClick={() => handleEdit(b)} style={{ padding: '6px 12px', background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                            Edit
-                          </button>
-                          <button onClick={() => { setSelectedBounty(b); setView('participants'); setCurrentPage(1); }} style={{ padding: '6px 12px', background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                            View Participants
-                          </button>
+                          {b.state !== 'DRAFT' && b.state !== 'CLOSED' && (
+                            <button className="btn btn--solid btn--accent btn--sm" onClick={() => handleEdit(b)}>
+                              <Edit2 className="btn__icon" size={14} /> Edit
+                            </button>
+                          )}
+                          {b.state !== 'DRAFT' && (
+                            <button className="btn btn--outline btn--sm" onClick={() => { setSelectedBounty(b); setView('participants'); setCurrentPage(1); }}>
+                              View Participants
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

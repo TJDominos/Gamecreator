@@ -51,6 +51,33 @@
   font-size: var(--font-size-xs) !important;
 }
 
+.admin-bounty-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs);
+  border: 1px solid var(--portal-border);
+  border-radius: var(--radius-md);
+}
+
+.admin-bounty-tab {
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--portal-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-bounty-tab:hover,
+.admin-bounty-tab:focus-visible,
+.admin-bounty-tab.is-active {
+  color: var(--portal-ink);
+  background: var(--color-purple-50);
+}
+
 .portal-layout *,
 .onboarding-page * {
   box-sizing: border-box;
@@ -792,6 +819,53 @@
   gap: 24px;
 }
 
+.bounty-example-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) repeat(3, minmax(0, 1fr)) 40px;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  margin-bottom: var(--space-sm);
+}
+
+.bounty-example-row > * {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bounty-example-row input,
+.bounty-example-row select {
+  min-width: 0;
+  padding: 11px 12px;
+  color: var(--portal-ink);
+  background: #fbfafc;
+  border: 1px solid #dcd7e0;
+  border-radius: 9px;
+  outline: none;
+  font: inherit;
+}
+
+.bounty-example-row input:focus,
+.bounty-example-row select:focus {
+  border-color: var(--portal-purple);
+  box-shadow: 0 0 0 3px rgba(97, 54, 154, 0.1);
+}
+
+.bounty-example-delete {
+  justify-self: end;
+}
+
+.admin-bounty-row--draft {
+  cursor: pointer;
+}
+
+.admin-bounty-row--draft:hover,
+.admin-bounty-row--draft:focus-visible {
+  background: var(--color-purple-50);
+  outline: none;
+}
+
 .field small {
   color: #98929f;
   font-size: var(--font-size-xs);
@@ -918,6 +992,19 @@
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .bounty-example-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+  }
+
+  .bounty-example-type {
+    grid-column: 1 / -1;
+  }
+
+  .bounty-example-delete {
+    grid-column: 3;
+    grid-row: 3;
+  }
 }
 
 @media (max-width: 640px) {
@@ -947,6 +1034,23 @@
   .onboarding-form,
   .admin-bounty-form {
     grid-template-columns: 1fr;
+  }
+
+  .bounty-example-row {
+    grid-template-columns: minmax(0, 1fr) 40px;
+    gap: var(--space-xs);
+  }
+
+  .bounty-example-type,
+  .bounty-example-name,
+  .bounty-example-url,
+  .bounty-example-thumbnail {
+    grid-column: 1;
+  }
+
+  .bounty-example-delete {
+    grid-column: 2;
+    grid-row: 4;
   }
 
   .field--wide,

@@ -80,32 +80,36 @@ async function handleCreateBounty(request: Request, env: Env): Promise<Response>
     const description = body.shortDesc ?? body.description ?? "";
     const fullDescription = nullableText(body.fullDesc ?? body.fullDescription);
     const prizePool = body.poolAmount ?? body.prizePool ?? 0;
+    const maxParticipants = body.maxParticipants ?? body.max_participants ?? 100;
     const deadline = nullableText(body.participationEndDate ?? body.deadline);
+    const releaseDate = nullableText(body.releaseDate ?? body.release_date);
     const battleEnd = nullableText(body.distributionDate ?? body.battleEnd);
     const videoUrl = nullableText(body.videoUrl ?? body.thumbnailUrl);
+    const settlementRules = body.settlementRules ?? body.settlement_rules ?? "Default Distribution Algorithm";
 
     await env.DB.prepare(`
       INSERT INTO bounties (
         id, title, description, full_description, state, category, 
-        prize_pool, currency, tags, deadline, battle_end, video_url, 
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        prize_pool, currency, tags, max_participants, deadline, release_date,
+        battle_end, video_url, settlement_rules, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, body.title ?? "", description, fullDescription,
       body.state ?? 'OPEN', body.category ?? "", prizePool, body.currency ?? "WLT",
-      JSON.stringify(body.tags ?? []), deadline,
-      battleEnd, videoUrl, now, now
+      JSON.stringify(body.tags ?? []), maxParticipants, deadline, releaseDate,
+      battleEnd, videoUrl, settlementRules, now, now
     ).run();
 
     // Insert examples if any
     if (body.examples && Array.isArray(body.examples)) {
       for (const ex of body.examples) {
         await env.DB.prepare(`
-          INSERT INTO bounty_examples (id, bounty_id, title, thumbnail, url)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO bounty_examples (id, bounty_id, type, title, thumbnail, url)
+          VALUES (?, ?, ?, ?, ?, ?)
         `).bind(
           generateId(),
           id,
+          ex.type ?? "web",
           nullableText(ex.title ?? ex.name),
           nullableText(ex.thumbnail ?? ex.thumbnailUrl),
           nullableText(ex.url),
@@ -135,21 +139,25 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
     const description = body.shortDesc ?? body.description ?? "";
     const fullDescription = nullableText(body.fullDesc ?? body.fullDescription);
     const prizePool = body.poolAmount ?? body.prizePool ?? 0;
+    const maxParticipants = body.maxParticipants ?? body.max_participants ?? 100;
     const deadline = nullableText(body.participationEndDate ?? body.deadline);
+    const releaseDate = nullableText(body.releaseDate ?? body.release_date);
     const battleEnd = nullableText(body.distributionDate ?? body.battleEnd);
     const videoUrl = nullableText(body.videoUrl ?? body.thumbnailUrl);
+    const settlementRules = body.settlementRules ?? body.settlement_rules ?? "Default Distribution Algorithm";
 
     await env.DB.prepare(`
       UPDATE bounties SET 
         title = ?, description = ?, full_description = ?, state = COALESCE(?, state), category = ?,
-        prize_pool = ?, currency = ?, tags = ?, deadline = ?, battle_end = ?, video_url = ?, 
+        prize_pool = ?, currency = ?, tags = ?, max_participants = ?, deadline = ?, release_date = ?,
+        battle_end = ?, video_url = ?, settlement_rules = ?,
         updated_at = ?
       WHERE id = ?
     `).bind(
       body.title ?? "", description, fullDescription,
       body.state ?? null, body.category ?? "", prizePool, body.currency ?? "WLT",
-      JSON.stringify(body.tags ?? []), deadline,
-      battleEnd, videoUrl, now, id
+      JSON.stringify(body.tags ?? []), maxParticipants, deadline, releaseDate,
+      battleEnd, videoUrl, settlementRules, now, id
     ).run();
 
     // Recreate examples (naive approach: delete and insert)
@@ -157,8 +165,8 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
     if (body.examples && Array.isArray(body.examples)) {
       for (const ex of body.examples) {
         await env.DB.prepare(`
-          INSERT INTO bounty_examples (id, bounty_id, title, thumbnail, url)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO bounty_examples (id, bounty_id, type, title, thumbnail, url)
+          VALUES (?, ?, ?, ?, ?, ?)
         `).bind(
           generateId(),
           id,
@@ -245,7 +253,7 @@ async function attachBountyDetails(
   principalId?: string,
 ): Promise<any> {
   const { results: examples } = await env.DB.prepare(
-    "SELECT id, title, thumbnail, url FROM bounty_examples WHERE bounty_id = ? ORDER BY id",
+    "SELECT id, type, title, thumbnail, url FROM bounty_examples WHERE bounty_id = ? ORDER BY id",
   ).bind(bounty.id).all();
 
   const { results: participants } = await env.DB.prepare(`
