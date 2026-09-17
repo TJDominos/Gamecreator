@@ -5,13 +5,15 @@
 
 :root {
   --max-content-width-pc: 1024px;
-  --app-font-family: "SF Pro", "Segoe UI", Roboto;
-  --app-font-display: "SF Pro", "Segoe UI", Roboto;
+  --app-font-family: "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --app-font-display: "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   overflow-x: hidden;
+  font-family: var(--app-font-family);
+  font-size: var(--font-size-sm);
 }
 
 .route-loading {

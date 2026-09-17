@@ -1,6 +1,4 @@
 
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap");
-
 .portal-layout,
 .onboarding-page {
   --portal-ink: #17151d;
@@ -11,7 +9,30 @@
   min-height: 100vh;
   color: var(--portal-ink);
   background: #f7f6f8;
-  font-family: "Manrope", sans-serif;
+  font-family: "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: var(--font-size-sm);
+}
+
+.portal-layout :where(p, label, th, td, input, select, textarea, button) {
+  font-size: var(--font-size-sm) !important;
+}
+
+.portal-layout :where(small, .portal-note) {
+  font-size: var(--font-size-xs) !important;
+}
+
+.portal-layout [style*="font-size: 9px"],
+.portal-layout [style*="font-size: 10px"],
+.portal-layout [style*="font-size: 11px"],
+.portal-layout [style*="font-size: 12px"],
+.portal-layout [style*="font-size: 13px"] {
+  font-size: var(--font-size-sm) !important;
+}
+
+.portal-layout small,
+.portal-layout .portal-note,
+.portal-layout .status-pill {
+  font-size: var(--font-size-xs) !important;
 }
 
 .portal-layout *,
@@ -25,7 +46,7 @@
 .onboarding-page h1,
 .onboarding-page strong,
 .portal-brand {
-  font-family: "Bricolage Grotesque", sans-serif !important;
+  font-family: inherit !important;
 }
 
 .portal-layout a,
@@ -40,7 +61,7 @@
   inset: 0 auto 0 0;
   display: flex;
   width: 270px;
-  padding: 22px 16px 18px;
+  padding: var(--space-lg) var(--space-md) var(--space-md);
   flex-direction: column;
   background: #17151d;
   color: #fff;
@@ -50,13 +71,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px;
+  padding: 0 var(--space-xs);
 }
 
 .portal-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -67,12 +88,12 @@
 }
 
 .portal-brand b {
-  padding: 3px 7px;
+  padding: var(--space-xxs) var(--space-xs);
   color: #cba8f3;
   background: rgba(173, 118, 229, 0.14);
   border-radius: 6px;
-  font-family: "Manrope", sans-serif;
-  font-size: 9px;
+  font-family: inherit;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -81,9 +102,9 @@
   display: grid;
   grid-template-columns: 38px 1fr 16px;
   align-items: center;
-  margin: 28px 0 22px;
-  padding: 11px;
-  gap: 10px;
+  margin: var(--space-lg) 0;
+  padding: var(--space-sm);
+  gap: var(--space-xs);
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
@@ -118,12 +139,12 @@
 .organization-switcher small {
   margin-bottom: 2px;
   color: rgba(255, 255, 255, 0.46);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
 }
 
 .organization-switcher strong {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .organization-switcher > svg {
@@ -135,19 +156,19 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 5px;
-  margin-top: 32px;
+  gap: var(--space-xxs);
+  margin-top: var(--space-xl);
 }
 
 .portal-nav a {
   display: flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 12px;
-  gap: 12px;
+  padding: 0 var(--space-sm);
+  gap: var(--space-sm);
   color: rgba(255, 255, 255, 0.62);
   border-radius: 10px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   transition: 160ms ease;
 }
@@ -171,8 +192,8 @@
 .sidebar-help {
   display: flex;
   flex-direction: column;
-  padding: 13px;
-  gap: 12px;
+  padding: var(--space-sm);
+  gap: var(--space-sm);
   color: rgba(255, 255, 255, 0.6);
   border-top: 1px solid rgba(255, 255, 255, 0.09);
 }
@@ -194,7 +215,7 @@
 .sidebar-help strong,
 .sidebar-help a {
   display: block;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .sidebar-help a {
@@ -213,7 +234,7 @@
   align-items: center;
   margin-top: 0;
   color: #cba8f3;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   word-break: break-all;
   text-decoration: none;
   transition: color 0.15s ease;
@@ -244,7 +265,7 @@
   justify-content: space-between;
   align-items: center;
   min-height: 72px;
-  padding: 0 32px;
+  padding: 0 var(--space-xl);
   background: rgba(255, 255, 255, 0.88);
   border-bottom: 1px solid var(--portal-border);
   backdrop-filter: blur(12px);
@@ -257,7 +278,7 @@
 
 .portal-topbar > div:first-of-type small {
   color: var(--portal-muted);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -275,8 +296,8 @@
 .portal-account > button {
   display: flex;
   align-items: center;
-  padding: 5px 7px;
-  gap: 9px;
+  padding: var(--space-xxs) var(--space-xs);
+  gap: var(--space-xs);
   background: transparent;
   border: 0;
   border-radius: 10px;
@@ -309,14 +330,14 @@
 }
 
 .portal-account strong {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .portal-account small {
   max-width: 115px;
   overflow: hidden;
   color: var(--portal-muted);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
 }
 
@@ -326,12 +347,12 @@
 
 .account-menu {
   position: absolute;
-  top: calc(100% + 7px);
+  top: calc(100% + var(--space-xxs));
   left: 0;
   right: 0;
   width: 100%;
   min-width: 0;
-  padding: 5px;
+  padding: var(--space-xxs);
   box-sizing: border-box;
   background: #fff;
   border: 1px solid var(--portal-border);
@@ -344,8 +365,8 @@
   width: 100%;
   box-sizing: border-box;
   align-items: center;
-  padding: 8px 12px;
-  gap: 18px;
+  padding: var(--space-xs) var(--space-sm);
+  gap: var(--space-md);
   background: transparent;
   border: 0;
   border-radius: 7px;
@@ -364,20 +385,20 @@
 .portal-content {
   width: min(1180px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 40px 0 70px;
+  padding: var(--space-10) 0 var(--space-3xl);
 }
 
 .dashboard-welcome {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: var(--space-lg);
 }
 
 .portal-eyebrow {
-  margin: 0 0 7px;
+  margin: 0 0 var(--space-xs);
   color: var(--portal-purple);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -386,15 +407,15 @@
 .dashboard-welcome h1,
 .placeholder-page h1 {
   margin: 0;
-  font-size: clamp(32px, 4vw, 46px);
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.05em;
 }
 
 .dashboard-welcome p:last-child,
 .placeholder-page > p:last-child {
-  margin: 8px 0 0;
+  margin: var(--space-xs) 0 0;
   color: var(--portal-muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .primary-action,
@@ -403,14 +424,14 @@
   align-items: center;
   justify-content: center;
   min-height: 43px;
-  padding: 0 17px;
-  gap: 8px;
+  padding: 0 var(--space-md);
+  gap: var(--space-xs);
   color: #fff !important;
   background: var(--portal-purple);
   border: 0;
   border-radius: 9px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 700;
 }
 
@@ -425,7 +446,7 @@
 }
 
 .admin-shell {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -451,7 +472,7 @@
 .admin-page-header p {
   margin: 8px 0 0;
   color: var(--portal-muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .admin-shell .portal-sidebar {
@@ -469,7 +490,7 @@
 .admin-shell .sidebar-help-row {
   align-items: center;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
   text-decoration: none;
 }
@@ -503,7 +524,7 @@
 
 .stat-grid span {
   color: var(--portal-muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .stat-grid strong {
@@ -513,7 +534,7 @@
 
 .stat-grid small {
   color: #9b96a2;
-  font-size: 9px;
+  font-size: var(--font-size-xs);
 }
 
 .dashboard-grid {
@@ -566,7 +587,7 @@
   color: var(--portal-muted);
   background: #f2f0f3;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
 }
 
@@ -581,18 +602,18 @@
 }
 
 .next-action li strong {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .next-action li small {
   margin-top: 2px;
   color: var(--portal-muted);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
 }
 
 .next-action > a {
   color: var(--portal-purple);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 700;
 }
 
@@ -610,7 +631,7 @@
 .organization-summary dt,
 .organization-summary dd {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .organization-summary dt {
@@ -626,7 +647,7 @@
   color: #8a5314;
   background: #fff1d9;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: var(--font-size-xs);
 }
 
 .placeholder-page {
@@ -669,7 +690,7 @@
 
 .onboarding-header > span {
   color: var(--portal-muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .onboarding-card {
@@ -696,7 +717,7 @@
 .onboarding-intro > p:last-child {
   margin: 12px 0 0;
   color: var(--portal-muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.7;
 }
 
@@ -719,7 +740,7 @@
 }
 
 .field > span {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 700;
 }
 
@@ -734,7 +755,7 @@
   border-radius: 9px;
   outline: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
@@ -757,7 +778,7 @@
 
 .field small {
   color: #98929f;
-  font-size: 9px;
+  font-size: var(--font-size-xs);
 }
 
 .field-error,
@@ -808,7 +829,7 @@
   max-width: 420px;
   margin: 0;
   color: var(--portal-muted);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   line-height: 1.6;
 }
 
@@ -817,7 +838,7 @@
   align-items: center;
   margin: 0;
   gap: 7px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 
 .form-error svg {
@@ -945,7 +966,7 @@
   border: none;
   color: inherit;
   outline: none;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-family: inherit;
   cursor: pointer;
 }
@@ -968,7 +989,7 @@
   border: none;
   color: inherit;
   outline: none;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-family: inherit;
   cursor: pointer;
   width: 85px;
@@ -986,7 +1007,7 @@
 }
 
 .react-datepicker {
-  font-family: "Manrope", sans-serif !important;
+  font-family: "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
   border: 1px solid var(--portal-border) !important;
   border-radius: 8px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);

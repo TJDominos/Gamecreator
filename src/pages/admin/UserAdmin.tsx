@@ -126,13 +126,13 @@ export function UserAdmin(): React.ReactElement {
             placeholder="User Email Address" 
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
-            style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "12px" }}
+            style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "var(--font-size-sm)" }}
             required
           />
           <select 
             value={newRole}
             onChange={(e) => setNewRole(e.target.value)}
-            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "12px", background: "#fff" }}
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid #d1d5db", fontSize: "var(--font-size-sm)", background: "#fff" }}
           >
             <option value="admin">Administrator</option>
             <option value="creator">Creator</option>
@@ -148,10 +148,10 @@ export function UserAdmin(): React.ReactElement {
         <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>
-              <th style={{ padding: "16px", fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>Email / Principal</th>
-              <th style={{ padding: "16px", fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>Role</th>
-              <th style={{ padding: "16px", fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>Joined</th>
-              <th style={{ padding: "16px", fontSize: "12px", fontWeight: 600, color: "#6b7280", textAlign: "right" }}>Actions</th>
+              <th style={{ padding: "16px", fontSize: "var(--font-size-sm)", fontWeight: 600, color: "#6b7280" }}>Email / Principal</th>
+              <th style={{ padding: "16px", fontSize: "var(--font-size-sm)", fontWeight: 600, color: "#6b7280" }}>Role</th>
+              <th style={{ padding: "16px", fontSize: "var(--font-size-sm)", fontWeight: 600, color: "#6b7280" }}>Joined</th>
+              <th style={{ padding: "16px", fontSize: "var(--font-size-sm)", fontWeight: 600, color: "#6b7280", textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -164,11 +164,11 @@ export function UserAdmin(): React.ReactElement {
                 <tr key={u.principal_id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                   <td style={{ padding: "16px" }}>
                     <div style={{ fontSize: "14px", fontWeight: 500, color: "#111827" }}>{u.email || "No Email"}</div>
-                    <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px", fontFamily: "monospace" }}>{u.principal_id}</div>
+                    <div style={{ fontSize: "var(--font-size-xs)", color: "#6b7280", marginTop: "2px", fontFamily: "monospace" }}>{u.principal_id}</div>
                   </td>
                   <td style={{ padding: "16px" }}>
                     <span style={{ 
-                      padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 600,
+                      padding: "4px 8px", borderRadius: "6px", fontSize: "var(--font-size-xs)", fontWeight: 600,
                       background: u.role === "admin" ? "#fef3c7" : u.role === "creator" ? "#e0e7ff" : "#f3f4f6",
                       color: u.role === "admin" ? "#92400e" : u.role === "creator" ? "#3730a3" : "#4b5563"
                     }}>

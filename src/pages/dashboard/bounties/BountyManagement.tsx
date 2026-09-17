@@ -196,7 +196,7 @@ export function BountyManagement(): React.ReactElement {
             </button>
             <h2 style={{ fontSize: '20px', margin: '0 0 24px' }}>{view === 'create' ? 'Create New Bounty' : 'Edit Bounty'}</h2>
             <div style={{ position: 'sticky', top: '12px', zIndex: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', padding: '10px 12px', marginBottom: '24px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 14px rgba(17, 24, 39, 0.08)' }}>
-              <span style={{ marginRight: 'auto', color: '#6b7280', fontSize: '12px' }} aria-live="polite">
+              <span className="portal-note" style={{ marginRight: 'auto', color: '#6b7280', fontSize: '12px' }} aria-live="polite">
                 {view === 'edit' ? (autoSaveStatus || 'Changes save automatically') : 'Complete the form before publishing'}
               </span>
               <button type="button" onClick={() => setView('list')} disabled={isSaving} style={{ padding: '10px 16px', background: '#fff', color: '#111827', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isSaving ? 0.6 : 1 }}>Cancel</button>

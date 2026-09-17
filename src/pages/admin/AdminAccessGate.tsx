@@ -64,7 +64,7 @@ export function AdminAccessGate(): React.ReactElement {
             style={{
               width: "240px",
               minHeight: "40px",
-              fontSize: "13px",
+              fontSize: "var(--font-size-sm)",
               fontWeight: 600,
               background: "#f9fafb",
               color: "#4b5563",
@@ -88,7 +88,7 @@ export function AdminAccessGate(): React.ReactElement {
               display: "inline-flex",
               alignItems: "center",
               gap: "6px",
-              fontSize: "13px",
+              fontSize: "var(--font-size-sm)",
               color: "#64748b",
               textDecoration: "none",
             }}
