@@ -103,6 +103,31 @@ const generateId = () => `bty_${crypto.randomUUID().replace(/-/g, "").slice(0, 1
 const nullableText = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value : null;
 
+interface PublishedGameRow {
+  id: string;
+  game_id: string;
+  principal_id: string;
+  prize: string | null;
+  uu: number | null;
+  review_score: number | null;
+  performance_score: number | null;
+  is_winner: number | boolean;
+  game_name: string | null;
+  email: string | null;
+}
+
+interface MappedPublishedGame {
+  id: string;
+  gameId: string;
+  creator: { id: string; name: string; avatar: string };
+  gameName: string;
+  prize: string | null;
+  uu: number | null;
+  reviewScore: number | null;
+  performanceScore: number | null;
+  isWinner: boolean;
+}
+
 async function handleAdminListBounties(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
   if (!authUser || authUser.role !== "admin") {
@@ -382,9 +407,9 @@ async function attachBountyDetails(
     LEFT JOIN users u ON u.principal_id = p.principal_id
     WHERE p.bounty_id = ?
     ORDER BY p.performance_score DESC, p.published_at ASC
-  `).bind(bounty.id).all<any>();
+  `).bind(bounty.id).all<PublishedGameRow>();
 
-  const mappedGames = publishedGames.map((game) => ({
+  const mappedGames: MappedPublishedGame[] = publishedGames.map((game: PublishedGameRow) => ({
     id: game.id,
     gameId: game.game_id,
     creator: {
@@ -401,7 +426,7 @@ async function attachBountyDetails(
   }));
 
   const userGame = principalId
-    ? mappedGames.find((game) => game.creator.id === principalId)
+    ? mappedGames.find((game: MappedPublishedGame) => game.creator.id === principalId)
     : undefined;
 
   return {
@@ -413,8 +438,8 @@ async function attachBountyDetails(
       avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(participant.principal_id)}`,
       joinedAt: participant.joined_at,
     })),
-    published_games: mappedGames.filter((game) => !game.isWinner),
-    winners: mappedGames.filter((game) => game.isWinner),
+    published_games: mappedGames.filter((game: MappedPublishedGame) => !game.isWinner),
+    winners: mappedGames.filter((game: MappedPublishedGame) => game.isWinner),
     my_game_name: userGame?.gameName,
     my_game_score: userGame?.performanceScore,
   };

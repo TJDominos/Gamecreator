@@ -597,8 +597,8 @@ export function BountyManagement(): React.ReactElement {
                   Page {currentPage} of {Math.ceil(selectedBounty.participants.length / itemsPerPage)}
                 </span>
                 <button className="btn btn--outline btn--sm"
-                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(selectedBounty.participants.length / itemsPerPage), p + 1))}
-                  disabled={currentPage === Math.ceil(selectedBounty.participants.length / itemsPerPage)}
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil((selectedBounty.participants?.length ?? 0) / itemsPerPage), p + 1))}
+                  disabled={currentPage === Math.ceil((selectedBounty.participants?.length ?? 0) / itemsPerPage)}
                 >
                   Next
                 </button>
