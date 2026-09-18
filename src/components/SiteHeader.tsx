@@ -6,7 +6,7 @@ import { Menu, X } from "lucide-react";
 import "../pages/home/DeveloperLanding.css";
 
 export function SiteHeader(): React.ReactElement {
-  const { isSignedIn, profile, signInWithSSO } = useAuth();
+  const { isSignedIn, isCreator, signInWithSSO } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
@@ -15,7 +15,7 @@ export function SiteHeader(): React.ReactElement {
 
   function openPortal(): void {
     if (isSignedIn) {
-      if (profile?.role === 'creator' || profile?.role === 'admin') {
+      if (isCreator) {
         navigate("/dashboard");
       } else {
         setBecomeCreatorModalOpen(true);
@@ -53,7 +53,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
+              {isSignedIn ? (isCreator ? "My Games" : "Build Game") : "Sign In"}
             </button>
           </div>
           <div className="landing-nav__mobile-actions flex items-center gap-2">
@@ -63,7 +63,7 @@ export function SiteHeader(): React.ReactElement {
               type="button"
               onClick={openPortal}
             >
-              {isSignedIn ? ((profile?.role === 'creator' || profile?.role === 'admin') ? "My Games" : "Build Game") : "Sign In"}
+              {isSignedIn ? (isCreator ? "My Games" : "Build Game") : "Sign In"}
             </button>
             <button 
               className="landing-nav__hamburger"

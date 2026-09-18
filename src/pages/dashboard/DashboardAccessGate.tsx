@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Home } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
+import { BecomeCreatorModal } from "../../components/BecomeCreatorModal";
 import { Link } from "react-router";
 
 export function DashboardAccessGate(): React.ReactElement {
@@ -78,6 +79,7 @@ export function DashboardAccessGate(): React.ReactElement {
 
 export function CreatorAccessGate(): React.ReactElement {
   const { signOut } = useAuth();
+  const [isBecomeCreatorModalOpen, setBecomeCreatorModalOpen] = useState(false);
 
   return (
     <div
@@ -106,15 +108,29 @@ export function CreatorAccessGate(): React.ReactElement {
         <p style={{ margin: "0 0 24px", color: "#64748b", lineHeight: 1.5 }}>
           This portal is only available to Creator accounts. Your current account is signed in as a player.
         </p>
-        <button
-          type="button"
-          className="btn btn--solid"
-          onClick={() => void signOut()}
-          style={{ minWidth: "180px", justifyContent: "center" }}
-        >
-          Sign out
-        </button>
+        <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn btn--solid"
+            onClick={() => setBecomeCreatorModalOpen(true)}
+            style={{ minWidth: "180px", justifyContent: "center" }}
+          >
+            Become Creator
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={() => void signOut()}
+            style={{ minWidth: "120px", justifyContent: "center" }}
+          >
+            Sign out
+          </button>
+        </div>
       </div>
+      <BecomeCreatorModal
+        isOpen={isBecomeCreatorModalOpen}
+        onClose={() => setBecomeCreatorModalOpen(false)}
+      />
     </div>
   );
 }
