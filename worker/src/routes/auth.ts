@@ -1,20 +1,13 @@
 import type { DeveloperOrganizationRow, Env, UserRole, UserRow } from "../types";
 import { signJwt } from "../utils/crypto";
 import { errorResponse, jsonResponse } from "../utils/response";
-import { getAuthenticatedUser } from "../middleware/auth";
+import { getAuthenticatedUser, normalizeRoles } from "../middleware/auth";
 import { redeemSsoAuthorizationCode } from "../ic/sso";
 
 interface SsoRequestPayload {
   sso_code: string;
   redirect_uri: string;
   code_verifier: string;
-}
-
-interface MockLoginPayload {
-  role?: UserRole;
-  principal_id?: string;
-  email?: string;
-  is_email_verified?: boolean;
 }
 
 interface UpdateProfilePayload {
@@ -47,10 +40,6 @@ export async function handleAuthRoutes(
     return handleBecomeCreator(request, env);
   }
 
-  if (method === "POST" && pathname === "/api/auth/mock-login") {
-    return handleMockLogin(request, env);
-  }
-
   if (method === "PUT" && pathname === "/api/auth/profile") {
     return handleUpdateProfile(request, env);
   }
@@ -64,17 +53,31 @@ async function handleBecomeCreator(request: Request, env: Env): Promise<Response
     return errorResponse("Unauthorized", 401, "UNAUTHORIZED", request, env);
   }
 
-  if (authUser.role === "admin" || authUser.role === "creator") {
-    return jsonResponse({ success: true, role: authUser.role }, 200, request, env);
-  }
+  const user = await env.DB.prepare("SELECT * FROM users WHERE principal_id = ?")
+    .bind(authUser.principal_id)
+    .first<UserRow>();
+  if (!user) return errorResponse("User not found", 404, "USER_NOT_FOUND", request, env);
 
+  const roles = normalizeRoles(user.role, user.roles);
+  if (!roles.includes("creator")) roles.push("creator");
+  const primaryRole: UserRole = roles.includes("admin") ? "admin" : "creator";
   await env.DB.prepare(
-    "UPDATE users SET role = 'creator', updated_at = ? WHERE principal_id = ?",
+    "UPDATE users SET role = ?, roles = ?, updated_at = ? WHERE principal_id = ?",
   )
-    .bind(Date.now(), authUser.principal_id)
+    .bind(primaryRole, JSON.stringify(roles), Date.now(), authUser.principal_id)
     .run();
 
-  return jsonResponse({ success: true, role: "creator" }, 200, request, env);
+  const token = await signJwt(
+    {
+      principal_id: authUser.principal_id,
+      role: primaryRole,
+      roles,
+      email: user.email ?? undefined,
+      is_email_verified: user.email_verified === 1,
+    },
+    env.JWT_SECRET,
+  );
+  return jsonResponse({ success: true, role: primaryRole, roles, token }, 200, request, env);
 }
 
 async function handleSsoExchange(
@@ -144,36 +147,45 @@ async function handleSsoExchange(
       .split(",")
       .map((item) => item.trim().toLowerCase())
       .filter(Boolean);
-    let userRole: UserRole = email && configuredAdminEmails.includes(email.trim().toLowerCase())
-      ? "admin"
-      : initialRole;
+    const isConfiguredAdmin = Boolean(email && configuredAdminEmails.includes(email.trim().toLowerCase()));
+    let userRoles: UserRole[] = isConfiguredAdmin ? ["admin"] : [initialRole];
 
     if (existingUser) {
       // User already exists in D1, preserve established role and update login timestamp
-      userRole = configuredAdminEmails.includes((email || existingUser.email || "").trim().toLowerCase())
+      userRoles = normalizeRoles(existingUser.role || initialRole, existingUser.roles);
+      if (configuredAdminEmails.includes((email || existingUser.email || "").trim().toLowerCase()) && !userRoles.includes("admin")) {
+        userRoles.push("admin");
+      }
+      const userRole: UserRole = userRoles.includes("admin")
         ? "admin"
-        : existingUser.role || initialRole;
+        : userRoles.includes("creator")
+          ? "creator"
+          : "player";
       await env.DB.prepare(
         `UPDATE users 
          SET last_login_at = ?, 
              email = COALESCE(?, email), 
              email_verified = COALESCE(?, email_verified),
+             role = ?,
+             roles = ?,
              updated_at = ?
          WHERE principal_id = ?`,
       )
-        .bind(now, email, isEmailVerified ? 1 : 0, now, principalId)
+        .bind(now, email, isEmailVerified ? 1 : 0, userRole, JSON.stringify(userRoles), now, principalId)
         .run();
     } else {
+      const userRole: UserRole = userRoles.includes("admin") ? "admin" : "player";
       // Insert new Shadow User into D1
       await env.DB.prepare(
         `INSERT INTO users (
-           principal_id, role, email, email_verified, 
+           principal_id, role, roles, email, email_verified,
            last_login_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           principalId,
           userRole,
+          JSON.stringify(userRoles),
           email,
           isEmailVerified ? 1 : 0,
           now,
@@ -191,10 +203,16 @@ async function handleSsoExchange(
       .first<DeveloperOrganizationRow>();
 
     // 4. Issue Portal JWT session token
+    const finalUser = existingUser
+      ? await env.DB.prepare("SELECT * FROM users WHERE principal_id = ?").bind(principalId).first<UserRow>()
+      : { role: userRoles.includes("admin") ? "admin" as UserRole : "player" as UserRole, roles: JSON.stringify(userRoles) };
+    const userRole = finalUser?.role ?? "player";
+    const roles = normalizeRoles(userRole, finalUser?.roles);
     const token = await signJwt(
       {
         principal_id: principalId,
         role: userRole,
+        roles,
         email: email ?? undefined,
         is_email_verified: isEmailVerified,
       },
@@ -204,6 +222,7 @@ async function handleSsoExchange(
     const userProfile = {
       principal_id: principalId,
       role: userRole,
+      roles,
       email: email,
       isEmailVerified: isEmailVerified,
       lastPortalLoginAt: now,
@@ -257,6 +276,7 @@ async function handleGetMe(
     {
       principal_id: user.principal_id,
       role: user.role,
+      roles: normalizeRoles(user.role, user.roles),
       email: user.email ?? undefined,
       is_email_verified: user.email_verified === 1,
     },
@@ -270,6 +290,7 @@ async function handleGetMe(
       user: {
         principal_id: user.principal_id,
         role: user.role,
+        roles: normalizeRoles(user.role, user.roles),
         email: user.email,
         isEmailVerified: user.email_verified === 1,
         tosAcceptedVersion: user.tos_accepted_version,
@@ -288,83 +309,6 @@ async function handleGetMe(
     request,
     env,
   );
-}
-
-async function handleMockLogin(
-  request: Request,
-  env: Env,
-): Promise<Response> {
-  try {
-    if (env.ENVIRONMENT !== "dev" && env.ENVIRONMENT !== "test") {
-      return errorResponse("Mock login is disabled outside development and test environments", 404, "NOT_FOUND", request, env);
-    }
-    const body = (await request.json().catch(() => ({}))) as MockLoginPayload;
-    const role: UserRole = body.role ?? "creator";
-    const principalId = body.principal_id ?? `randseed:usr_${role}_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
-    const email = body.email ?? `${role}@example.com`;
-    const isEmailVerified = body.is_email_verified ?? true;
-    const now = Date.now();
-
-    await env.DB.prepare(
-      `INSERT INTO users (
-         principal_id, role, email, email_verified, 
-         last_login_at, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(principal_id) DO UPDATE SET 
-         role = excluded.role,
-         last_login_at = excluded.last_login_at,
-         updated_at = excluded.updated_at`,
-    )
-      .bind(
-        principalId,
-        role,
-        email,
-        isEmailVerified ? 1 : 0,
-        now,
-        now,
-        now,
-      )
-      .run();
-
-    const organization = await env.DB.prepare(
-      "SELECT * FROM developer_organizations WHERE owner_principal = ?",
-    )
-      .bind(principalId)
-      .first<DeveloperOrganizationRow>();
-
-    const token = await signJwt(
-      {
-        principal_id: principalId,
-        role,
-        email,
-        is_email_verified: isEmailVerified,
-      },
-      env.JWT_SECRET,
-    );
-
-    return jsonResponse(
-      {
-        success: true,
-        token,
-        customToken: token,
-        uid: principalId,
-        user: {
-          principal_id: principalId,
-          role,
-          email,
-          isEmailVerified,
-          lastPortalLoginAt: now,
-        },
-        organization: organization ?? null,
-      },
-      200,
-      request,
-      env,
-    );
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Mock login failed";
-    return errorResponse(msg, 500, "MOCK_LOGIN_FAILED", request, env);
-  }
 }
 
 async function handleUpdateProfile(

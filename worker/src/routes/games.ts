@@ -4,7 +4,7 @@ import type {
   GameRepoBindingRow,
   GameRow,
 } from "../types";
-import { getAuthenticatedUser } from "../middleware/auth";
+import { getAuthenticatedUser, hasRole } from "../middleware/auth";
 import { errorResponse, jsonResponse } from "../utils/response";
 
 export async function handleGameRoutes(
@@ -66,7 +66,7 @@ async function handleListGames(request: Request, env: Env): Promise<Response> {
   if (!user) {
     return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
   }
-  if (user.role !== "creator") {
+  if (!hasRole(user, "creator")) {
     return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   }
   const creatorPrincipal = user.principal_id;
@@ -226,7 +226,7 @@ async function handleGetGame(gameId: string, request: Request, env: Env): Promis
 async function handleCreateGame(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  if (user.role !== "creator") {
+  if (!hasRole(user, "creator")) {
     return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   }
   const creatorPrincipal = user.principal_id;
@@ -574,7 +574,7 @@ async function authorizeGame(
   if (!user) {
     return { ok: false, response: errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env) };
   }
-  if (user.role !== "creator") {
+  if (!hasRole(user, "creator")) {
     return { ok: false, response: errorResponse("Creator access required", 403, "FORBIDDEN", request, env) };
   }
 

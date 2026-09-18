@@ -76,19 +76,16 @@ interface PlaceholderPageProps {
 }
 
 function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
-  const { isAuthLoading, isSignedIn, isCreator, isAdmin } = useAuth();
-  const isPreview =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("preview") === "true";
+  const { isAuthLoading, isSignedIn, isCreator } = useAuth();
 
-  if (isAuthLoading && !isPreview) {
+  if (isAuthLoading) {
     return <AppLoadingScreen message="Checking your sign-in..." />;
   }
 
-  if (!isSignedIn && !isPreview) {
+  if (!isSignedIn) {
     return <DashboardAccessGate />;
   }
-  if (isSignedIn && !isPreview && !isCreator && !isAdmin) {
+  if (!isCreator) {
     return <CreatorAccessGate />;
   }
   return children;
@@ -377,46 +374,6 @@ function PortalShell(): React.ReactElement {
         />
       )}
       <div className={`portal-main ${!sidebarPinned ? "is-unpinned" : ""}`}>
-        {typeof window !== "undefined" &&
-          (new URLSearchParams(window.location.search).get("preview") === "true" ||
-            sessionStorage.getItem("rs_preview_dashboard") === "true") &&
-          !isSignedIn && (
-            <div
-              style={{
-                background: "#f5f3ff",
-                borderBottom: "1px solid #e9d5ff",
-                padding: "8px 20px",
-                fontSize: "12px",
-                color: "#581c87",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span>
-                <strong>🎨 Dashboard UI 预览模式已开启</strong>（真实登录与鉴权代码未修改，你可以直接查看和调整所有页面 UI）
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  sessionStorage.removeItem("rs_preview_dashboard");
-                  window.location.href = "/dashboard";
-                }}
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid #d8b4fe",
-                  borderRadius: "4px",
-                  padding: "3px 10px",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: "#6b21a8",
-                  cursor: "pointer",
-                }}
-              >
-                退出预览
-              </button>
-            </div>
-          )}
         <PortalHeader 
           pageName={pageName} 
           onMenuClick={() => { if (window.innerWidth > 900) { setSidebarPinned(!sidebarPinned); } else { setMenuOpen(true); } }} 

@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, Home, Rocket, CheckCircle2 } from "lucide-react";
+import { Home } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
 import { Link } from "react-router";
@@ -53,29 +53,6 @@ export function DashboardAccessGate(): React.ReactElement {
             style={{ width: "240px", minHeight: "48px", fontSize: "16px", justifyContent: "center" }}
           >
             Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = "/dashboard?preview=true";
-            }}
-            style={{
-              width: "240px",
-              minHeight: "40px",
-              fontSize: "13px",
-              fontWeight: 600,
-              background: "#faf5ff",
-              color: "#61369a",
-              border: "1px dashed #61369a",
-              borderRadius: "8px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-            }}
-          >
-            <Rocket size={15} /> 预览 Dashboard UI (免登录)
           </button>
         </div>
 

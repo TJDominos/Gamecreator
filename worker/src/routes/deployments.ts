@@ -7,7 +7,7 @@ import type {
   Env,
   GameReleasePointerRow,
 } from "../types";
-import { getAuthenticatedUser } from "../middleware/auth";
+import { getAuthenticatedUser, hasRole } from "../middleware/auth";
 import { verifyGithubActionsOidc } from "../middleware/githubOidc";
 import { sha256Hex, sha256HexBytes } from "../utils/crypto";
 import { gameBaseUrl, privateReleaseUrl } from "../utils/playUrl";
@@ -543,7 +543,7 @@ async function handleGetDeploymentEvents(deploymentId: string, request: Request,
 async function authorizeGameAccess(gameId: string, request: Request, env: Env): Promise<{ ok: true } | { ok: false; response: Response }> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return { ok: false, response: errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env) };
-  if (user.role !== "creator") {
+  if (!hasRole(user, "creator")) {
     return { ok: false, response: errorResponse("Creator access required", 403, "FORBIDDEN", request, env) };
   }
   const binding = await env.DB.prepare(

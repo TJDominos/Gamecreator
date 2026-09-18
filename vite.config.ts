@@ -176,32 +176,6 @@ function mockApiPlugin(): Plugin {
           );
         }
 
-        if (pathname === "/api/auth/mock-login" && method === "POST") {
-          const body = await getBody();
-          const role = body?.role || "creator";
-          const uid = `randseed:usr_${role}`;
-          res.statusCode = 200;
-          return res.end(
-            JSON.stringify({
-              success: true,
-              token: `jwt_mock_${role}`,
-              customToken: `jwt_mock_${role}`,
-              uid,
-              user: {
-                principal_id: uid,
-                role,
-                email: `${role}@randseed.org`,
-                isEmailVerified: true,
-                devNotificationEmail: `${role}@randseed.org`,
-                tosAcceptedVersion: "1.0",
-                kycStatus: "verified",
-                createdAt: Date.now(),
-              },
-              organization: null,
-            }),
-          );
-        }
-
         if (pathname === "/api/auth/profile" && method === "PUT") {
           res.statusCode = 200;
           return res.end(

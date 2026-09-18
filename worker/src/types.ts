@@ -178,6 +178,7 @@ export interface DeploymentManifest {
 export interface UserRow {
   principal_id: string;
   role: UserRole;
+  roles: string | null;
   email: string | null;
   email_verified: number; // 0 or 1
   tos_accepted_version: string | null;
@@ -232,6 +233,7 @@ export interface GameRow {
 export interface JwtPayload {
   principal_id: string;
   role: UserRole;
+  roles?: UserRole[];
   email?: string;
   is_email_verified: boolean;
   iat: number;
@@ -241,6 +243,7 @@ export interface JwtPayload {
 export interface AuthenticatedUser {
   principal_id: string;
   role: UserRole;
+  roles: UserRole[];
   email?: string;
   is_email_verified: boolean;
 }

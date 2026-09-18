@@ -1,6 +1,6 @@
 import type { Env } from "../types";
 import { errorResponse, jsonResponse } from "../utils/response";
-import { getAuthenticatedUser } from "../middleware/auth";
+import { getAuthenticatedUser, hasRole } from "../middleware/auth";
 import { renderShareMetadataHtml, resolveShareImage } from "../utils/shareMetadata";
 
 export async function handleBountyPageRequest(request: Request, env: Env): Promise<Response | null> {
@@ -130,7 +130,7 @@ interface MappedPublishedGame {
 
 async function handleAdminListBounties(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 
@@ -204,7 +204,7 @@ async function handleAdminListBounties(request: Request, env: Env): Promise<Resp
 
 async function handleCreateBounty(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 
@@ -260,7 +260,7 @@ async function handleCreateBounty(request: Request, env: Env): Promise<Response>
 
 async function handleUpdateBounty(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 
@@ -321,7 +321,7 @@ async function handleUpdateBounty(request: Request, env: Env): Promise<Response>
 
 async function handleDeleteBounty(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 
@@ -528,7 +528,7 @@ async function handleLeaveBounty(request: Request, env: Env): Promise<Response> 
 
 async function handleUploadMedia(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 

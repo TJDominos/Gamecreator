@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
     principal_id TEXT PRIMARY KEY,       -- 核心锚点: 对应主站的 Internet Computer Principal
     
     -- 下面是主站同步过来或门户专属的数据
-    role TEXT DEFAULT 'player',          -- 门户专属角色: 'player', 'creator', 'admin'
+    role TEXT DEFAULT 'player',          -- 兼容字段与主角色: 'player', 'creator', 'admin'
+    roles TEXT NOT NULL DEFAULT '["player"]', -- 独立身份集合，允许同时拥有 creator 与 admin
     dev_notification_email TEXT,         -- 开发者接收悬赏审核邮件的专属邮箱(可选)
     
     -- 邮箱同步与验证 (随主站 SSO 登录时更新)
@@ -66,6 +67,7 @@ pub enum UserRole {
 pub struct User {
     pub principal_id: String,
     pub role: UserRole,
+    pub roles: Vec<UserRole>,
     pub dev_notification_email: Option<String>,
     pub email: Option<String>,
     pub is_email_verified: bool,

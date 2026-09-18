@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, Home, Rocket, ShieldCheck } from "lucide-react";
+import { Home, ShieldCheck } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
 import { Link } from "react-router";
@@ -55,30 +55,6 @@ export function AdminAccessGate(): React.ReactElement {
             Sign In
           </button>
           
-          <button
-            type="button"
-            onClick={() => {
-              sessionStorage.setItem("rs_preview_dashboard", "true");
-              window.location.href = "/admin?preview=true";
-            }}
-            style={{
-              width: "240px",
-              minHeight: "40px",
-              fontSize: "var(--font-size-sm)",
-              fontWeight: 600,
-              background: "#f9fafb",
-              color: "#4b5563",
-              border: "1px dashed #9ca3af",
-              borderRadius: "8px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-            }}
-          >
-            <Rocket size={15} /> 预览 Admin UI (免登录)
-          </button>
         </div>
         
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", borderTop: "1px solid #f1f5f9", paddingTop: "16px" }}>

@@ -1,6 +1,6 @@
-import type { Env } from "../types";
+import type { Env, UserRole } from "../types";
 import { errorResponse, jsonResponse } from "../utils/response";
-import { getAuthenticatedUser } from "../middleware/auth";
+import { getAuthenticatedUser, hasRole, normalizeRoles } from "../middleware/auth";
 
 export async function handleAdminRoutes(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
@@ -22,11 +22,11 @@ export async function handleAdminRoutes(request: Request, env: Env): Promise<Res
 
 async function handleUpdateUserRole(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 
-  const body = (await request.json().catch(() => null)) as { email?: string; role?: string } | null;
+  const body = (await request.json().catch(() => null)) as { email?: string; role?: UserRole } | null;
   if (!body || !body.email || !body.role) {
     return errorResponse("Missing email or role", 400, "INVALID_BODY", request, env);
   }
@@ -44,11 +44,16 @@ async function handleUpdateUserRole(request: Request, env: Env): Promise<Respons
     const now = Date.now();
     
     // Check if user exists
-    const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
+    const user = await env.DB.prepare("SELECT role, roles FROM users WHERE email = ? COLLATE NOCASE").bind(email).first<{ role: UserRole; roles: string | null }>();
     
     if (user) {
-      await env.DB.prepare("UPDATE users SET role = ?, updated_at = ? WHERE email = ? COLLATE NOCASE")
-        .bind(role, now, email)
+      const roles = role === "player"
+        ? ["player"]
+        : normalizeRoles(user.role, user.roles).filter((item) => item !== "player").concat(role);
+      const uniqueRoles = [...new Set(roles)];
+      const primaryRole: UserRole = uniqueRoles.includes("admin") ? "admin" : uniqueRoles.includes("creator") ? "creator" : "player";
+      await env.DB.prepare("UPDATE users SET role = ?, roles = ?, updated_at = ? WHERE email = ? COLLATE NOCASE")
+        .bind(primaryRole, JSON.stringify(uniqueRoles), now, email)
         .run();
     } else {
       // Create shadow user with a mock principal ID (will be overwritten on first login, wait actually SSO uses principal ID from github/google)
@@ -62,10 +67,10 @@ async function handleUpdateUserRole(request: Request, env: Env): Promise<Respons
       // Actually, we can update the users table. Let's just create a row with `principal_id` = `pending:email`
       const mockPrincipal = `pending:${email}`;
       await env.DB.prepare(`
-        INSERT INTO users (principal_id, role, email, email_verified, created_at, updated_at) 
-        VALUES (?, ?, ?, 0, ?, ?)
-        ON CONFLICT(principal_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at
-      `).bind(mockPrincipal, role, email, now, now).run();
+        INSERT INTO users (principal_id, role, roles, email, email_verified, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, ?, ?)
+        ON CONFLICT(principal_id) DO UPDATE SET role = excluded.role, roles = excluded.roles, updated_at = excluded.updated_at
+      `).bind(mockPrincipal, role, JSON.stringify([role]), email, now, now).run();
     }
 
     return jsonResponse({ success: true, message: `Role updated for ${email}` }, 200, request, env);
@@ -76,12 +81,12 @@ async function handleUpdateUserRole(request: Request, env: Env): Promise<Respons
 
 async function handleListUsers(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 
   try {
-    const { results } = await env.DB.prepare("SELECT principal_id, role, email, email_verified, created_at, last_login_at FROM users ORDER BY created_at DESC LIMIT 100").all();
+    const { results } = await env.DB.prepare("SELECT principal_id, role, roles, email, email_verified, created_at, last_login_at FROM users ORDER BY created_at DESC LIMIT 100").all();
     return jsonResponse({ success: true, users: results }, 200, request, env);
   } catch (err: any) {
     return errorResponse(err.message, 500, "DB_ERROR", request, env);
@@ -91,7 +96,7 @@ async function handleListUsers(request: Request, env: Env): Promise<Response> {
 
 async function handleDeleteUser(request: Request, env: Env): Promise<Response> {
   const authUser = await getAuthenticatedUser(request, env);
-  if (!authUser || authUser.role !== "admin") {
+  if (!authUser || !hasRole(authUser, "admin")) {
     return errorResponse("Admin access required", 403, "FORBIDDEN", request, env);
   }
 

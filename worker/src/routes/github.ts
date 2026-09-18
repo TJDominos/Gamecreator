@@ -5,7 +5,7 @@ import type {
   GameRepoBindingRow,
   GithubInstallationRow,
 } from "../types";
-import { getAuthenticatedUser } from "../middleware/auth";
+import { getAuthenticatedUser, hasRole, normalizeRoles } from "../middleware/auth";
 import { sha256Hex, signJwt, verifyGitHubWebhookSignature, verifyJwt } from "../utils/crypto";
 import {
   createWorkflowPullRequest,
@@ -80,13 +80,14 @@ export async function handleGitHubRoutes(
 async function handleGitHubInstall(request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  if (user.role !== "creator") return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
+  if (!hasRole(user, "creator")) return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   const appSlug = env.GITHUB_APP_SLUG || "RDcreatordev";
   const gameId = new URL(request.url).searchParams.get("game_id") || undefined;
   const state = await signJwt(
     {
       principal_id: user.principal_id,
-      role: user.role,
+      role: "creator",
+      roles: user.roles,
       email: user.email,
       is_email_verified: user.is_email_verified,
       game_id: gameId,
@@ -127,7 +128,7 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
   }
   const statePayload = await verifyJwt(state, env.JWT_SECRET);
   if (!statePayload) return errorResponse("Invalid or expired installation state", 400, "INVALID_STATE", request, env);
-  if (statePayload.role !== "creator") return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
+  if (!normalizeRoles(statePayload.role, statePayload.roles).includes("creator")) return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   const now = Date.now();
 
   try {
@@ -189,7 +190,7 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
 async function handleGetGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, user.roles, request, env);
   if (!access.ok) return access.response;
 
   try {
@@ -240,7 +241,7 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
 async function handleLinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, user.roles, request, env);
   if (!access.ok) return access.response;
   const ownerPrincipal = user.principal_id;
 
@@ -353,7 +354,7 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
 async function handleImportWorkflow(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, user.roles, request, env);
   if (!access.ok) return access.response;
 
   const body = await request.json().catch(() => null) as { workflow_content?: string } | null;
@@ -405,7 +406,7 @@ async function handleImportWorkflow(gameId: string, request: Request, env: Env):
 async function handleUnlinkGameRepo(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, user.roles, request, env);
   if (!access.ok) return access.response;
   try {
     if (env.DB) {
@@ -440,7 +441,7 @@ async function handleUnlinkGameRepo(gameId: string, request: Request, env: Env):
 async function handleCheckSyncStatus(gameId: string, request: Request, env: Env): Promise<Response> {
   const user = await getAuthenticatedUser(request, env);
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
-  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, user.roles, request, env);
   if (!access.ok) return access.response;
 
   const deployment = await env.DB.prepare(
@@ -655,10 +656,11 @@ async function authorizeCreatorGame(
   gameId: string,
   principalId: string,
   role: string,
+  roles: string[],
   request: Request,
   env: Env,
 ): Promise<{ ok: true } | { ok: false; response: Response }> {
-  if (role !== "creator") {
+  if (role !== "creator" && !roles.includes("creator")) {
     return { ok: false, response: errorResponse("Creator access required", 403, "FORBIDDEN", request, env) };
   }
   const game = await env.DB.prepare(

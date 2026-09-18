@@ -7,16 +7,8 @@ import { AppLoadingScreen } from "../components/AppLoadingScreen";
 
 export function RequireAdmin({ children }: { children: React.ReactNode }): React.ReactNode {
   const { isAuthLoading, isSignedIn, isAdmin } = useAuth();
-  const isPreview =
-    typeof window !== "undefined" &&
-    (new URLSearchParams(window.location.search).get("preview") === "true" ||
-      sessionStorage.getItem("rs_preview_dashboard") === "true");
 
-  if (isPreview) {
-    return children;
-  }
-
-  if (isAuthLoading && !isPreview) {
+  if (isAuthLoading) {
     return <AppLoadingScreen message="Checking your sign-in..." />;
   }
 

@@ -14,7 +14,6 @@ import {
   UserRole,
   Permission,
   ROLE_PERMISSIONS,
-  DEFAULT_PERSONAS,
   hasPermission as checkPermission,
 } from "./permissionSystem";
 
@@ -40,6 +39,7 @@ export interface UserProfile extends UserProfileInfo {
   email?: string;
   isEmailVerified?: boolean;
   role?: "player" | "creator" | "admin"; // B-side role
+  roles?: Array<"player" | "creator" | "admin">;
   creatorOrgName?: string | null;
   withdrawalToken?: string | null;
   withdrawalNetwork?: string | null;
@@ -85,7 +85,6 @@ interface AuthContextValue {
   role: UserRole;
   permissions: Permission[];
   hasPermission: (permission: Permission) => boolean;
-  switchRole: (role: UserRole) => Promise<void>;
   isCreator: boolean;
   isAdmin: boolean;
   isPlayer: boolean;
@@ -164,6 +163,7 @@ export function AuthProvider({
             location: profiles[uid]?.location || "",
             joinedDate: profiles[uid]?.joinedDate || new Date().toISOString().split("T")[0],
             role: ssoRes.user.role,
+            roles: ssoRes.user.roles ?? [ssoRes.user.role],
             email: ssoRes.user.email ?? undefined,
             isEmailVerified: ssoRes.user.isEmailVerified,
           };
@@ -287,6 +287,7 @@ export function AuthProvider({
                 location: prev?.location || "",
                 joinedDate: prev?.joinedDate || new Date().toISOString().split("T")[0],
                 role: meRes.user.role,
+                roles: meRes.user.roles ?? [meRes.user.role],
                 email: meRes.user.email ?? undefined,
                 isEmailVerified: meRes.user.isEmailVerified,
                 creatorOrgName: meRes.user.creatorOrgName,
@@ -512,72 +513,16 @@ export function AuthProvider({
     };
   }, [signOut]);
 
-  const switchRole = useCallback(async (targetRole: UserRole) => {
-    const session = await authApi.mockLogin(targetRole);
-    if (!session.token || session.user.role !== targetRole) {
-      throw new Error("Role switch returned an invalid session.");
-    }
-
-    localStorage.removeItem("randseed_signed_out");
-    localStorage.setItem(CUSTOM_TOKEN_KEY, session.token);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session.uid));
-
-    try {
-      const verified = await authApi.getMe();
-      if (verified.user.role !== targetRole) {
-        throw new Error("Role verification failed after switching accounts.");
-      }
-      if (verified.token) {
-        localStorage.setItem(CUSTOM_TOKEN_KEY, verified.token);
-      }
-    } catch (error) {
-      localStorage.removeItem(CUSTOM_TOKEN_KEY);
-      localStorage.removeItem(SESSION_KEY);
-      setAccountId(null);
-      setProfile(null);
-      setOrganization(null);
-      throw error;
-    }
-
-    const targetPersona = DEFAULT_PERSONAS[targetRole];
-    const newProfile: UserProfile = {
-      avatarUrl: targetPersona.avatarUrl,
-      username: targetPersona.username,
-      isVerified: targetPersona.isEmailVerified,
-      hasStake: true,
-      lastActive: "Just now",
-      bio: targetPersona.bio,
-      location: "Global",
-      joinedDate: "2026-01-01",
-      role: targetRole,
-      email: targetPersona.email,
-      isEmailVerified: targetPersona.isEmailVerified,
-    };
-    const profiles = readProfiles();
-    profiles[targetPersona.id] = newProfile;
-    localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(newProfile));
-
-    if (targetPersona.organization) {
-      const orgs = readOrganizations();
-      orgs[targetPersona.id] = targetPersona.organization;
-      localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
-      setOrganization(targetPersona.organization);
-    } else {
-      setOrganization(null);
-    }
-
-    setAccountId(session.uid);
-    setProfile(newProfile);
-  }, []);
-
   const upgradeToCreator = useCallback(
     async (customOrg?: Partial<DeveloperOrganizationInput>) => {
       const currentAcc = accountId;
       if (!currentAcc) {
         throw new Error("You must sign in before upgrading to creator.");
       }
-      await authApi.becomeCreator();
+      const response = await authApi.becomeCreator();
+      if (response.token) {
+        localStorage.setItem(CUSTOM_TOKEN_KEY, response.token);
+      }
 
       const updatedProfile: UserProfile = {
         avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentAcc}`,
@@ -588,7 +533,8 @@ export function AuthProvider({
         bio: profile?.bio || "",
         location: profile?.location || "Global",
         joinedDate: profile?.joinedDate || new Date().toISOString().split("T")[0],
-        role: "creator",
+        role: response.role,
+        roles: response.roles ?? ["creator"],
         email: profile?.email || "creator@randseed.org",
         isEmailVerified: true,
       };
@@ -709,10 +655,9 @@ export function AuthProvider({
       role: currentRole,
       permissions,
       hasPermission,
-      switchRole,
-      isCreator: currentRole === "creator",
-      isAdmin: currentRole === "admin",
-      isPlayer: currentRole === "player",
+      isCreator: profile?.roles?.includes("creator") ?? currentRole === "creator",
+      isAdmin: profile?.roles?.includes("admin") ?? currentRole === "admin",
+      isPlayer: profile?.roles?.includes("player") ?? currentRole === "player",
       upgradeToCreator,
       signIn,
       signInWithSSO,
@@ -731,7 +676,6 @@ export function AuthProvider({
       currentRole,
       permissions,
       hasPermission,
-      switchRole,
       upgradeToCreator,
       signIn,
       signInWithSSO,
