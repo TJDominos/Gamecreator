@@ -180,6 +180,7 @@ export interface UserRow {
   role: UserRole;
   roles: string | null;
   email: string | null;
+  avatar_url: string | null;
   email_verified: number; // 0 or 1
   tos_accepted_version: string | null;
   kyc_status: string;

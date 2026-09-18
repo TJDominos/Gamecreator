@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     -- 下面是主站同步过来或门户专属的数据
     role TEXT DEFAULT 'player',          -- 兼容字段与主角色: 'player', 'creator', 'admin'
     roles TEXT NOT NULL DEFAULT '["player"]', -- 独立身份集合，允许同时拥有 creator 与 admin
+    avatar_url TEXT,                      -- 从主站用户 logo 同步到 Creator Portal
     dev_notification_email TEXT,         -- 开发者接收悬赏审核邮件的专属邮箱(可选)
     
     -- 邮箱同步与验证 (随主站 SSO 登录时更新)

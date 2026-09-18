@@ -154,7 +154,7 @@ export function AuthProvider({
 
           const profiles = readProfiles();
           const updatedProfile: UserProfile = {
-            avatarUrl: profiles[uid]?.avatarUrl || "",
+            avatarUrl: ssoRes.user.avatarUrl || profiles[uid]?.avatarUrl || "",
             username: profiles[uid]?.username || (ssoRes.user.email?.split("@")[0] ?? uid.substring(0, 10)),
             isVerified: ssoRes.user.isEmailVerified,
             hasStake: profiles[uid]?.hasStake ?? false,
@@ -278,7 +278,7 @@ export function AuthProvider({
               }
               setProfile((prev) => ({
                 ...prev,
-                avatarUrl: prev?.avatarUrl || "",
+                avatarUrl: meRes.user.avatarUrl || prev?.avatarUrl || "",
                 username: prev?.username || (meRes.user.email?.split("@")[0] ?? storedSession),
                 isVerified: meRes.user.isEmailVerified,
                 hasStake: prev?.hasStake ?? false,

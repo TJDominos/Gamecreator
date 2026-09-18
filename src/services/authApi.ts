@@ -10,6 +10,7 @@ export interface SsoExchangeResponse {
     principal_id: string;
     role: "player" | "creator" | "admin";
     roles?: Array<"player" | "creator" | "admin">;
+    avatarUrl?: string | null;
     email: string | null;
     isEmailVerified: boolean;
     tosAcceptedVersion?: string | null;
@@ -27,6 +28,7 @@ export interface MeResponse {
     principal_id: string;
     role: "player" | "creator" | "admin";
     roles?: Array<"player" | "creator" | "admin">;
+    avatarUrl?: string | null;
     email: string | null;
     isEmailVerified: boolean;
     tosAcceptedVersion?: string | null;

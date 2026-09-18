@@ -2,7 +2,7 @@ import type { DeveloperOrganizationRow, Env, UserRole, UserRow } from "../types"
 import { signJwt } from "../utils/crypto";
 import { errorResponse, jsonResponse } from "../utils/response";
 import { getAuthenticatedUser, normalizeRoles } from "../middleware/auth";
-import { redeemSsoAuthorizationCode } from "../ic/sso";
+import { querySsoUserProfile, redeemSsoAuthorizationCode } from "../ic/sso";
 
 interface SsoRequestPayload {
   sso_code: string;
@@ -134,6 +134,8 @@ async function handleSsoExchange(
     const principalId = authorizationCode.principal_id;
     const email = authorizationCode.email?.[0] || null;
     const isEmailVerified = authorizationCode.is_email_verified;
+    const ssoUserProfile = await querySsoUserProfile(principalId, env);
+    const avatarUrl = ssoUserProfile?.logo?.trim() || null;
     const initialRole: UserRole = "player";
 
     // 2. Query existing Shadow User from D1
@@ -165,28 +167,30 @@ async function handleSsoExchange(
         `UPDATE users 
          SET last_login_at = ?, 
              email = COALESCE(?, email), 
+           avatar_url = COALESCE(?, avatar_url),
              email_verified = COALESCE(?, email_verified),
              role = ?,
              roles = ?,
              updated_at = ?
          WHERE principal_id = ?`,
       )
-        .bind(now, email, isEmailVerified ? 1 : 0, userRole, JSON.stringify(userRoles), now, principalId)
+        .bind(now, email, avatarUrl, isEmailVerified ? 1 : 0, userRole, JSON.stringify(userRoles), now, principalId)
         .run();
     } else {
       const userRole: UserRole = userRoles.includes("admin") ? "admin" : "player";
       // Insert new Shadow User into D1
       await env.DB.prepare(
         `INSERT INTO users (
-           principal_id, role, roles, email, email_verified,
+           principal_id, role, roles, email, avatar_url, email_verified,
            last_login_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           principalId,
           userRole,
           JSON.stringify(userRoles),
           email,
+          avatarUrl,
           isEmailVerified ? 1 : 0,
           now,
           now,
@@ -205,7 +209,11 @@ async function handleSsoExchange(
     // 4. Issue Portal JWT session token
     const finalUser = existingUser
       ? await env.DB.prepare("SELECT * FROM users WHERE principal_id = ?").bind(principalId).first<UserRow>()
-      : { role: userRoles.includes("admin") ? "admin" as UserRole : "player" as UserRole, roles: JSON.stringify(userRoles) };
+      : {
+          role: userRoles.includes("admin") ? "admin" as UserRole : "player" as UserRole,
+          roles: JSON.stringify(userRoles),
+          avatar_url: avatarUrl,
+        };
     const userRole = finalUser?.role ?? "player";
     const roles = normalizeRoles(userRole, finalUser?.roles);
     const token = await signJwt(
@@ -224,6 +232,7 @@ async function handleSsoExchange(
       role: userRole,
       roles,
       email: email,
+      avatarUrl: finalUser?.avatar_url ?? avatarUrl,
       isEmailVerified: isEmailVerified,
       lastPortalLoginAt: now,
     };
@@ -266,6 +275,17 @@ async function handleGetMe(
     return errorResponse("User not found", 404, "USER_NOT_FOUND", request, env);
   }
 
+  let avatarUrl = user.avatar_url;
+  if (!avatarUrl) {
+    const ssoUserProfile = await querySsoUserProfile(user.principal_id, env);
+    avatarUrl = ssoUserProfile?.logo?.trim() || null;
+    if (avatarUrl) {
+      await env.DB.prepare("UPDATE users SET avatar_url = ?, updated_at = ? WHERE principal_id = ?")
+        .bind(avatarUrl, Date.now(), user.principal_id)
+        .run();
+    }
+  }
+
   const organization = await env.DB.prepare(
     "SELECT * FROM developer_organizations WHERE owner_principal = ?",
   )
@@ -292,6 +312,7 @@ async function handleGetMe(
         role: user.role,
         roles: normalizeRoles(user.role, user.roles),
         email: user.email,
+        avatarUrl,
         isEmailVerified: user.email_verified === 1,
         tosAcceptedVersion: user.tos_accepted_version,
         kycStatus: user.kyc_status,
