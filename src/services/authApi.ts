@@ -49,6 +49,20 @@ export interface CreateOrgInput {
   socialLinks?: [string, string];
 }
 
+export interface MockLoginResponse {
+  success: boolean;
+  token: string;
+  customToken: string;
+  uid: string;
+  user: {
+    principal_id: string;
+    role: "player" | "creator" | "admin";
+    email: string | null;
+    isEmailVerified: boolean;
+  };
+  organization: DeveloperOrganization | null;
+}
+
 export const authApi = {
   async verifySSO(ssoCode: string, redirectUri: string, codeVerifier: string): Promise<SsoExchangeResponse> {
     return request<SsoExchangeResponse>("/api/auth/sso", {
@@ -60,6 +74,13 @@ export const authApi = {
   async getMe(): Promise<MeResponse> {
     return request<MeResponse>("/api/auth/me", {
       method: "GET",
+    });
+  },
+
+  async mockLogin(role: "player" | "creator" | "admin"): Promise<MockLoginResponse> {
+    return request<MockLoginResponse>("/api/auth/mock-login", {
+      method: "POST",
+      body: JSON.stringify({ role }),
     });
   },
 

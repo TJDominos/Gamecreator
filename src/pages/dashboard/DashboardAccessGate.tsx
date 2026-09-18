@@ -57,7 +57,6 @@ export function DashboardAccessGate(): React.ReactElement {
           <button
             type="button"
             onClick={() => {
-              sessionStorage.setItem("rs_preview_dashboard", "true");
               window.location.href = "/dashboard?preview=true";
             }}
             style={{
@@ -95,6 +94,49 @@ export function DashboardAccessGate(): React.ReactElement {
             <Home size={15} /> Creator Main Page
           </Link>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function CreatorAccessGate(): React.ReactElement {
+  const { signOut } = useAuth();
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        padding: "24px 16px",
+        background: "linear-gradient(180deg, #f8f7fa 0%, #ede9f2 100%)",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "520px",
+          padding: "36px 32px",
+          border: "1px solid #e5e1e9",
+          borderRadius: "20px",
+          background: "#fff",
+          textAlign: "center",
+          boxShadow: "0 20px 40px -15px rgba(97, 54, 154, 0.12)",
+        }}
+      >
+        <p className="portal-eyebrow">Creator Portal</p>
+        <h1 style={{ margin: "0 0 12px", color: "#17151d" }}>Creator account required</h1>
+        <p style={{ margin: "0 0 24px", color: "#64748b", lineHeight: 1.5 }}>
+          This portal is only available to Creator accounts. Your current account is signed in as a player.
+        </p>
+        <button
+          type="button"
+          className="btn btn--solid"
+          onClick={() => void signOut()}
+          style={{ minWidth: "180px", justifyContent: "center" }}
+        >
+          Sign out
+        </button>
       </div>
     </div>
   );

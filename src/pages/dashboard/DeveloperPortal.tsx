@@ -39,7 +39,7 @@ import {
   useNavigate,
 } from "react-router";
 import { getStoredGames, createNextNewGame, createNextNewGameAsync, syncGamesWithBackend, GAMES_UPDATED_EVENT } from "./games/gameData";
-import { DashboardAccessGate } from "./DashboardAccessGate";
+import { CreatorAccessGate, DashboardAccessGate } from "./DashboardAccessGate";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
 import { PortalHeader } from "../../components/PortalHeader";
@@ -76,18 +76,20 @@ interface PlaceholderPageProps {
 }
 
 function RequireSignedIn({ children }: RouteGuardProps): React.ReactNode {
-  const { isAuthLoading, isSignedIn, hasPermission } = useAuth();
+  const { isAuthLoading, isSignedIn, isCreator, isAdmin } = useAuth();
   const isPreview =
     typeof window !== "undefined" &&
-    (new URLSearchParams(window.location.search).get("preview") === "true" ||
-      sessionStorage.getItem("rs_preview_dashboard") === "true");
+    new URLSearchParams(window.location.search).get("preview") === "true";
 
   if (isAuthLoading && !isPreview) {
     return <AppLoadingScreen message="Checking your sign-in..." />;
   }
 
-  if (!isSignedIn && !isPreview && !hasPermission("dashboard:access")) {
+  if (!isSignedIn && !isPreview) {
     return <DashboardAccessGate />;
+  }
+  if (isSignedIn && !isPreview && !isCreator && !isAdmin) {
+    return <CreatorAccessGate />;
   }
   return children;
 }

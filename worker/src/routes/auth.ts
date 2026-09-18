@@ -295,9 +295,12 @@ async function handleMockLogin(
   env: Env,
 ): Promise<Response> {
   try {
+    if (env.ENVIRONMENT !== "dev" && env.ENVIRONMENT !== "test") {
+      return errorResponse("Mock login is disabled outside development and test environments", 404, "NOT_FOUND", request, env);
+    }
     const body = (await request.json().catch(() => ({}))) as MockLoginPayload;
     const role: UserRole = body.role ?? "creator";
-    const principalId = body.principal_id ?? `randseed:usr_${role}_${Math.random().toString(36).substring(2, 8)}`;
+    const principalId = body.principal_id ?? `randseed:usr_${role}_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
     const email = body.email ?? `${role}@example.com`;
     const isEmailVerified = body.is_email_verified ?? true;
     const now = Date.now();

@@ -85,7 +85,7 @@ interface AuthContextValue {
   role: UserRole;
   permissions: Permission[];
   hasPermission: (permission: Permission) => boolean;
-  switchRole: (role: UserRole) => void;
+  switchRole: (role: UserRole) => Promise<void>;
   isCreator: boolean;
   isAdmin: boolean;
   isPlayer: boolean;
@@ -512,8 +512,33 @@ export function AuthProvider({
     };
   }, [signOut]);
 
-  const switchRole = useCallback((targetRole: UserRole) => {
+  const switchRole = useCallback(async (targetRole: UserRole) => {
+    const session = await authApi.mockLogin(targetRole);
+    if (!session.token || session.user.role !== targetRole) {
+      throw new Error("Role switch returned an invalid session.");
+    }
+
     localStorage.removeItem("randseed_signed_out");
+    localStorage.setItem(CUSTOM_TOKEN_KEY, session.token);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session.uid));
+
+    try {
+      const verified = await authApi.getMe();
+      if (verified.user.role !== targetRole) {
+        throw new Error("Role verification failed after switching accounts.");
+      }
+      if (verified.token) {
+        localStorage.setItem(CUSTOM_TOKEN_KEY, verified.token);
+      }
+    } catch (error) {
+      localStorage.removeItem(CUSTOM_TOKEN_KEY);
+      localStorage.removeItem(SESSION_KEY);
+      setAccountId(null);
+      setProfile(null);
+      setOrganization(null);
+      throw error;
+    }
+
     const targetPersona = DEFAULT_PERSONAS[targetRole];
     const newProfile: UserProfile = {
       avatarUrl: targetPersona.avatarUrl,
@@ -528,17 +553,13 @@ export function AuthProvider({
       email: targetPersona.email,
       isEmailVerified: targetPersona.isEmailVerified,
     };
-
-    localStorage.setItem(SESSION_KEY, JSON.stringify(targetPersona.id));
-    localStorage.setItem(CUSTOM_TOKEN_KEY, `jwt_local_${targetRole}`);
-
     const profiles = readProfiles();
     profiles[targetPersona.id] = newProfile;
     localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
     localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(newProfile));
 
-    const orgs = readOrganizations();
     if (targetPersona.organization) {
+      const orgs = readOrganizations();
       orgs[targetPersona.id] = targetPersona.organization;
       localStorage.setItem(ORGANIZATIONS_KEY, JSON.stringify(orgs));
       setOrganization(targetPersona.organization);
@@ -546,7 +567,7 @@ export function AuthProvider({
       setOrganization(null);
     }
 
-    setAccountId(targetPersona.id);
+    setAccountId(session.uid);
     setProfile(newProfile);
   }, []);
 
