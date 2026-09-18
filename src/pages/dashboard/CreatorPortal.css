@@ -54,6 +54,7 @@
 .admin-bounty-tabs {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-xxs);
   padding: var(--space-xxs);
   border: 1px solid var(--portal-border);
@@ -61,6 +62,11 @@
 }
 
 .admin-bounty-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-width: 86px;
   padding: var(--space-xs) var(--space-sm);
   color: var(--portal-muted);
   background: transparent;
@@ -69,6 +75,56 @@
   font-size: var(--font-size-xs);
   font-weight: 600;
   cursor: pointer;
+}
+
+.admin-bounty-tab__count {
+  color: currentColor;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.admin-bounty-list-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(180px, 220px);
+  align-items: center;
+  gap: var(--space-md);
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--portal-border);
+}
+
+.admin-bounty-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  width: 100%;
+  max-width: 220px;
+}
+
+.admin-bounty-search > svg {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+}
+
+.admin-bounty-search > input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  border: 1px solid var(--portal-border);
+  border-radius: 8px;
+  font-size: var(--font-size-xs);
+}
+
+.admin-bounty-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-md) 24px;
+  border-top: 1px solid var(--portal-border);
+  color: var(--portal-muted);
+  font-size: var(--font-size-xs);
 }
 
 .admin-bounty-tab:hover,
@@ -1300,6 +1356,26 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 20px;
+  }
+
+  .admin-bounty-list-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    padding: var(--space-md);
+  }
+
+  .admin-bounty-tabs {
+    width: 100%;
+  }
+
+  .admin-bounty-tab {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .admin-bounty-search {
+    justify-self: stretch;
+    max-width: none;
   }
 
   .stat-grid,

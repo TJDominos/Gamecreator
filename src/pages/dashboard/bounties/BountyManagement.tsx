@@ -66,6 +66,7 @@ export function BountyManagement(): React.ReactElement {
   const itemsPerPage = 20;
 
   React.useEffect(() => {
+    setCurrentPage(1);
     void fetchBounties(1, filterState, searchQuery);
   }, [filterState, searchQuery]);
 
@@ -247,14 +248,6 @@ export function BountyManagement(): React.ReactElement {
     if (secondConfirmation) void handleSave(false, 'CLOSED');
   };
 
-  const filteredBounties = bounties.filter(b => {
-    const matchState = filterState === 'ACTIVE'
-      ? b.state !== 'DRAFT' && b.state !== 'CLOSED'
-      : b.state === filterState;
-    const matchSearch = b.title.toLowerCase().includes(searchQuery.toLowerCase()) || b.id.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchState && matchSearch;
-  });
-
   return (
     <div className="admin-bounty-page">
       {toast && <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />}
@@ -348,7 +341,6 @@ export function BountyManagement(): React.ReactElement {
                 <TipTapEditor 
                   value={form.fullDesc} 
                   onChange={(val) => setForm({...form, fullDesc: val})} 
-                  uploadImage={bountyApi.uploadMedia}
                 />
               </div>
 
@@ -541,7 +533,7 @@ export function BountyManagement(): React.ReactElement {
                      amount = winner.prize || '-';
                      gameId = winner.gameId || '-';
                    } else if (publishedGame) {
-                     status = 'Released';
+                     status = 'Published';
                      statusColor = '#1e874b';
                      statusBg = '#e6f6ec';
                      score = publishedGame.performanceScore?.toLocaleString() || '-';
@@ -580,7 +572,7 @@ export function BountyManagement(): React.ReactElement {
                         {gameId !== '-' ? <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'var(--portal-purple)', textDecoration: 'none' }}>{gameId}</a> : '-'}
                       </td>
                       <td style={{ padding: '16px' }}>
-                        {status === 'Released' && selectedBounty.state === 'ONLINE' && (
+                        {status === 'Published' && selectedBounty.state === 'ONLINE' && (
                            <button className="btn btn--solid btn--sm">
                              Mark as Winner
                            </button>
@@ -618,39 +610,38 @@ export function BountyManagement(): React.ReactElement {
         {/* Table */}
         {view === 'list' && (
           <div style={{ background: '#fff', border: '1px solid var(--portal-border)', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="admin-bounty-list-toolbar">
               <h3 style={{ margin: 0, fontSize: '16px' }}>All Bounties</h3>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Search size={16} color="var(--portal-muted)" style={{ position: 'absolute', left: '10px' }} />
-                  <input 
-                    type="text" 
-                    placeholder="Search ID or Title..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ padding: '8px 12px 8px 32px', border: '1px solid var(--portal-border)', borderRadius: '8px', fontSize: '13px', width: '200px' }}
-                  />
-                </div>
-                <div className="admin-bounty-tabs" role="tablist" aria-label="Bounty state">
-                  {(['ACTIVE', 'CLOSED', 'DRAFT'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      role="tab"
-                      aria-selected={filterState === tab}
-                      className={`admin-bounty-tab${filterState === tab ? ' is-active' : ''}`}
-                      onClick={() => setFilterState(tab)}
-                    >
-                      {tab === 'ACTIVE' ? 'Active' : tab.charAt(0) + tab.slice(1).toLowerCase()}
-                    </button>
-                  ))}
-                </div>
+              <div className="admin-bounty-tabs" role="tablist" aria-label="Bounty state">
+                {(['ACTIVE', 'CLOSED', 'DRAFT'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={filterState === tab}
+                    className={`admin-bounty-tab${filterState === tab ? ' is-active' : ''}`}
+                    onClick={() => setFilterState(tab)}
+                  >
+                    <span>{tab === 'ACTIVE' ? 'Active' : tab.charAt(0) + tab.slice(1).toLowerCase()}</span>
+                    <span className="admin-bounty-tab__count">{tabCounts[tab]}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="admin-bounty-search">
+                <Search size={16} color="var(--portal-muted)" aria-hidden="true" />
+                <input
+                  type="text"
+                  placeholder="Search ID or Title..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
             </div>
             
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr>
+                  <th style={{ padding: '16px 24px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', color: 'var(--portal-muted)' }}>No.</th>
                   <th style={{ padding: '16px 24px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', color: 'var(--portal-muted)' }}>Title / ID</th>
                   <th style={{ padding: '16px 24px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', color: 'var(--portal-muted)' }}>Category</th>
                   <th style={{ padding: '16px 24px', borderBottom: '1px solid var(--portal-border)', fontSize: '12px', color: 'var(--portal-muted)' }}>State</th>
@@ -660,8 +651,8 @@ export function BountyManagement(): React.ReactElement {
                 </tr>
               </thead>
               <tbody>
-                {filteredBounties.length > 0 ? (
-                  filteredBounties.map(b => (
+                {bounties.length > 0 ? (
+                  bounties.map((b, index) => (
                     <tr
                       key={b.id}
                       className={b.state === 'DRAFT' ? 'admin-bounty-row--draft' : undefined}
@@ -676,6 +667,9 @@ export function BountyManagement(): React.ReactElement {
                       aria-label={b.state === 'DRAFT' ? `Continue editing ${b.title}` : undefined}
                       style={{ borderBottom: '1px solid var(--portal-border)' }}
                     >
+                      <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 600, color: 'var(--portal-muted)' }}>
+                        {(pagination.page - 1) * pagination.pageSize + index + 1}
+                      </td>
                       <td style={{ padding: '16px 24px' }}>
                         <div style={{ fontSize: '14px', fontWeight: 600 }}>{b.title}</div>
                         <div style={{ fontSize: '12px', color: 'var(--portal-muted)', fontFamily: 'monospace' }}>{b.id}</div>
@@ -709,7 +703,7 @@ export function BountyManagement(): React.ReactElement {
                             </button>
                           )}
                           {b.state !== 'DRAFT' && (
-                            <button className="btn btn--sm bounty-view-participants" onClick={() => { setSelectedBounty(b); setView('participants'); setCurrentPage(1); }}>
+                            <button className="btn btn--outline btn--sm" onClick={() => { setSelectedBounty(b); setView('participants'); setCurrentPage(1); }}>
                               View Participants
                             </button>
                           )}
@@ -719,13 +713,42 @@ export function BountyManagement(): React.ReactElement {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--portal-muted)', fontSize: '14px' }}>
+                    <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: 'var(--portal-muted)', fontSize: '14px' }}>
                       No bounties found matching your search and filter criteria.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            {pagination.totalPages > 1 && (
+              <div className="admin-bounty-pagination">
+                <button
+                  className="btn btn--outline btn--sm"
+                  type="button"
+                  onClick={() => {
+                    const nextPage = Math.max(1, pagination.page - 1);
+                    setCurrentPage(nextPage);
+                    void fetchBounties(nextPage);
+                  }}
+                  disabled={loading || pagination.page <= 1}
+                >
+                  Previous
+                </button>
+                <span>Page {pagination.page} of {pagination.totalPages}</span>
+                <button
+                  className="btn btn--outline btn--sm"
+                  type="button"
+                  onClick={() => {
+                    const nextPage = Math.min(pagination.totalPages, pagination.page + 1);
+                    setCurrentPage(nextPage);
+                    void fetchBounties(nextPage);
+                  }}
+                  disabled={loading || pagination.page >= pagination.totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
