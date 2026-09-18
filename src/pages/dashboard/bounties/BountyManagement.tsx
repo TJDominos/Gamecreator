@@ -541,7 +541,7 @@ export function BountyManagement(): React.ReactElement {
                      amount = winner.prize || '-';
                      gameId = winner.gameId || '-';
                    } else if (publishedGame) {
-                     status = 'Published';
+                     status = 'Released';
                      statusColor = '#1e874b';
                      statusBg = '#e6f6ec';
                      score = publishedGame.performanceScore?.toLocaleString() || '-';
@@ -580,7 +580,7 @@ export function BountyManagement(): React.ReactElement {
                         {gameId !== '-' ? <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'var(--portal-purple)', textDecoration: 'none' }}>{gameId}</a> : '-'}
                       </td>
                       <td style={{ padding: '16px' }}>
-                        {status === 'Published' && selectedBounty.state === 'ONLINE' && (
+                        {status === 'Released' && selectedBounty.state === 'ONLINE' && (
                            <button className="btn btn--solid btn--sm">
                              Mark as Winner
                            </button>

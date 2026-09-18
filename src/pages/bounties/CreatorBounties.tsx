@@ -11,7 +11,7 @@ import '../guides/CreatorGuide.css';
 const StateStyles: Record<string, { bg: string, color: string, icon: any, label: string }> = {
   OPEN: { bg: '#e0f2fe', color: '#0369a1', icon: Target, label: 'Open / Accepting Subs' },
   RUNNING: { bg: '#dcfce7', color: '#15803d', icon: CheckCircle2, label: 'Running / Development' },
-  ONLINE: { bg: '#fff1d9', color: '#8a5314', icon: Activity, label: 'Online / Traffic Battle' },
+  ONLINE: { bg: '#fff1d9', color: '#8a5314', icon: Activity, label: 'Released / Traffic Battle' },
   CLOSED: { bg: '#f2f0f3', color: '#6b7280', icon: Lock, label: 'Closed / Settled' }
 };
 
@@ -142,7 +142,7 @@ export default function CreatorBounties() {
                     transition: 'all 0.2s'
                   }}
                 >
-                  {status === 'All' ? 'All Status' : status}
+                  {status === 'All' ? 'All Status' : status === 'ONLINE' ? 'Released' : status}
                 </button>
               ))}
             </div>

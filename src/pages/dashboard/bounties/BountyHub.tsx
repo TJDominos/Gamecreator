@@ -9,9 +9,29 @@ const StateStyles: Record<BountyState, { bg: string; color: string; icon: any; l
   DRAFT: { bg: '#f3f4f6', color: '#6b7280', icon: Lock, label: 'Draft' },
   OPEN: { bg: '#e6f6ec', color: '#1e874b', icon: Clock, label: 'Open for Subscription' },
   RUNNING: { bg: '#e0e7ff', color: '#4f46e5', icon: PlayCircle, label: 'Running / Development' },
-  ONLINE: { bg: '#fff1d9', color: '#8a5314', icon: Activity, label: 'Online / Traffic Battle' },
+  ONLINE: { bg: '#fff1d9', color: '#8a5314', icon: Activity, label: 'Released / Traffic Battle' },
   CLOSED: { bg: '#f2f0f3', color: '#6b7280', icon: Lock, label: 'Closed / Settled' },
 };
+
+const filterLabels: Record<BountyState | 'ALL', string> = {
+  ALL: 'All',
+  DRAFT: 'Draft',
+  OPEN: 'Open',
+  RUNNING: 'Running',
+  ONLINE: 'Released',
+  CLOSED: 'Closed',
+};
+
+function formatBountyDate(value?: string): string {
+  if (!value) return 'Not set';
+  const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+}
 
 export function BountyHub(): React.ReactElement {
   const navigate = useNavigate();
@@ -47,7 +67,7 @@ export function BountyHub(): React.ReactElement {
   };
 
   return (
-    <div style={{ maxWidth: '1080px', margin: '0 auto', paddingBottom: '48px' }}>
+    <div className="my-bounties-page" style={{ paddingBottom: '48px' }}>
       {/* Toast notification for Unsubscribe with Undo */}
       {isLoading && <div style={{ padding: '48px', textAlign: 'center', color: 'var(--portal-muted)' }}>Loading your bounties...</div>}
       {error && !isLoading && (
@@ -206,7 +226,7 @@ export function BountyHub(): React.ReactElement {
                   transition: 'all 0.15s',
                 }}
               >
-                {f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
+                {filterLabels[f]}
               </button>
             ))}
           </div>
@@ -254,6 +274,7 @@ export function BountyHub(): React.ReactElement {
                   return (
                     <div
                       key={bounty.id}
+                      className="my-bounty-card"
                       style={{
                         background: '#fff',
                         border: '1px solid var(--portal-border)',
@@ -277,7 +298,7 @@ export function BountyHub(): React.ReactElement {
                       onClick={() => navigate(`/dashboard/bounties/${bounty.id}`)}
                     >
                       {/* Left side: Information */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="my-bounty-card__main" style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                           <span
                             style={{
@@ -318,6 +339,21 @@ export function BountyHub(): React.ReactElement {
                           {bounty.description}
                         </p>
 
+                        <div className="my-bounty-schedule" aria-label="Bounty phase dates">
+                          <div>
+                            <span>Subscriptions close</span>
+                            <strong>{formatBountyDate(bounty.deadline)}</strong>
+                          </div>
+                          <div>
+                            <span>Release date</span>
+                            <strong>{formatBountyDate(bounty.releaseDate)}</strong>
+                          </div>
+                          <div>
+                            <span>Distribution date</span>
+                            <strong>{formatBountyDate(bounty.battleEnd)}</strong>
+                          </div>
+                        </div>
+
                         <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
                           {bounty.tags.map(tag => (
                             <span
@@ -339,10 +375,12 @@ export function BountyHub(): React.ReactElement {
 
                       {/* Right side: Prize pool, Scores & Unsubscribe button */}
                       <div
+                        className="my-bounty-card__aside"
                         style={{
                           borderLeft: '1px solid var(--portal-border)',
                           paddingLeft: '24px',
-                          minWidth: '240px',
+                          flex: '0 0 32%',
+                          minWidth: '300px',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -448,7 +486,7 @@ export function BountyHub(): React.ReactElement {
                               </strong>
                             </div>
 
-                            {/* Online Games */}
+                            {/* Released Games */}
                             <div>
                               <span
                                 style={{
@@ -460,7 +498,7 @@ export function BountyHub(): React.ReactElement {
                                   marginBottom: '2px',
                                 }}
                               >
-                                <Activity size={11} /> Online
+                                <Activity size={11} /> Released Games
                               </span>
                               <strong style={{ fontSize: '13px', color: 'var(--portal-ink)', fontWeight: 600 }}>
                                 {bounty.onlineGames}

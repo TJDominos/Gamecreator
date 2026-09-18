@@ -457,7 +457,7 @@
 }
 
 .portal-content {
-  width: min(1180px, calc(100% - 64px));
+  width: min(1520px, calc(100% - 64px));
   margin: 0 auto;
   padding: var(--space-10) 0 var(--space-3xl);
 }
@@ -515,8 +515,64 @@
 
 .admin-bounty-page__inner {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1520px;
   margin: 0 auto;
+}
+
+.my-bounty-card {
+  min-width: 0;
+}
+
+.my-bounty-schedule {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding: var(--space-sm) 0 0;
+  border-top: 1px solid var(--portal-border);
+}
+
+.my-bounty-schedule > div {
+  min-width: 0;
+}
+
+.my-bounty-schedule span,
+.my-bounty-schedule strong {
+  display: block;
+}
+
+.my-bounty-schedule span {
+  margin-bottom: 3px;
+  color: var(--portal-muted);
+  font-size: var(--font-size-xs);
+}
+
+.my-bounty-schedule strong {
+  color: var(--portal-ink);
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+}
+
+@media (max-width: 900px) {
+  .my-bounty-card {
+    flex-direction: column !important;
+  }
+
+  .my-bounty-card__aside {
+    flex-basis: auto !important;
+    min-width: 0 !important;
+    padding-top: var(--space-lg);
+    padding-left: 0 !important;
+    border-top: 1px solid var(--portal-border);
+    border-left: 0 !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .my-bounty-schedule {
+    grid-template-columns: 1fr;
+    gap: var(--space-xs);
+  }
 }
 
 .admin-shell {

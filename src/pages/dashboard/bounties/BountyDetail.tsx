@@ -101,6 +101,7 @@ export function BountyDetail(): React.ReactElement {
   };
 
   const statusStyle = getStatusColor(bounty.state);
+  const statusLabel = bounty.state === 'ONLINE' ? 'RELEASED' : bounty.state;
 
   return (
     <div className="creator-content-shell px-6 pb-[60px]">
@@ -176,7 +177,7 @@ export function BountyDetail(): React.ReactElement {
                     fontWeight: 600,
                     border: `1px solid ${statusStyle.color}40`
                   }}>
-                    {bounty.state}
+                    {statusLabel}
                   </span>
                   <span style={{ color: 'var(--portal-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Target size={14} /> {bounty.category}
@@ -380,7 +381,7 @@ export function BountyDetail(): React.ReactElement {
             {(bounty.state === 'ONLINE' || bounty.state === 'CLOSED') && bounty.publishedGames && (
               <div style={{ marginBottom: '32px' }}>
                 <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle2 size={18} color="#10b981" /> {bounty.state === 'CLOSED' ? 'Other Published' : 'Published Games'}
+                  <CheckCircle2 size={18} color="#10b981" /> {bounty.state === 'CLOSED' ? 'Other Released' : 'Released Games'}
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {bounty.publishedGames.map((pub, idx) => (
