@@ -135,6 +135,26 @@ The GitHub App callback and webhook URLs must point to the matching Worker:
 - Production: `https://creator.randseed.org/api/github/callback` and
 	`https://creator.randseed.org/api/webhooks/github`
 
+### Local GitHub App debugging
+
+GitHub connection endpoints are not mocked by the Vite development server. Run
+the Worker and portal separately, and point the browser-safe API URL at the
+local Worker:
+
+```bash
+cp .dev.vars.example .dev.vars
+# Fill .dev.vars with the GitHub App credentials and a local JWT_SECRET.
+npm run worker:dev
+```
+
+Create an ignored `.env.local` with `VITE_API_BASE_URL` set to the local Worker
+URL (normally `http://localhost:8787`) before starting `npm run dev`. GitHub
+must be able to reach the callback and webhook, so use an HTTPS tunnel for the
+Worker when testing installation callbacks or webhook delivery. Configure the
+GitHub App's Setup URL and Webhook URL to that tunnel's `/api/github/callback`
+and `/api/webhooks/github` paths, and set the local Worker `MAIN_SITE_URL` to
+the portal URL that should receive the callback redirect.
+
 Vercel SPA rewrites are configured in `vercel.json`.
 
 Production deploys run automatically from the `main` branch through

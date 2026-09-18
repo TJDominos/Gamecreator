@@ -33,6 +33,16 @@ export interface LinkGameRepoResponse {
   error?: string;
 }
 
+export interface ImportWorkflowResponse {
+  success: boolean;
+  pull_request?: {
+    number: number;
+    html_url: string;
+    branch: string;
+  };
+  error?: string;
+}
+
 export interface DeploymentRecord {
   id: string;
   game_id: string;
@@ -93,20 +103,10 @@ export const githubApi = {
    * Retrieves GitHub App install link for RDcreatordev
    */
   async getInstallInfo(gameId?: string): Promise<GitHubInstallInfo> {
-    try {
-      const res = await request<GitHubInstallInfo>("/api/github/install");
-      if (res && res.install_url) {
-        return res;
-      }
-    } catch {
-      // Fallback
-    }
-    const slug = "RDcreatordev";
-    return {
-      success: true,
-      app_slug: slug,
-      install_url: `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(gameId || "creator_dev")}`,
-    };
+    const query = gameId ? `?game_id=${encodeURIComponent(gameId)}` : "";
+    return request<GitHubInstallInfo>(`/api/github/install${query}`, {
+      method: "GET",
+    });
   },
 
   /**
@@ -129,6 +129,16 @@ export const githubApi = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+
+  async importWorkflow(gameId: string, workflowContent: string): Promise<ImportWorkflowResponse> {
+    return request<ImportWorkflowResponse>(
+      `/api/games/${encodeURIComponent(gameId)}/repo/import-workflow`,
+      {
+        method: "POST",
+        body: JSON.stringify({ workflow_content: workflowContent }),
+      },
+    );
   },
 
   /**

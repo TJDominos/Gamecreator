@@ -7,7 +7,12 @@ import type {
 } from "../types";
 import { getAuthenticatedUser } from "../middleware/auth";
 import { sha256Hex, signJwt, verifyGitHubWebhookSignature, verifyJwt } from "../utils/crypto";
-import { dispatchDeploymentWorkflow } from "../utils/githubApp";
+import {
+  createWorkflowPullRequest,
+  dispatchDeploymentWorkflow,
+  getInstallationInfo,
+  getInstallationRepository,
+} from "../utils/githubApp";
 import { gameBaseUrl } from "../utils/playUrl";
 import { errorResponse, jsonResponse } from "../utils/response";
 
@@ -51,6 +56,9 @@ export async function handleGitHubRoutes(
     if (method === "POST" && subPath === "/link") {
       return handleLinkGameRepo(gameId, request, env);
     }
+    if (method === "POST" && subPath === "/import-workflow") {
+      return handleImportWorkflow(gameId, request, env);
+    }
     if (method === "POST" && subPath === "/unlink") {
       return handleUnlinkGameRepo(gameId, request, env);
     }
@@ -74,12 +82,14 @@ async function handleGitHubInstall(request: Request, env: Env): Promise<Response
   if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
   if (user.role !== "creator") return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   const appSlug = env.GITHUB_APP_SLUG || "RDcreatordev";
+  const gameId = new URL(request.url).searchParams.get("game_id") || undefined;
   const state = await signJwt(
     {
       principal_id: user.principal_id,
       role: user.role,
       email: user.email,
       is_email_verified: user.is_email_verified,
+      game_id: gameId,
     },
     env.JWT_SECRET,
     10 * 60,
@@ -112,12 +122,21 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
   }
 
   const installationId = parseInt(installationIdStr, 10);
+  if (!Number.isSafeInteger(installationId) || installationId <= 0) {
+    return errorResponse("Invalid installation_id in callback", 400, "INVALID_PARAM", request, env);
+  }
   const statePayload = await verifyJwt(state, env.JWT_SECRET);
   if (!statePayload) return errorResponse("Invalid or expired installation state", 400, "INVALID_STATE", request, env);
   if (statePayload.role !== "creator") return errorResponse("Creator access required", 403, "FORBIDDEN", request, env);
   const now = Date.now();
 
   try {
+    const installation = await getInstallationInfo(env, installationId);
+    const accountLogin = installation.account?.login;
+    if (!accountLogin) {
+      return errorResponse("GitHub installation has no account", 502, "GITHUB_API_ERROR", request, env);
+    }
+
     if (env.DB) {
       // Save or update installation record
       const id = `gh_inst_${installationId}`;
@@ -132,10 +151,10 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
         .bind(
           id,
           installationId,
-          "Authorized-User",
-          "User",
+          accountLogin,
+          installation.account?.type || "User",
           ownerPrincipal,
-          JSON.stringify({ setup_action: setupAction }),
+          JSON.stringify({ setup_action: setupAction, permissions: installation.permissions || {} }),
           now,
           now,
         )
@@ -143,7 +162,10 @@ async function handleGitHubCallback(request: Request, env: Env): Promise<Respons
     }
 
     // Redirect user back to dashboard or return JSON
-    const redirectTarget = `${env.MAIN_SITE_URL || ""}/dashboard/games?github_installed=true&installation_id=${installationId}`;
+    const gamePath = typeof statePayload.game_id === "string"
+      ? `/dashboard/games/${encodeURIComponent(statePayload.game_id)}/publish`
+      : "/dashboard/games";
+    const redirectTarget = `${env.MAIN_SITE_URL || ""}${gamePath}?github_installed=true&installation_id=${installationId}`;
     return new Response(null, {
       status: 302,
       headers: {
@@ -185,8 +207,8 @@ async function handleGetGameRepo(gameId: string, request: Request, env: Env): Pr
             repo_info: {
               repository: binding.repo_full_name,
               branch: binding.default_branch,
-              lastCommitSha: binding.last_synced_commit || "init",
-              lastCommitMessage: binding.last_commit_message || "Ready for deployments",
+              lastCommitSha: binding.last_synced_commit || "",
+              lastCommitMessage: binding.last_commit_message || "No successful deployment yet",
               lastSyncedAt: binding.last_synced_at ? new Date(binding.last_synced_at).toISOString() : "Never",
               isSynced: binding.sync_status === "synced",
               syncMethod: binding.sync_method,
@@ -243,13 +265,26 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
     return errorResponse("Repository, branch, or build directory is invalid", 400, "INVALID_REPOSITORY", request, env);
   }
 
-  if (!installationId) {
+  if (!installationId || !Number.isSafeInteger(installationId) || installationId <= 0) {
     return errorResponse("Missing required 'installation_id' parameter", 400, "MISSING_INSTALLATION_ID", request, env);
   }
   const installation = await env.DB.prepare(
     `SELECT installation_id FROM github_installations WHERE installation_id = ? AND owner_principal = ?`,
   ).bind(installationId, ownerPrincipal).first<{ installation_id: number }>();
   if (!installation) return errorResponse("GitHub installation is not owned by the authenticated creator", 403, "FORBIDDEN", request, env);
+
+  let githubRepository;
+  try {
+    githubRepository = await getInstallationRepository(env, installationId, repository, branch);
+  } catch (err) {
+    return errorResponse(
+      err instanceof Error ? err.message : "GitHub repository validation failed",
+      502,
+      "GITHUB_API_ERROR",
+      request,
+      env,
+    );
+  }
 
   const tokenHash = await sha256Hex(`oidc-only:${crypto.randomUUID()}`);
   const sandboxUrl = gameBaseUrl(env, gameId);
@@ -272,14 +307,14 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
         .bind(
           gameId,
           installationId,
-          repository,
-          branch,
+          githubRepository.full_name,
+          githubRepository.branch,
           tokenHash,
           "github_action",
-          "synced",
-          "init-head",
-          "Linked via RandSeed Developer Portal",
-          now,
+          "outdated",
+          null,
+          null,
+          null,
           sandboxUrl,
           buildDir,
           now,
@@ -294,8 +329,8 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
         message: "Repository successfully linked!",
         binding: {
           game_id: gameId,
-          repository,
-          branch,
+          repository: githubRepository.full_name,
+          branch: githubRepository.branch,
           sandbox_url: sandboxUrl,
           deployment_auth: "github_actions_oidc",
         },
@@ -309,6 +344,55 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
       err instanceof Error ? err.message : "Failed to link repository",
       500,
       "DB_ERROR",
+      request,
+      env,
+    );
+  }
+}
+
+async function handleImportWorkflow(gameId: string, request: Request, env: Env): Promise<Response> {
+  const user = await getAuthenticatedUser(request, env);
+  if (!user) return errorResponse("Authentication required", 401, "UNAUTHORIZED", request, env);
+  const access = await authorizeCreatorGame(gameId, user.principal_id, user.role, request, env);
+  if (!access.ok) return access.response;
+
+  const body = await request.json().catch(() => null) as { workflow_content?: string } | null;
+  const workflowContent = body?.workflow_content || "";
+  if (
+    workflowContent.length === 0 ||
+    workflowContent.length > 100_000 ||
+    !workflowContent.includes("name: Deploy to RandSeed Sandbox") ||
+    !workflowContent.includes("workflow_dispatch:") ||
+    !workflowContent.includes("id-token: write")
+  ) {
+    return errorResponse("Invalid RandSeed workflow content", 400, "INVALID_WORKFLOW", request, env);
+  }
+
+  const binding = await env.DB.prepare(
+    `SELECT b.installation_id, b.repo_full_name, b.default_branch
+     FROM game_repo_bindings b
+     JOIN github_installations i ON i.installation_id = b.installation_id
+     WHERE b.game_id = ? AND i.owner_principal = ?`,
+  ).bind(gameId, user.principal_id).first<{ installation_id: number; repo_full_name: string; default_branch: string }>();
+  if (!binding) return errorResponse("No GitHub repository is connected to this game", 404, "NOT_FOUND", request, env);
+
+  try {
+    const pullRequest = await createWorkflowPullRequest(env, {
+      installationId: binding.installation_id,
+      repository: binding.repo_full_name,
+      baseBranch: binding.default_branch,
+      workflowContent,
+    });
+    return jsonResponse({ success: true, pull_request: pullRequest }, 201, request, env);
+  } catch (error) {
+    const status = error instanceof Error && "status" in error && typeof error.status === "number"
+      ? error.status
+      : 502;
+    const code = status === 409 ? "WORKFLOW_ALREADY_EXISTS" : "GITHUB_API_ERROR";
+    return errorResponse(
+      error instanceof Error ? error.message : "Failed to create workflow pull request",
+      status,
+      code,
       request,
       env,
     );

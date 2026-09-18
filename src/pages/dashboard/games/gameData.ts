@@ -174,16 +174,6 @@ export function createNextNewGame(): Game {
       coverImage: '',
       animationUrl: ''
     },
-    repoInfo: {
-      repository: `RandseedStudio/${name.replace(/\s+/g, '-').toLowerCase()}`,
-      branch: 'main',
-      lastCommitSha: 'init',
-      lastCommitMessage: 'Initial game repository',
-      lastSyncedAt: 'Just now',
-      isSynced: false,
-      syncMethod: 'github_action',
-      sandboxUrl: `https://randseed.org/${id}`
-    }
   };
 
   const currentGames = getStoredGames();

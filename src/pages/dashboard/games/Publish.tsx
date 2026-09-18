@@ -39,6 +39,7 @@ import {
   type PrivateReleaseResponse,
   type ActivePrivateReleaseInfo
 } from "../../../services/githubApi";
+import { GitHubSyncCard } from "./GitHubSyncCard";
 
 function formatDate(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -331,6 +332,10 @@ export function Publish(): React.ReactElement {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <GitHubSyncCard
+        gameId={gameId || ""}
+        gameName={game?.name || ""}
+      />
       
       {/* Top Action Bar: Header + Private Publish + Go Public Buttons */}
       <div style={{

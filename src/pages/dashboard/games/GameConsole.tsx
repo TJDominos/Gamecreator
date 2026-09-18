@@ -19,7 +19,7 @@ import {
   AlertCircle,
   Copy 
 } from "lucide-react";
-import { getGameById, updateGame, isGameNameUnique, GAMES_UPDATED_EVENT } from "./gameData";
+import { getGameById, updateGame, isGameNameUnique, GAMES_UPDATED_EVENT, type GameRepoInfo } from "./gameData";
 import { githubApi } from "../../../services/githubApi";
 
 const GITHUB_APP_SLUG = "RDcreatordev";
@@ -41,36 +41,35 @@ export const StatusLabels: Record<GameStatus, string> = {
 export function GameConsole(): React.ReactElement {
   const { gameId } = useParams();
   const location = useLocation();
-  const [game, setGame] = useState(() => getGameById(gameId || 'g_101'));
-  const initialRepoInfo = game?.repoInfo || {
-    repository: "TJDominos/Gamecreator",
+  const [game, setGame] = useState(() => getGameById(gameId || ''));
+  const emptyRepoInfo: GameRepoInfo = {
+    repository: "",
     branch: "main",
-    lastCommitSha: "a4f29cb",
-    lastCommitMessage: "Fix collision bugs and particle effects",
-    lastSyncedAt: "2 mins ago",
-    isSynced: true,
+    lastCommitSha: "",
+    lastCommitMessage: "",
+    lastSyncedAt: "",
+    isSynced: false,
     syncMethod: "github_action",
-    sandboxUrl: `https://randseed.org/${gameId || 'g_101'}`
+    sandboxUrl: "",
   };
-  const [repoInfo, setRepoInfo] = useState(initialRepoInfo);
-  const [isDisconnected, setIsDisconnected] = useState(false);
+  const [repoInfo, setRepoInfo] = useState<GameRepoInfo>(emptyRepoInfo);
+  const [isDisconnected, setIsDisconnected] = useState(true);
   const [showGithubMenu, setShowGithubMenu] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
 
   // Connect modal state
-  const [repoInput, setRepoInput] = useState(repoInfo?.repository || "TJDominos/Gamecreator");
-  const [branchInput, setBranchInput] = useState(repoInfo?.branch || "main");
+  const [repoInput, setRepoInput] = useState("");
+  const [branchInput, setBranchInput] = useState("main");
   const [buildDirInput, setBuildDirInput] = useState("dist");
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-  const [installUrl, setInstallUrl] = useState(`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`);
-  const [showGithubIframe, setShowGithubIframe] = useState(false);
+  const [installUrl, setInstallUrl] = useState<string | null>(null);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isPublishTab = location.pathname.includes('/publish') || location.pathname.includes('/deployments');
-  const sandboxUrl = repoInfo?.sandboxUrl || game?.repoInfo?.sandboxUrl || `https://randseed.org/${gameId || 'g_101'}`;
+  const sandboxUrl = repoInfo.sandboxUrl;
   const [copiedSandbox, setCopiedSandbox] = useState(false);
 
   const handleCopySandbox = () => {
@@ -93,7 +92,6 @@ export function GameConsole(): React.ReactElement {
         setGame(g);
         setGameName(g.name);
         setStatus(g.status);
-        if (g.repoInfo) setRepoInfo(g.repoInfo);
       }
     };
     window.addEventListener(GAMES_UPDATED_EVENT, handleUpdate);
@@ -113,7 +111,7 @@ export function GameConsole(): React.ReactElement {
         setRepoInfo(res.repo_info);
         setIsDisconnected(false);
       }
-    }).catch(() => {});
+    }).catch(() => setIsDisconnected(true));
 
     return () => { isMounted = false; };
   }, [gameId]);
@@ -164,19 +162,24 @@ export function GameConsole(): React.ReactElement {
     }
     setIsLinking(true);
     setLinkError(null);
+    if (!gameId) {
+      setLinkError("A game is required before connecting a repository.");
+      return;
+    }
     try {
-      const res = await githubApi.linkGameRepo(gameId || 'g_101', {
+      const res = await githubApi.linkGameRepo(gameId, {
         repository: repoInput.trim(),
         branch: branchInput.trim() || 'main',
-        build_dir: buildDirInput.trim() || 'dist'
+        build_dir: buildDirInput.trim() || 'dist',
+        installation_id: Number(new URLSearchParams(window.location.search).get("installation_id")) || undefined,
       });
       if (res && res.success && res.binding) {
         setRepoInfo(prev => ({
           ...prev,
           repository: res.binding.repository,
           branch: res.binding.branch,
-          lastSyncedAt: "Just now",
-          isSynced: true
+          lastSyncedAt: "Never",
+          isSynced: false
         }));
         setIsDisconnected(false);
         setShowConnectModal(false);
@@ -191,15 +194,17 @@ export function GameConsole(): React.ReactElement {
   };
 
   const handleUnlinkConfirm = async () => {
-    if (gameId) {
-      try {
-        await githubApi.unlinkGameRepo(gameId);
-      } catch {
-        // Continue
+    if (!gameId) return;
+    try {
+      const response = await githubApi.unlinkGameRepo(gameId);
+      if (!response.success) {
+        throw new Error(response.message || "Failed to disconnect repository");
       }
+      setShowUnlinkModal(false);
+      setIsDisconnected(true);
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : "Failed to disconnect repository");
     }
-    setShowUnlinkModal(false);
-    setIsDisconnected(true);
   };
 
   const hasActiveRepo = !isDisconnected && Boolean(repoInfo?.repository);
@@ -544,7 +549,10 @@ export function GameConsole(): React.ReactElement {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowGithubIframe(true)}
+                  onClick={() => {
+                    if (installUrl) window.open(installUrl, "_blank", "noopener,noreferrer");
+                  }}
+                  disabled={!installUrl}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -557,7 +565,8 @@ export function GameConsole(): React.ReactElement {
                     fontWeight: 600,
                     textDecoration: 'none',
                     border: 'none',
-                    cursor: 'pointer'
+                    cursor: installUrl ? 'pointer' : 'not-allowed',
+                    opacity: installUrl ? 1 : 0.5
                   }}
                 >
                   <span>Authorize on GitHub</span>
@@ -579,9 +588,7 @@ export function GameConsole(): React.ReactElement {
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box', appearance: 'none', backgroundColor: '#fff', cursor: 'pointer' }}
                   >
                     <option value="" disabled>Select an authorized repository...</option>
-                    {repoInfo?.repository && <option value={repoInfo.repository}>{repoInfo.repository}</option>}
-                    {(!repoInfo?.repository || repoInfo.repository !== "RandseedStudio/new-game6") && <option value="RandseedStudio/new-game6">RandseedStudio/new-game6</option>}
-                    <option value="RandseedStudio/demo-game">RandseedStudio/demo-game</option>
+                    {repoInfo.repository && <option value={repoInfo.repository}>{repoInfo.repository}</option>}
                   </select>
                   <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -678,31 +685,6 @@ export function GameConsole(): React.ReactElement {
         </div>
       )}
 
-      {/* GitHub App Iframe Modal */}
-      {showGithubIframe && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 130, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.6)', padding: '20px' }}>
-          <div style={{ background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '800px', height: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <div style={{ padding: '12px 16px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Github size={18} color="#111827" />
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>Install GitHub App</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGithubIframe(false)}
-                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#9ca3af' }}
-              >
-                &times;
-              </button>
-            </div>
-            <iframe
-              src={installUrl}
-              title="GitHub App Installation"
-              style={{ width: '100%', flex: 1, border: 'none' }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

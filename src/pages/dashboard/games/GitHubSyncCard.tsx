@@ -14,7 +14,9 @@ import {
   AlertCircle,
   Plus,
   ArrowUpRight,
-  ShieldCheck
+  ShieldCheck,
+  Download,
+  GitPullRequest
 } from "lucide-react";
 import { GameRepoInfo } from "./gameData";
 import { githubApi } from "../../../services/githubApi";
@@ -24,46 +26,46 @@ const GITHUB_APP_SLUG = "RDcreatordev";
 interface GitHubSyncCardProps {
   gameId: string;
   gameName: string;
-  initialRepoInfo?: GameRepoInfo;
   isLocked?: boolean;
 }
 
 export function GitHubSyncCard({
   gameId,
   gameName,
-  initialRepoInfo,
   isLocked = false
 }: GitHubSyncCardProps): React.ReactElement {
-  const [repoInfo, setRepoInfo] = useState<GameRepoInfo>(
-    initialRepoInfo || {
-      repository: "TJDominos/Gamecreator",
-      branch: "main",
-      lastCommitSha: "a4f29cb",
-      lastCommitMessage: "Fix collision bugs and particle effects",
-      lastSyncedAt: "2 mins ago",
-      isSynced: true,
-      syncMethod: "github_action",
-      sandboxUrl: `https://randseed.org/${gameId}`
-    }
-  );
+  const [repoInfo, setRepoInfo] = useState<GameRepoInfo>({
+    repository: "",
+    branch: "main",
+    lastCommitSha: "",
+    lastCommitMessage: "",
+    lastSyncedAt: "",
+    isSynced: false,
+    syncMethod: "github_action",
+    sandboxUrl: ""
+  });
 
   const [isCheckingSync, setIsCheckingSync] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
   const [showInfoDetails, setShowInfoDetails] = useState(false);
   const [activeSyncTab, setActiveSyncTab] = useState<'action' | 'webhook' | 'manual'>('action');
   const [copiedWorkflow, setCopiedWorkflow] = useState(false);
+  const [isImportingWorkflow, setIsImportingWorkflow] = useState(false);
+  const [workflowImportFeedback, setWorkflowImportFeedback] = useState<string | null>(null);
+  const [workflowPullRequestUrl, setWorkflowPullRequestUrl] = useState<string | null>(null);
   const [copiedSandboxUrl, setCopiedSandboxUrl] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
 
   // Connect form state
-  const [repoInput, setRepoInput] = useState(repoInfo.repository || "TJDominos/Gamecreator");
+  const [repoInput, setRepoInput] = useState(repoInfo.repository || "");
   const [branchInput, setBranchInput] = useState(repoInfo.branch || "main");
   const [buildDirInput, setBuildDirInput] = useState("dist");
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-  const [installUrl, setInstallUrl] = useState(`https://github.com/apps/${GITHUB_APP_SLUG}/installations/new`);
+  const [installUrl, setInstallUrl] = useState<string | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
 
   // Load install URL & initial repo info from backend API
   useEffect(() => {
@@ -73,14 +75,18 @@ export function GitHubSyncCard({
       if (isMounted && info.install_url) {
         setInstallUrl(info.install_url);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) setInstallError("Unable to load the GitHub App authorization link.");
+    });
 
     githubApi.getGameRepo(gameId).then(res => {
       if (isMounted && res.success && res.repo_info) {
         setRepoInfo(res.repo_info);
         setIsDisconnected(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) setIsDisconnected(true);
+    });
 
     return () => {
       isMounted = false;
@@ -106,16 +112,8 @@ export function GitHubSyncCard({
       } else {
         setSyncFeedback("Sync checked. Repository is reachable.");
       }
-    } catch {
-      // Fallback
-      setRepoInfo(prev => ({
-        ...prev,
-        isSynced: true,
-        lastSyncedAt: "Just now",
-        lastCommitSha: "c8e170f",
-        lastCommitMessage: "Update player physics and sandbox camera boundaries"
-      }));
-      setSyncFeedback("Sync verified! Sandbox is up-to-date with latest commit c8e170f on main.");
+    } catch (err) {
+      setSyncFeedback(err instanceof Error ? err.message : "Unable to verify GitHub sync status.");
     } finally {
       setIsCheckingSync(false);
       setTimeout(() => setSyncFeedback(null), 6000);
@@ -125,7 +123,7 @@ export function GitHubSyncCard({
   const handleLinkRepository = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!repoInput.trim() || !repoInput.includes("/")) {
-      setLinkError("Please enter a valid GitHub repository in the format 'owner/repo' (e.g. TJDominos/Gamecreator)");
+      setLinkError("Please enter a valid GitHub repository in the format 'owner/repository'.");
       return;
     }
 
@@ -146,13 +144,13 @@ export function GitHubSyncCard({
           repository: res.binding?.repository || repoInput.trim(),
           branch: res.binding?.branch || branchInput.trim(),
           sandboxUrl: res.binding?.sandbox_url || prev.sandboxUrl,
-          isSynced: true,
-          lastSyncedAt: "Just now",
+          isSynced: false,
+          lastSyncedAt: "Never",
         }));
 
         setIsDisconnected(false);
         setShowConnectModal(false);
-        setSyncFeedback(`Repository successfully linked to ${res.binding.repository} via ${GITHUB_APP_SLUG}!`);
+        setSyncFeedback(`Repository successfully linked to ${res.binding.repository} via ${GITHUB_APP_SLUG}.`);
         setTimeout(() => setSyncFeedback(null), 8000);
       } else {
         setLinkError(res.error || "Failed to link repository. Please check permissions.");
@@ -166,17 +164,20 @@ export function GitHubSyncCard({
 
   const handleUnlinkConfirm = async () => {
     try {
-      await githubApi.unlinkGameRepo(gameId);
+      const response = await githubApi.unlinkGameRepo(gameId);
+      if (!response.success) {
+        throw new Error(response.message || "Failed to disconnect repository");
+      }
+      setShowUnlinkModal(false);
+      setIsDisconnected(true);
     } catch {
-      // Ignore network error on local dev
+      setLinkError("Failed to disconnect repository. Please try again.");
     }
-    setShowUnlinkModal(false);
-    setIsDisconnected(true);
   };
 
-  const handleCopyWorkflow = () => {
+  const getWorkflowContent = () => {
     const buildDir = buildDirInput || "dist";
-    const workflowContent = [
+    return [
       "name: Deploy to RandSeed Sandbox",
       "",
       "on:",
@@ -243,10 +244,45 @@ export function GitHubSyncCard({
       "        run: |",
       "          curl -fsS -X POST \"$RANDSEED_API_URL/api/deployments/$DEPLOYMENT_ID/upload-complete\" -H \"Authorization: Bearer $OIDC_TOKEN\" -H 'Content-Type: application/json' --data \"$(node -e \"const fs=require('fs');console.log(JSON.stringify({manifest:JSON.parse(fs.readFileSync('/tmp/randseed-manifest.json'))}))\")\"",
       "",
-    ].join("\\n");
+    ].join("\n");
+  };
+
+  const handleCopyWorkflow = () => {
+    const workflowContent = getWorkflowContent();
     navigator.clipboard.writeText(workflowContent);
     setCopiedWorkflow(true);
     setTimeout(() => setCopiedWorkflow(false), 2500);
+  };
+
+  const handleDownloadWorkflow = () => {
+    const workflow = new Blob([getWorkflowContent()], { type: "text/yaml;charset=utf-8" });
+    const url = URL.createObjectURL(workflow);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "randseed-deploy.yml";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportWorkflow = async () => {
+    setIsImportingWorkflow(true);
+    setWorkflowImportFeedback(null);
+    setWorkflowPullRequestUrl(null);
+    try {
+      const response = await githubApi.importWorkflow(gameId, getWorkflowContent());
+      if (!response.success || !response.pull_request) {
+        setWorkflowImportFeedback(response.error || "Unable to create the workflow pull request.");
+        return;
+      }
+      setWorkflowPullRequestUrl(response.pull_request.html_url);
+      setWorkflowImportFeedback(`Pull request #${response.pull_request.number} is ready for review.`);
+    } catch (error) {
+      setWorkflowImportFeedback(error instanceof Error ? error.message : "Unable to create the workflow pull request.");
+    } finally {
+      setIsImportingWorkflow(false);
+    }
   };
 
   const handleCopySandboxUrl = () => {
@@ -262,7 +298,7 @@ export function GitHubSyncCard({
           <Github size={28} />
         </div>
         <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: '#111827' }}>No Repository Connected</h3>
-        <p style={{ color: '#6b7280', fontSize: '14px', maxWidth: '460px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+          <p style={{ color: '#6b7280', fontSize: '14px', maxWidth: '460px', margin: '0 auto 20px', lineHeight: 1.5 }}>
           Connect your GitHub repository using the official <strong>{GITHUB_APP_SLUG}</strong> App to enable automated builds, sync status checks, and instant sandbox updates.
         </p>
         <button 
@@ -330,9 +366,13 @@ export function GitHubSyncCard({
                 </p>
               </div>
               <a
-                href={installUrl}
+                href={installUrl || undefined}
                 target="_blank"
                 rel="noreferrer"
+                aria-disabled={!installUrl}
+                onClick={event => {
+                  if (!installUrl) event.preventDefault();
+                }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -344,13 +384,16 @@ export function GitHubSyncCard({
                   fontSize: '12px',
                   fontWeight: 600,
                   textDecoration: 'none',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  opacity: installUrl ? 1 : 0.5,
+                  pointerEvents: installUrl ? 'auto' : 'none'
                 }}
               >
                 <span>Authorize on GitHub</span>
                 <ArrowUpRight size={13} />
               </a>
             </div>
+            {installError && <div style={{ marginTop: '10px', color: '#b91c1c', fontSize: '12px' }}>{installError}</div>}
           </div>
 
           {/* Step 2: Form to link repo */}
@@ -361,7 +404,7 @@ export function GitHubSyncCard({
               </label>
               <input
                 type="text"
-                placeholder="e.g. TJDominos/Gamecreator"
+                placeholder="e.g. owner/repository"
                 value={repoInput}
                 onChange={e => setRepoInput(e.target.value)}
                 required
@@ -376,7 +419,7 @@ export function GitHubSyncCard({
                 }}
               />
               <small style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: '#6b7280' }}>
-                The GitHub owner and repository name (e.g. <code>TJDominos/Gamecreator</code>)
+                The GitHub owner and repository name (e.g. <code>owner/repository</code>)
               </small>
             </div>
 
@@ -942,27 +985,83 @@ export function GitHubSyncCard({
               <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>
                 Workflow File: <code style={{ color: '#111827', fontWeight: 600 }}>.github/workflows/randseed-sandbox.yml</code>
               </span>
-              <button
-                type="button"
-                onClick={handleCopyWorkflow}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  padding: '4px 10px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: '#374151',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                {copiedWorkflow ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
-                <span>{copiedWorkflow ? 'Copied' : 'Copy Workflow'}</span>
-              </button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => void handleImportWorkflow()}
+                  disabled={isImportingWorkflow}
+                  style={{
+                    background: '#111827',
+                    border: '1px solid #111827',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#fff',
+                    cursor: isImportingWorkflow ? 'wait' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    opacity: isImportingWorkflow ? 0.7 : 1
+                  }}
+                >
+                  {isImportingWorkflow ? <RefreshCw size={12} className="animate-spin" /> : <GitPullRequest size={12} />}
+                  <span>{isImportingWorkflow ? 'Creating PR...' : 'Import via PR'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadWorkflow}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <Download size={12} />
+                  <span>Download</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyWorkflow}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  {copiedWorkflow ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
+                  <span>{copiedWorkflow ? 'Copied' : 'Copy YAML'}</span>
+                </button>
+              </div>
             </div>
+
+            {workflowImportFeedback && (
+              <div style={{ background: workflowPullRequestUrl ? '#ecfdf5' : '#fef2f2', border: `1px solid ${workflowPullRequestUrl ? '#a7f3d0' : '#fecaca'}`, color: workflowPullRequestUrl ? '#047857' : '#b91c1c', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {workflowPullRequestUrl ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                <span>{workflowImportFeedback}</span>
+                {workflowPullRequestUrl && (
+                  <a href={workflowPullRequestUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', color: '#047857', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Review PR <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+            )}
 
             <pre 
               style={{ 

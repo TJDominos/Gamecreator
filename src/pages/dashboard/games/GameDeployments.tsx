@@ -33,7 +33,6 @@ export function GameDeployments(): React.ReactElement {
   const { gameId } = useParams();
   
   const [game, setGame] = useState(() => getGameById(gameId || 'g_101'));
-  const repoInfo = game?.repoInfo;
 
   // Name resolution state if unique check fails
   const [editNameInput, setEditNameInput] = useState(game?.name || '');
@@ -146,7 +145,6 @@ export function GameDeployments(): React.ReactElement {
       <GitHubSyncCard 
         gameId={gameId || 'g_101'} 
         gameName={game?.name || 'Neon Dash'}
-        initialRepoInfo={game?.repoInfo}
       />
 
       <div>

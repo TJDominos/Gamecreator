@@ -22,16 +22,6 @@ function mockApiPlugin(): Plugin {
         animationUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
         savedAt: "2026-03-01T12:00:00.000Z",
       },
-      repoInfo: {
-        repository: "TJDominos/Gamecreator",
-        branch: "main",
-        lastCommitSha: "a4f29cb",
-        lastCommitMessage: "Fix collision bugs and particle effects",
-        lastSyncedAt: "2 mins ago",
-        isSynced: true,
-        syncMethod: "github_action",
-        sandboxUrl: "https://randseed.org/g_101",
-      },
     },
     {
       id: "g_102",
@@ -50,16 +40,6 @@ function mockApiPlugin(): Plugin {
         animationUrl: "",
         savedAt: "2026-03-05T15:30:00.000Z",
       },
-      repoInfo: {
-        repository: "RandseedStudio/space-miner",
-        branch: "main",
-        lastCommitSha: "7b1c3a8",
-        lastCommitMessage: "Update laser drill physics",
-        lastSyncedAt: "15 mins ago",
-        isSynced: true,
-        syncMethod: "github_action",
-        sandboxUrl: "https://randseed.org/g_102",
-      },
     },
     {
       id: "g_999",
@@ -77,16 +57,6 @@ function mockApiPlugin(): Plugin {
         coverImage: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=600&auto=format&fit=crop&q=80",
         animationUrl: "",
         savedAt: "2026-03-08T09:15:00.000Z",
-      },
-      repoInfo: {
-        repository: "RandseedStudio/cosmic-wars",
-        branch: "release/1.0",
-        lastCommitSha: "9f0d1e2",
-        lastCommitMessage: "Initial release candidate audit",
-        lastSyncedAt: "2 hours ago",
-        isSynced: true,
-        syncMethod: "webhook",
-        sandboxUrl: "https://randseed.org/g_999",
       },
     },
   ];
@@ -284,88 +254,6 @@ function mockApiPlugin(): Plugin {
           );
         }
 
-        if (pathname === "/api/github/install" && method === "GET") {
-          res.statusCode = 200;
-          return res.end(
-            JSON.stringify({
-              success: true,
-              app_slug: "RDcreatordev",
-              install_url: "https://github.com/apps/RDcreatordev/installations/new",
-            }),
-          );
-        }
-
-        const repoMatch = pathname.match(/^\/api\/games\/([^/]+)\/repo(\/.*)?$/);
-        if (repoMatch) {
-          const gameId = decodeURIComponent(repoMatch[1]);
-          const sub = repoMatch[2] || "";
-
-          if (method === "GET" && sub === "") {
-            res.statusCode = 200;
-            return res.end(
-              JSON.stringify({
-                success: true,
-                repo_info: {
-                  repository: "TJDominos/Gamecreator",
-                  branch: "main",
-                  lastCommitSha: "a4f29cb",
-                  lastCommitMessage: "Fix collision bugs and particle effects",
-                  lastSyncedAt: "2 mins ago",
-                  isSynced: true,
-                  syncMethod: "github_action",
-                  sandboxUrl: `https://randseed.org/sandbox/${gameId}`,
-                },
-              }),
-            );
-          }
-
-          if (method === "POST" && sub === "/link") {
-            const body = await getBody();
-            res.statusCode = 200;
-            return res.end(
-              JSON.stringify({
-                success: true,
-                message: "Repository successfully linked via RDcreatordev!",
-                binding: {
-                  game_id: gameId,
-                  repository: body?.repository || "TJDominos/Gamecreator",
-                  branch: body?.branch || "main",
-                  sandbox_url: `https://randseed.org/sandbox/${gameId}`,
-                  api_token: `rs_live_${Math.random().toString(36).substring(2)}`,
-                },
-              }),
-            );
-          }
-
-          if (method === "POST" && sub === "/unlink") {
-            res.statusCode = 200;
-            return res.end(
-              JSON.stringify({
-                success: true,
-                message: `Repository unlinked from game ${gameId}`,
-              }),
-            );
-          }
-        }
-
-        const syncMatch = pathname.match(/^\/api\/games\/([^/]+)\/sync-status$/);
-        if (syncMatch && method === "GET") {
-          const gameId = decodeURIComponent(syncMatch[1]);
-          res.statusCode = 200;
-          return res.end(
-            JSON.stringify({
-              success: true,
-              game_id: gameId,
-              is_synced: true,
-              last_synced_at: new Date().toISOString(),
-              latest_commit: "c8e170f",
-              commit_message: "Update player physics and sandbox camera boundaries",
-              sandbox_url: `https://randseed.org/sandbox/${gameId}`,
-              message: "GitHub (RDcreatordev) & RandSeed Sandbox are currently in sync",
-            }),
-          );
-        }
-
         // --- Games Backend API ---
         if (pathname === "/api/games") {
           if (method === "GET") {
@@ -408,16 +296,6 @@ function mockApiPlugin(): Plugin {
                 description: "",
                 coverImage: "",
                 animationUrl: "",
-              },
-              repoInfo: {
-                repository: `RandseedStudio/${gameName.replace(/\s+/g, "-").toLowerCase()}`,
-                branch: "main",
-                lastCommitSha: "init",
-                lastCommitMessage: "Initial repository commit",
-                lastSyncedAt: "Just now",
-                isSynced: false,
-                syncMethod: "github_action",
-                sandboxUrl: `https://randseed.org/${id}`,
               },
             };
 
