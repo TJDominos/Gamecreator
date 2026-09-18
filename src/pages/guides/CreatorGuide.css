@@ -53,7 +53,7 @@
 
 .guide-main {
   display: flex;
-  max-width: 1520px;
+  max-width: var(--creator-content-max-width);
   margin: 0 auto;
   padding: 40px 24px;
   gap: 60px;

@@ -17,15 +17,16 @@ const inferExampleType = (mediaUrl: string): 'image' | 'video' => {
 export function BountyManagement(): React.ReactElement {
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 1 });
+  const [tabCounts, setTabCounts] = useState<Record<'ACTIVE' | 'CLOSED' | 'DRAFT', number>>({ ACTIVE: 0, CLOSED: 0, DRAFT: 0 });
 
-  React.useEffect(() => {
-    fetchBounties();
-  }, []);
-
-  const fetchBounties = async (): Promise<Bounty[]> => {
+  const fetchBounties = async (page = 1, state = filterState, search = searchQuery): Promise<Bounty[]> => {
+    setLoading(true);
     try {
       const token = localStorage.getItem("randseed_custom_jwt");
-      const res = await fetch("/api/admin/bounties", {
+      const params = new URLSearchParams({ state, page: String(page), pageSize: String(itemsPerPage) });
+      if (search.trim()) params.set('search', search.trim());
+      const res = await fetch(`/api/admin/bounties?${params.toString()}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
@@ -34,6 +35,10 @@ export function BountyManagement(): React.ReactElement {
         if (Array.isArray(rawBounties)) {
           const nextBounties = rawBounties.map(mapBounty);
           setBounties(nextBounties);
+          const nextPagination = data.pagination || data.data?.pagination;
+          if (nextPagination) setPagination(nextPagination);
+          const nextCounts = data.counts || data.data?.counts;
+          if (nextCounts) setTabCounts(nextCounts);
           return nextBounties;
         }
         throw new Error(data.error || data.message || 'Bounty list response was invalid');
@@ -59,6 +64,10 @@ export function BountyManagement(): React.ReactElement {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  React.useEffect(() => {
+    void fetchBounties(1, filterState, searchQuery);
+  }, [filterState, searchQuery]);
 
   const [form, setForm] = useState({
     title: '', category: 'Arcade' as Category, shortDesc: '', fullDesc: '', thumbnailUrl: '',
@@ -148,7 +157,7 @@ export function BountyManagement(): React.ReactElement {
       if (!res.ok || data.success === false) {
         throw new Error(data.error || data.message || "Failed to save bounty");
       }
-      const refreshedBounties = await fetchBounties();
+      const refreshedBounties = await fetchBounties(pagination.page, filterState, searchQuery);
       lastSavedFormRef.current = form;
       if (isAutoSave) {
         setAutoSaveStatus("Saved at " + new Date().toLocaleTimeString());
@@ -339,6 +348,7 @@ export function BountyManagement(): React.ReactElement {
                 <TipTapEditor 
                   value={form.fullDesc} 
                   onChange={(val) => setForm({...form, fullDesc: val})} 
+                  uploadImage={bountyApi.uploadMedia}
                 />
               </div>
 
@@ -699,7 +709,7 @@ export function BountyManagement(): React.ReactElement {
                             </button>
                           )}
                           {b.state !== 'DRAFT' && (
-                            <button className="btn btn--outline btn--sm" onClick={() => { setSelectedBounty(b); setView('participants'); setCurrentPage(1); }}>
+                            <button className="btn btn--sm bounty-view-participants" onClick={() => { setSelectedBounty(b); setView('participants'); setCurrentPage(1); }}>
                               View Participants
                             </button>
                           )}

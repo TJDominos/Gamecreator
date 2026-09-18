@@ -1,6 +1,64 @@
 import type { Env } from "../types";
 import { errorResponse, jsonResponse } from "../utils/response";
 import { getAuthenticatedUser } from "../middleware/auth";
+import { renderShareMetadataHtml, resolveShareImage } from "../utils/shareMetadata";
+
+export async function handleBountyPageRequest(request: Request, env: Env): Promise<Response | null> {
+  if (!env.ASSETS || !["GET", "HEAD"].includes(request.method)) return null;
+
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/(?:dashboard\/)?bounties\/([^/]+)$/);
+  if (!match) return null;
+
+  let bountyId: string;
+  try {
+    bountyId = decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+
+  try {
+    const bounty = await env.DB.prepare(
+      "SELECT title, description, full_description, video_url, state FROM bounties WHERE id = ?",
+    ).bind(bountyId).first<{
+      title: string;
+      description: string | null;
+      full_description: string | null;
+      video_url: string | null;
+      state: string;
+    }>();
+    if (!bounty || bounty.state === "DRAFT") return null;
+
+    const pageUrl = new URL(request.url);
+    pageUrl.search = "";
+    pageUrl.hash = "";
+    const image = resolveShareImage(bounty.video_url, pageUrl.toString());
+    const templateResponse = await env.ASSETS.fetch(
+      new Request(new URL("/index.html", request.url), { method: "GET", headers: request.headers }),
+    );
+    if (!templateResponse.ok) return templateResponse;
+
+    const metadataHtml = renderShareMetadataHtml(await templateResponse.text(), {
+      title: `${bounty.title} - Creator Center`,
+      description: bounty.description || bounty.full_description || "Explore this creator bounty on Randseed.",
+      url: pageUrl.toString(),
+      image: image.url,
+      imageType: image.type,
+    });
+    const headers = new Headers(templateResponse.headers);
+    headers.set("content-type", "text/html; charset=UTF-8");
+    headers.set("cache-control", "public, max-age=60, s-maxage=300");
+    headers.delete("content-length");
+    headers.delete("etag");
+
+    return new Response(request.method === "HEAD" ? null : metadataHtml, {
+      status: templateResponse.status,
+      headers,
+    });
+  } catch {
+    return null;
+  }
+}
 
 export async function handleBountyRoutes(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
@@ -52,16 +110,68 @@ async function handleAdminListBounties(request: Request, env: Env): Promise<Resp
   }
 
   try {
+    const url = new URL(request.url);
+    const requestedState = url.searchParams.get("state") || "ACTIVE";
+    const state = ["ACTIVE", "CLOSED", "DRAFT"].includes(requestedState) ? requestedState : "ACTIVE";
+    const search = (url.searchParams.get("search") || "").trim();
+    const parsedPage = Number.parseInt(url.searchParams.get("page") || "1", 10);
+    const parsedPageSize = Number.parseInt(url.searchParams.get("pageSize") || "20", 10);
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const pageSize = Number.isFinite(parsedPageSize) ? Math.min(100, Math.max(1, parsedPageSize)) : 20;
+    const offset = (page - 1) * pageSize;
+    const searchPattern = `%${search}%`;
+
+    const stateCondition = state === "ACTIVE"
+      ? "b.state NOT IN (?, ?)"
+      : "b.state = ?";
+    const stateBindings = state === "ACTIVE" ? ["DRAFT", "CLOSED"] : [state];
+    const searchCondition = search ? " AND (b.title LIKE ? OR b.id LIKE ?)" : "";
+    const searchBindings = search ? [searchPattern, searchPattern] : [];
+
+    const countResult = await env.DB.prepare(`
+      SELECT COUNT(*) AS total
+      FROM bounties b
+      WHERE ${stateCondition}${searchCondition}
+    `).bind(...stateBindings, ...searchBindings).first<{ total: number }>();
+
     const { results: bounties } = await env.DB.prepare(`
-      SELECT * FROM bounties ORDER BY created_at DESC
-    `).all();
+      SELECT *
+      FROM bounties b
+      WHERE ${stateCondition}${searchCondition}
+      ORDER BY b.created_at DESC, b.id DESC
+      LIMIT ? OFFSET ?
+    `).bind(...stateBindings, ...searchBindings, pageSize, offset).all();
+
+    const { results: countRows } = await env.DB.prepare(`
+      SELECT
+        SUM(CASE WHEN state NOT IN ('DRAFT', 'CLOSED') THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN state = 'CLOSED' THEN 1 ELSE 0 END) AS closed,
+        SUM(CASE WHEN state = 'DRAFT' THEN 1 ELSE 0 END) AS draft
+      FROM bounties
+      WHERE title LIKE ? OR id LIKE ?
+    `).bind(searchPattern, searchPattern).all<{ active: number; closed: number; draft: number }>();
+    const counts = countRows[0] || { active: 0, closed: 0, draft: 0 };
 
     // Attach participants and published games for the admin management view.
     for (const b of bounties) {
       Object.assign(b, await attachBountyDetails(b, env, authUser.principal_id));
     }
 
-    return jsonResponse({ success: true, bounties }, 200, request, env);
+    return jsonResponse({
+      success: true,
+      bounties,
+      pagination: {
+        page,
+        pageSize,
+        total: Number(countResult?.total || 0),
+        totalPages: Math.max(1, Math.ceil(Number(countResult?.total || 0) / pageSize)),
+      },
+      counts: {
+        ACTIVE: Number(counts.active || 0),
+        CLOSED: Number(counts.closed || 0),
+        DRAFT: Number(counts.draft || 0),
+      },
+    }, 200, request, env);
   } catch (err: any) {
     return errorResponse(err.message, 500, "DB_ERROR", request, env);
   }

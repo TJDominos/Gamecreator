@@ -171,7 +171,23 @@ export default function CreatorBounties() {
                     style={{ cursor: 'pointer' }}
                   >
                     <div className="bounty-card-cover" style={{ display: 'grid', placeItems: 'center', background: 'var(--portal-soft, #f4f0fb)' }}>
-                      <Target size={42} color="var(--portal-purple)" aria-hidden="true" />
+                      {bounty.videoUrl?.toLowerCase().endsWith('.mp4') ? (
+                        <video
+                          src={bounty.videoUrl}
+                          muted
+                          playsInline
+                          aria-label={bounty.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : bounty.videoUrl ? (
+                        <img
+                          src={bounty.videoUrl}
+                          alt={bounty.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : (
+                        <Target size={42} color="var(--portal-purple)" aria-hidden="true" />
+                      )}
                     </div>
                     
                     <div className="bounty-card-content">

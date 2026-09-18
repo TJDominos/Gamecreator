@@ -1,5 +1,5 @@
 export const routeTitleMap = {
-  '/': 'Randseed Developers - Build Next-Gen AI Games',
+  '/': 'Randseed Creators - Build Next-Gen AI Games',
   '/guides': 'Creator Guide - Randseed Developers',
   '/bounties': 'Developer Bounties - Randseed Developers',
   // Legacy main site routes

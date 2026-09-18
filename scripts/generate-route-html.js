@@ -5,6 +5,7 @@ import { routeTitleMap } from '../src/config/routeTitles.js';
 
 const SITE_URL = 'https://randseed.org';
 const STORAGE_URL = 'https://storage.randseed.org';
+const MAIN_SITE_LOGO_URL = `${SITE_URL}/logo.png`;
 export const HOME_THUMBNAIL_URL = `${STORAGE_URL}/Thumbnail/HomeThumbnail.jpg`;
 const MANAGED_BLOCK_START = '<!-- route-meta:start -->';
 const MANAGED_BLOCK_END = '<!-- route-meta:end -->';
@@ -121,8 +122,8 @@ export function buildManagedHeadBlock(route, metadata) {
     `  ${MANAGED_BLOCK_START}`,
     `  <title>${title}</title>`,
     `  <meta name="description" content="${description}" />`,
-    '  <link rel="icon" type="image/x-icon" href="/favicon.ico" />',
-    '  <link rel="apple-touch-icon" href="/logo.png" />',
+    `  <link rel="icon" type="image/png" href="${MAIN_SITE_LOGO_URL}" />`,
+    `  <link rel="apple-touch-icon" href="${MAIN_SITE_LOGO_URL}" />`,
     `  <meta property="og:title" content="${title}" />`,
     `  <meta property="og:description" content="${description}" />`,
     `  <meta property="og:image" content="${image}" />`,

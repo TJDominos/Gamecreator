@@ -8,7 +8,7 @@ import { handleGitHubRoutes } from "./routes/github";
 import { handleDeploymentRoutes } from "./routes/deployments";
 import { handleGameRoutes } from "./routes/games";
 import { handleAdminRoutes } from "./routes/admin";
-import { handleBountyRoutes } from "./routes/bounties";
+import { handleBountyPageRequest, handleBountyRoutes } from "./routes/bounties";
 
 export default {
   async fetch(
@@ -41,6 +41,9 @@ export default {
           env,
         );
       }
+
+      const bountyPageRes = await handleBountyPageRequest(request, env);
+      if (bountyPageRes) return bountyPageRes;
 
       // 2. Dispatch to modular route handlers
       const bountyRes = await handleBountyRoutes(request, env);

@@ -5,8 +5,14 @@
 
 :root {
   --max-content-width-pc: 1024px;
+  --creator-content-max-width: 1520px;
   --app-font-family: "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --app-font-display: "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+.creator-content-shell {
+  width: min(var(--creator-content-max-width), calc(100% - 48px));
+  margin-inline: auto;
 }
 
 body {

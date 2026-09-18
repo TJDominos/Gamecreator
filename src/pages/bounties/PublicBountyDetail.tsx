@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router';
 import { SiteHeader } from '../../components/SiteHeader';
 import { BountyDetail } from '../dashboard/bounties/BountyDetail';
+import '../guides/CreatorGuide.css';
 
 export default function PublicBountyDetail(): React.ReactElement {
   return (

@@ -1,4 +1,5 @@
 import Markdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { getBountyScores, type Bounty } from './bountyData';
@@ -9,6 +10,28 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Share2, Trophy, Users, CheckCircle2, Target, ExternalLink, AlertCircle } from 'lucide-react';
 
 import { CategorySidebar } from '../../../components/CategorySidebar';
+
+const DEFAULT_SHARE_IMAGE = 'https://storage.randseed.org/Thumbnail/HomeThumbnail.jpg';
+
+function getShareImage(rawUrl: string | undefined): { url: string; type?: string } {
+  if (rawUrl) {
+    try {
+      const imageUrl = new URL(rawUrl, window.location.href);
+      if (/^https?:$/.test(imageUrl.protocol) && !/\.(?:m4v|mov|mp4|webm)$/i.test(imageUrl.pathname)) {
+        const extension = imageUrl.pathname.split('.').pop()?.toLowerCase();
+        const type = extension === 'jpg' || extension === 'jpeg'
+          ? 'image/jpeg'
+          : extension === 'png' ? 'image/png'
+            : extension === 'gif' ? 'image/gif'
+              : extension === 'webp' ? 'image/webp'
+                : undefined;
+        return { url: imageUrl.toString(), type };
+      }
+    } catch {
+    }
+  }
+  return { url: DEFAULT_SHARE_IMAGE, type: 'image/jpeg' };
+}
 
 export function BountyDetail(): React.ReactElement {
   const { bountyId } = useParams();
@@ -48,6 +71,7 @@ export function BountyDetail(): React.ReactElement {
   const scores = getBountyScores(bounty);
 
   const shareUrl = window.location.href;
+  const shareImage = getShareImage(bounty.videoUrl);
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -79,13 +103,23 @@ export function BountyDetail(): React.ReactElement {
   const statusStyle = getStatusColor(bounty.state);
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 pb-[60px]">
+    <div className="creator-content-shell px-6 pb-[60px]">
       <Helmet>
         <title>{bounty.title} - Creator Center</title>
         <meta property="og:title" content={bounty.title} />
         <meta property="og:description" content={bounty.description} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={shareUrl} />
+        <meta property="og:image" content={shareImage.url} />
+        <meta property="og:image:alt" content={bounty.title} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        {shareImage.type && <meta property="og:image:type" content={shareImage.type} />}
+        <link rel="canonical" href={shareUrl} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={bounty.title} />
+        <meta name="twitter:description" content={bounty.description} />
+        <meta name="twitter:image" content={shareImage.url} />
       </Helmet>
       
       <div className="flex flex-col lg:flex-row gap-10 lg:gap-[60px] items-start">
@@ -247,7 +281,25 @@ export function BountyDetail(): React.ReactElement {
           <div className="bg-white rounded-2xl p-5 md:p-8 border border-[var(--portal-border)]">
             <h2 style={{ fontSize: '20px', margin: '0 0 20px 0', color: 'var(--portal-ink)' }}>Description</h2>
             <div className="markdown-body" style={{ color: 'var(--portal-text)', lineHeight: 1.6, fontSize: '15px' }}>
-              <Markdown>{bounty.fullDescription || bounty.description}</Markdown>
+              <Markdown
+                rehypePlugins={[rehypeRaw]}
+                allowedElements={[
+                  'a', 'blockquote', 'br', 'code', 'del', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                  'hr', 'img', 'li', 'ol', 'p', 'pre', 'strong', 'u', 'ul',
+                ]}
+                components={{
+                  img: ({ node, ...props }) => (
+                    <img
+                      {...props}
+                      alt={props.alt || ''}
+                      loading="lazy"
+                      style={{ display: 'block', maxWidth: '100%', height: 'auto', margin: '16px 0', borderRadius: '8px' }}
+                    />
+                  ),
+                }}
+              >
+                {bounty.fullDescription || bounty.description}
+              </Markdown>
             </div>
           </div>
 
