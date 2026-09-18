@@ -29,6 +29,7 @@ import { useParams, Link } from "react-router";
 import {
   getGameById,
   validateGameForPrivatePublish,
+  validateGameForPublicPublish,
   updateGame,
   GAMES_UPDATED_EVENT,
   type Game
@@ -39,6 +40,7 @@ import {
   type PrivateReleaseResponse,
   type ActivePrivateReleaseInfo
 } from "../../../services/githubApi";
+import { gameApi } from "../../../services/gameApi";
 import { GitHubSyncCard } from "./GitHubSyncCard";
 
 function formatDate(timestamp: number): string {
@@ -85,6 +87,7 @@ export function Publish(): React.ReactElement {
   const [isPublishingPrivate, setIsPublishingPrivate] = useState(false);
   const [isPublishingPublic, setIsPublishingPublic] = useState(false);
   const [publicConfirmVersion, setPublicConfirmVersion] = useState("");
+  const [shortNameInput, setShortNameInput] = useState(game?.shortName || "");
   const [privateConfirmVersion, setPrivateConfirmVersion] = useState("");
   const [isRevokingPrivateRelease, setIsRevokingPrivateRelease] = useState(false);
   const [showDelistModal, setShowDelistModal] = useState(false);
@@ -112,6 +115,7 @@ export function Publish(): React.ReactElement {
       if (g) {
         setGame(g);
         setEditNameInput(g.name);
+        setShortNameInput(g.shortName || "");
         if (!isEditingVersion) {
           setCustomVersionInput(g.displayVersion || g.version || "v1.0.0");
         }
@@ -297,17 +301,33 @@ export function Publish(): React.ReactElement {
   };
 
   // Submit for Public Release Audit
-  const handleExecuteGoPublic = () => {
-    if (!gameId || !selectedDeploymentId) return;
+  const handleExecuteGoPublic = async () => {
+    if (!gameId || !selectedDeploymentId || !game) return;
+    const publicGame = { ...game, shortName: shortNameInput.trim().toLowerCase() };
+    const publicValidation = validateGameForPublicPublish(publicGame);
+    if (!publicValidation.valid) {
+      setModalError(publicValidation.errors.join(" "));
+      return;
+    }
+
     setIsPublishingPublic(true);
+    setModalError(null);
     try {
-      // Transition status to PENDING_REVIEW or PUBLIC_ACTIVE
-      updateGame(gameId, {
+      await gameApi.updateGame(gameId, {
+        name: game.name.trim(),
+        shortName: publicGame.shortName,
         status: 'PENDING_REVIEW',
-        version: customVersionInput.trim() || game?.version || 'v1.0.0',
         displayVersion: customVersionInput.trim() || game?.version || 'v1.0.0'
       });
+      const updated = updateGame(gameId, {
+        shortName: publicGame.shortName,
+        status: 'PENDING_REVIEW',
+        displayVersion: customVersionInput.trim() || game.version || 'v1.0.0'
+      });
+      if (updated) setGame(updated);
       setShowGoPublicModal(false);
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : "Unable to submit public review");
     } finally {
       setIsPublishingPublic(false);
     }
@@ -463,6 +483,7 @@ export function Publish(): React.ReactElement {
             onClick={() => {
               setModalError(null);
               setPublicConfirmVersion("");
+              setShortNameInput(game?.shortName || "");
               setShowGoPublicModal(true);
             }}
             disabled={!selectedDeploymentId || !isSelectedPublished || !validation.valid}
@@ -819,7 +840,7 @@ export function Publish(): React.ReactElement {
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   <input
-                    value={activeReleaseUrl || `https://randseed.org/p/${gameId}?token=rs_active_release`}
+                    value={activeReleaseUrl || `https://randseed.org/private/${gameId}?token=rs_active_release`}
                     readOnly
                     style={{ flex: 1, minWidth: 0, padding: "8px 10px", border: "1px solid #bbf7d0", borderRadius: "6px", fontSize: "12px", background: "#fff" }}
                   />
@@ -828,7 +849,7 @@ export function Publish(): React.ReactElement {
                     className="primary-action"
                     style={{ padding: "8px 14px", fontSize: "12px" }}
                     onClick={() => {
-                      const urlToCopy = activeReleaseUrl || `https://randseed.org/p/${gameId}?token=rs_active_release`;
+                      const urlToCopy = activeReleaseUrl || `https://randseed.org/private/${gameId}?token=rs_active_release`;
                       void navigator.clipboard?.writeText(urlToCopy);
                       setCopySuccess(true);
                       setTimeout(() => setCopySuccess(false), 2000);
@@ -1080,8 +1101,32 @@ export function Publish(): React.ReactElement {
                 <strong style={{ color: "#111827" }}>{game?.name}</strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--portal-muted)" }}>Public Link:</span>
+                <span style={{ fontFamily: "monospace", color: "#111827" }}>
+                  randseed.org/{shortNameInput || "short-name"}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "var(--portal-muted)" }}>Deployment Build:</span>
                 <span style={{ fontFamily: "monospace", color: "#111827" }}>{selectedDeployment?.commit_sha.slice(0, 8)}</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '18px', textAlign: 'left' }}>
+              <label style={{ display: 'block', fontSize: '13px', color: '#374151', marginBottom: '8px', fontWeight: 500 }}>
+                Public Short Name <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={shortNameInput}
+                onChange={(e) => setShortNameInput(e.target.value.toLowerCase())}
+                placeholder="e.g. space-runner"
+                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                required
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+              />
+              <div style={{ marginTop: '6px', color: 'var(--portal-muted)', fontSize: '12px', lineHeight: 1.4 }}>
+                This becomes the public link: <strong>randseed.org/{shortNameInput || 'short-name'}</strong>. Use lowercase letters, numbers, and hyphens only.
               </div>
             </div>
 
@@ -1098,6 +1143,12 @@ export function Publish(): React.ReactElement {
               />
             </div>
 
+            {modalError && (
+              <div style={{ marginBottom: "16px", padding: "10px 12px", border: "1px solid #fecaca", background: "#fff7f7", color: "#991b1b", borderRadius: "8px", fontSize: "12px" }}>
+                {modalError}
+              </div>
+            )}
+
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
               <button
                 type="button"
@@ -1109,11 +1160,11 @@ export function Publish(): React.ReactElement {
               <button
                 type="button"
                 className="primary-action"
-                disabled={isPublishingPublic || !customVersionInput.trim()}
-                onClick={handleExecuteGoPublic}
+                disabled={isPublishingPublic || !customVersionInput.trim() || !shortNameInput.trim()}
+                onClick={() => void handleExecuteGoPublic()}
                 style={{
-                  opacity: (isPublishingPublic || !customVersionInput.trim()) ? 0.5 : 1,
-                  cursor: (isPublishingPublic || !customVersionInput.trim()) ? "not-allowed" : "pointer"
+                  opacity: (isPublishingPublic || !customVersionInput.trim() || !shortNameInput.trim()) ? 0.5 : 1,
+                  cursor: (isPublishingPublic || !customVersionInput.trim() || !shortNameInput.trim()) ? "not-allowed" : "pointer"
                 }}
               >
                 {isPublishingPublic ? "Submitting..." : "Confirm & Submit Audit"}

@@ -16,6 +16,7 @@ interface PointerCacheEntry {
 
 const sandboxPointerCache = new Map<string, PointerCacheEntry>();
 const privateReleaseCache = new Map<string, PointerCacheEntry>();
+const publicGameCache = new Map<string, PointerCacheEntry>();
 const POINTER_CACHE_TTL_MS = 25_000; // 25s in-memory cache to eliminate D1 per-asset load bottle-neck
 
 const MIME_TYPES: Record<string, string> = {
@@ -76,7 +77,7 @@ export async function handlePlayRequest(
     if (cached) return cached;
   }
 
-  const target = resolveStaticTarget(url, env);
+  const target = await resolveStaticTarget(url, env);
   if (!target) return null;
 
   // Look up release prefix (in-memory cached or D1)
@@ -159,7 +160,7 @@ export async function handlePlayRequest(
   return response;
 }
 
-function resolveStaticTarget(url: URL, env: PlayEnv): StaticTarget | null {
+async function resolveStaticTarget(url: URL, env: PlayEnv): Promise<StaticTarget | null> {
   const parts = url.pathname.split("/").filter(Boolean);
   if (parts.length === 0) return null;
 
@@ -183,6 +184,22 @@ function resolveStaticTarget(url: URL, env: PlayEnv): StaticTarget | null {
   // 2. Path-based routing (used on workers.dev or direct paths)
   let gameId: string;
   let subParts: string[];
+  let privateToken: string | undefined;
+
+  if (parts[0] === "private") {
+    if (!parts[1]) return null;
+    gameId = decodeURIComponent(parts[1]);
+    subParts = parts.slice(2);
+    if (queryToken) {
+      privateToken = queryToken;
+    } else {
+      const tokenPart = subParts.shift();
+      privateToken = tokenPart ? decodeURIComponent(tokenPart) : undefined;
+    }
+    if (!isSafeGameHostLabel(gameId)) return null;
+    const path = normalizeFilePath(subParts.join("/") || "index.html");
+    return path ? { gameId, path, privateToken } : null;
+  }
 
   if (parts[0] === "sandbox") {
     if (!parts[1]) return null;
@@ -195,14 +212,34 @@ function resolveStaticTarget(url: URL, env: PlayEnv): StaticTarget | null {
 
   if (!isSafeGameHostLabel(gameId)) return null;
 
+  if (parts[0] !== "sandbox") {
+    gameId = await resolvePublicGameId(gameId, env);
+  }
+
   if (subParts[0] === "private" && subParts[1]) {
-    const privateToken = decodeURIComponent(subParts[1]);
+    privateToken = decodeURIComponent(subParts[1]);
     const path = normalizeFilePath(subParts.slice(2).join("/") || "index.html");
     return path ? { gameId, path, privateToken } : null;
   }
 
   const path = normalizeFilePath(subParts.join("/") || "index.html");
   return path ? { gameId, path, privateToken: queryToken } : null;
+}
+
+async function resolvePublicGameId(identifier: string, env: PlayEnv): Promise<string> {
+  const cached = publicGameCache.get(identifier.toLowerCase());
+  if (cached && cached.expiresAt > Date.now()) return cached.prefix;
+
+  const game = await env.DB.prepare(
+    `SELECT id FROM games WHERE lower(trim(short_name)) = lower(trim(?)) AND status = 'PUBLIC_ACTIVE' LIMIT 1`,
+  ).bind(identifier).first<{ id: string }>();
+  if (!game) return identifier;
+
+  publicGameCache.set(identifier.toLowerCase(), {
+    prefix: game.id,
+    expiresAt: Date.now() + POINTER_CACHE_TTL_MS,
+  });
+  return game.id;
 }
 
 function isSafeGameHostLabel(value: string): boolean {

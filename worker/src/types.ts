@@ -216,6 +216,7 @@ export interface GameRow {
   tenant_id: string | null;
   creator_principal: string;
   name: string;
+  short_name: string | null;
   status: string;
   version: string;
   display_version?: string | null;

@@ -18,7 +18,7 @@ import {
   Download,
   GitPullRequest
 } from "lucide-react";
-import { GameRepoInfo } from "./gameData";
+import { ensureGamePersisted, GameRepoInfo } from "./gameData";
 import { githubApi } from "../../../services/githubApi";
 
 const GITHUB_APP_SLUG = "RDcreatordev";
@@ -67,6 +67,21 @@ export function GitHubSyncCard({
   const [installUrl, setInstallUrl] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   const [isOpeningGitHub, setIsOpeningGitHub] = useState(false);
+  const [installationId, setInstallationId] = useState<number | null>(null);
+
+  const refreshRepoInfo = async () => {
+    try {
+      const res = await githubApi.getGameRepo(gameId);
+      if (res.success && res.repo_info) {
+        setRepoInfo(res.repo_info);
+        setRepoInput(res.repo_info.repository);
+        setBranchInput(res.repo_info.branch || "main");
+        setIsDisconnected(false);
+      }
+    } catch {
+      setIsDisconnected(true);
+    }
+  };
 
   const handleConnectGitHub = async () => {
     setIsOpeningGitHub(true);
@@ -77,7 +92,15 @@ export function GitHubSyncCard({
         throw new Error("GitHub App installation URL was not returned.");
       }
       setInstallUrl(info.install_url);
-      window.location.assign(info.install_url);
+      const popup = window.open(
+        info.install_url,
+        "randseed-github-install",
+        "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
+      );
+      if (!popup) {
+        throw new Error("GitHub could not be opened. Please allow popups and try again.");
+      }
+      popup.focus();
     } catch (error) {
       setInstallError(
         error instanceof Error
@@ -92,23 +115,53 @@ export function GitHubSyncCard({
   // is created after the user explicitly clicks Connect GitHub.
   useEffect(() => {
     let isMounted = true;
+    const installationStorageKey = `randseed:github-install:${gameId}`;
+
+    const handleInstallationStorage = (event: StorageEvent) => {
+      if (event.key !== installationStorageKey || !event.newValue) return;
+      const parsedInstallationId = Number(event.newValue);
+      if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
+      setInstallationId(parsedInstallationId);
+      setIsOpeningGitHub(false);
+      setInstallError(null);
+      setShowConnectModal(true);
+      window.localStorage.removeItem(installationStorageKey);
+      void refreshRepoInfo();
+    };
+
+    window.addEventListener("storage", handleInstallationStorage);
 
     githubApi.getGameRepo(gameId).then(res => {
       if (isMounted && res.success && res.repo_info) {
         setRepoInfo(res.repo_info);
+        setRepoInput(res.repo_info.repository);
+        setBranchInput(res.repo_info.branch || "main");
         setIsDisconnected(false);
       }
     }).catch(() => {
       if (isMounted) setIsDisconnected(true);
     });
 
-    if (new URLSearchParams(window.location.search).get("github_installed") === "true") {
+    const params = new URLSearchParams(window.location.search);
+    const callbackInstallationId = Number(params.get("installation_id"));
+    if (
+      params.get("github_installed") === "true" &&
+      Number.isSafeInteger(callbackInstallationId) &&
+      callbackInstallationId > 0
+    ) {
+      window.localStorage.setItem(installationStorageKey, String(callbackInstallationId));
+      setInstallationId(callbackInstallationId);
       setShowConnectModal(true);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      if (window.opener && window.opener !== window) {
+        window.close();
+      } else {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
 
     return () => {
       isMounted = false;
+      window.removeEventListener("storage", handleInstallationStorage);
     };
   }, [gameId]);
 
@@ -150,11 +203,12 @@ export function GitHubSyncCard({
     setLinkError(null);
 
     try {
+      await ensureGamePersisted(gameId, gameName);
       const res = await githubApi.linkGameRepo(gameId, {
         repository: repoInput.trim(),
         branch: branchInput.trim() || "main",
         build_dir: buildDirInput.trim() || "dist",
-        installation_id: Number(new URLSearchParams(window.location.search).get("installation_id")) || undefined,
+        installation_id: installationId || undefined,
       });
 
       if (res.success && res.binding) {
@@ -169,6 +223,7 @@ export function GitHubSyncCard({
 
         setIsDisconnected(false);
         setShowConnectModal(false);
+        await refreshRepoInfo();
         setSyncFeedback(`Repository successfully linked to ${res.binding.repository} via ${GITHUB_APP_SLUG}.`);
         setTimeout(() => setSyncFeedback(null), 8000);
       } else {

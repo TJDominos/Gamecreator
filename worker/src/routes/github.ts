@@ -299,9 +299,13 @@ async function handleLinkGameRepo(gameId: string, request: Request, env: Env): P
            last_synced_at, sandbox_url, build_dir, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(game_id) DO UPDATE SET
+           installation_id = excluded.installation_id,
            repo_full_name = excluded.repo_full_name,
            default_branch = excluded.default_branch,
            sync_token_hash = excluded.sync_token_hash,
+           sync_method = excluded.sync_method,
+           sync_status = excluded.sync_status,
+           sandbox_url = excluded.sandbox_url,
            build_dir = excluded.build_dir,
            updated_at = excluded.updated_at`,
       )

@@ -99,6 +99,7 @@ async function handleListGames(request: Request, env: Env): Promise<Response> {
         return {
           id: row.id,
           name: row.name,
+          shortName: row.short_name || "",
           status: row.status,
           version,
           displayVersion: row.display_version || "",
@@ -177,6 +178,7 @@ async function handleGetGame(gameId: string, request: Request, env: Env): Promis
     const game = {
       id: row.id,
       name: row.name,
+      shortName: row.short_name || "",
       status: row.status,
       version,
       displayVersion: row.display_version || "",
@@ -266,7 +268,7 @@ async function handleCreateGame(request: Request, env: Env): Promise<Response> {
       }
     }
 
-    const id = body.id || `g_${crypto.randomUUID().replace(/-/g, "")}`;
+    const id = body.id || generateGameId();
     const now = Date.now();
 
     await env.DB.prepare(
@@ -278,6 +280,7 @@ async function handleCreateGame(request: Request, env: Env): Promise<Response> {
     const createdGame = {
       id,
       name: gameName,
+      shortName: "",
       status: "DRAFT",
       version: "---",
       visitors: "---",
@@ -305,6 +308,24 @@ async function handleCreateGame(request: Request, env: Env): Promise<Response> {
   }
 }
 
+function generateGameId(): string {
+  const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const idLength = 12;
+  const bytes = new Uint8Array(idLength);
+  let id = "";
+
+  while (id.length < idLength) {
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      if (byte >= 248) continue;
+      id += alphabet[byte % alphabet.length];
+      if (id.length === idLength) break;
+    }
+  }
+
+  return id;
+}
+
 /**
  * Updates game fields (excluding version, which is bound to deployment publishing)
  */
@@ -314,6 +335,7 @@ async function handleUpdateGame(gameId: string, request: Request, env: Env): Pro
 
   const body = (await request.json().catch(() => null)) as {
     name?: string;
+    shortName?: string;
     status?: string;
     displayVersion?: string;
     profile?: {
@@ -341,6 +363,9 @@ async function handleUpdateGame(gameId: string, request: Request, env: Env): Pro
 
     const name = body.name?.trim() || existing.name;
     const status = body.status || existing.status;
+    const shortName = body.shortName !== undefined
+      ? body.shortName.trim().toLowerCase()
+      : (existing.short_name || "");
     const displayVersion = body.displayVersion !== undefined 
       ? body.displayVersion 
       : (body.profile?.displayVersion !== undefined ? body.profile.displayVersion : (existing.display_version || ""));
@@ -348,20 +373,59 @@ async function handleUpdateGame(gameId: string, request: Request, env: Env): Pro
     const coverImage = body.profile?.coverImage !== undefined ? body.profile.coverImage : existing.cover_image;
     const animationUrl = body.profile?.animationUrl !== undefined ? body.profile.animationUrl : existing.animation_url;
 
+    if (shortName && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(shortName)) {
+      return errorResponse(
+        "Short name may contain only lowercase letters, numbers, and hyphens",
+        400,
+        "INVALID_SHORT_NAME",
+        request,
+        env,
+      );
+    }
+
+    if (status === "PENDING_REVIEW" || status === "PUBLIC_ACTIVE") {
+      if (!name || /^new\s*game\s*(\d*)$/i.test(name)) {
+        return errorResponse("A final game name is required for public review", 400, "PUBLIC_NAME_REQUIRED", request, env);
+      }
+      if (!shortName) {
+        return errorResponse("A short name is required because it becomes the public game link", 400, "SHORT_NAME_REQUIRED", request, env);
+      }
+
+      const duplicateName = await env.DB.prepare(
+        `SELECT id FROM games
+         WHERE id != ? AND status IN ('PENDING_REVIEW', 'PUBLIC_ACTIVE')
+           AND lower(trim(name)) = lower(trim(?))
+         LIMIT 1`,
+      ).bind(gameId, name).first<{ id: string }>();
+      if (duplicateName) {
+        return errorResponse("This game name is already used by a public game", 409, "PUBLIC_NAME_CONFLICT", request, env);
+      }
+
+      const duplicateShortName = await env.DB.prepare(
+        `SELECT id FROM games
+         WHERE id != ? AND status IN ('PENDING_REVIEW', 'PUBLIC_ACTIVE')
+           AND lower(trim(short_name)) = lower(trim(?))
+         LIMIT 1`,
+      ).bind(gameId, shortName).first<{ id: string }>();
+      if (duplicateShortName) {
+        return errorResponse("This short name is already used by a public game", 409, "SHORT_NAME_CONFLICT", request, env);
+      }
+    }
+
     // Persist to database including display_version
     try {
       await env.DB.prepare(
         `UPDATE games
-         SET name = ?, status = ?, display_version = ?, description = ?, cover_image = ?, animation_url = ?, updated_at = ?
+         SET name = ?, short_name = ?, status = ?, display_version = ?, description = ?, cover_image = ?, animation_url = ?, updated_at = ?
          WHERE id = ?`,
-      ).bind(name, status, displayVersion, description, coverImage, animationUrl, now, gameId).run();
+      ).bind(name, shortName || null, status, displayVersion, description, coverImage, animationUrl, now, gameId).run();
     } catch {
       // Fallback if display_version column is not yet present in existing D1 migration
       await env.DB.prepare(
         `UPDATE games
-         SET name = ?, status = ?, description = ?, cover_image = ?, animation_url = ?, updated_at = ?
+         SET name = ?, short_name = ?, status = ?, description = ?, cover_image = ?, animation_url = ?, updated_at = ?
          WHERE id = ?`,
-      ).bind(name, status, description, coverImage, animationUrl, now, gameId).run();
+      ).bind(name, shortName || null, status, description, coverImage, animationUrl, now, gameId).run();
     }
 
     return jsonResponse({ success: true, message: "Game updated successfully" }, 200, request, env);

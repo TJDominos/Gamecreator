@@ -54,6 +54,7 @@ export interface GameProfile {
 export interface Game {
   id: string;
   name: string;
+  shortName?: string;
   status: GameStatus;
   players: string; // e.g. "1,204" or "---"
   version: string; // e.g. "v1.2.0" or "---"
@@ -136,6 +137,24 @@ export function getNextNewGameName(): string {
   return `new game${maxNumber + 1}`;
 }
 
+function generateGameId(): string {
+  const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const idLength = 12;
+  const bytes = new Uint8Array(idLength);
+  let id = "";
+
+  while (id.length < idLength) {
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      if (byte >= 248) continue;
+      id += alphabet[byte % alphabet.length];
+      if (id.length === idLength) break;
+    }
+  }
+
+  return id;
+}
+
 /**
  * Synchronizes local cached games with backend database API
  */
@@ -151,12 +170,21 @@ export async function syncGamesWithBackend(): Promise<Game[]> {
   return getStoredGames();
 }
 
+export async function ensureGamePersisted(gameId: string, gameName: string): Promise<void> {
+  try {
+    await gameApi.getGame(gameId);
+    return;
+  } catch {
+    await gameApi.createGame({ id: gameId, name: gameName.trim() || "New Game" });
+  }
+}
+
 /**
  * Creates a new draft game persisted to backend D1 database
  */
 export function createNextNewGame(): Game {
   const name = getNextNewGameName();
-  const id = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const id = generateGameId();
   
   const newGame: Game = {
     id,
@@ -199,7 +227,7 @@ export function createNextNewGame(): Game {
  */
 export async function createNextNewGameAsync(): Promise<Game> {
   const name = getNextNewGameName();
-  const id = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const id = generateGameId();
   
   try {
     const backendGame = await gameApi.createGame({ id, name });
@@ -247,6 +275,7 @@ export function updateGame(id: string, updates: Partial<Game>): Game | undefined
   // Send update to backend API
   gameApi.updateGame(id, {
     name: updatedGame.name,
+    shortName: updatedGame.shortName,
     status: updatedGame.status,
     profile: updatedGame.profile
   }).catch(err => {
@@ -291,12 +320,7 @@ export function validateGameForPrivatePublish(game: Game): { valid: boolean; err
     errors.push(`Game name cannot be the default placeholder "${game.name}". Please choose a unique game name before private publish.`);
   }
 
-  // 3. Check uniqueness across all games
-  if (!isGameNameUnique(game.name, game.id)) {
-    errors.push(`Game name "${game.name}" is already taken. Game names must be globally unique in Randseed.`);
-  }
-
-  // 4. Check description & cover image (required)
+  // 3. Check description & cover image (required)
   const description = game.profile?.description?.trim() || "";
   const words = description.split(/\s+/).filter(Boolean);
   if (!description) {
@@ -309,7 +333,7 @@ export function validateGameForPrivatePublish(game: Game): { valid: boolean; err
     errors.push("Cover Image is required before publishing.");
   }
 
-  // 5. Check meta tags
+  // 4. Check meta tags
   if (!game.profile?.category) {
     errors.push("Game Category is required.");
   }
@@ -324,4 +348,22 @@ export function validateGameForPrivatePublish(game: Game): { valid: boolean; err
     valid: errors.length === 0,
     errors
   };
+}
+
+export function validateGameForPublicPublish(game: Game): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const name = game.name.trim();
+  const shortName = game.shortName?.trim().toLowerCase() || "";
+
+  if (!name) errors.push("Game name is required for public review.");
+  if (/^new\s*game\s*(\d*)$/i.test(name)) {
+    errors.push("Choose a final game name before submitting for public review.");
+  }
+  if (!shortName) {
+    errors.push("A short name is required because it becomes the public game link.");
+  } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(shortName)) {
+    errors.push("Short name may contain only lowercase letters, numbers, and hyphens.");
+  }
+
+  return { valid: errors.length === 0, errors };
 }

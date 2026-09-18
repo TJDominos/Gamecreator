@@ -23,6 +23,8 @@
     "d1:migrate:github:remote": "npx wrangler d1 execute gamecreator-d1 --remote --file=./migrations/0002_github_sync.sql",
     "d1:migrate:pipeline:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0005_deployment_pipeline.sql",
     "d1:migrate:private:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0006_private_releases.sql",
+    "d1:migrate:games:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0007_games.sql --yes",
+    "d1:migrate:public-identity:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0013_public_game_identity.sql --yes",
     "r2:list": "npx wrangler r2 bucket list",
     "r2:create:dev": "npx wrangler r2 bucket create gamecreator-artifacts-dev"
   },

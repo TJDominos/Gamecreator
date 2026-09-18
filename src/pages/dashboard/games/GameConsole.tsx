@@ -19,7 +19,7 @@ import {
   AlertCircle,
   Copy 
 } from "lucide-react";
-import { getGameById, updateGame, isGameNameUnique, GAMES_UPDATED_EVENT, type GameRepoInfo } from "./gameData";
+import { ensureGamePersisted, getGameById, updateGame, GAMES_UPDATED_EVENT, type GameRepoInfo } from "./gameData";
 import { githubApi } from "../../../services/githubApi";
 
 const GITHUB_APP_SLUG = "RDcreatordev";
@@ -65,6 +65,7 @@ export function GameConsole(): React.ReactElement {
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [installUrl, setInstallUrl] = useState<string | null>(null);
+  const [installationId, setInstallationId] = useState<number | null>(null);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +77,35 @@ export function GameConsole(): React.ReactElement {
     void navigator.clipboard?.writeText(sandboxUrl);
     setCopiedSandbox(true);
     setTimeout(() => setCopiedSandbox(false), 2000);
+  };
+
+  const refreshRepoInfo = async () => {
+    if (!gameId) return;
+    try {
+      const res = await githubApi.getGameRepo(gameId);
+      if (res.success && res.repo_info) {
+        setRepoInfo(res.repo_info);
+        setRepoInput(res.repo_info.repository);
+        setBranchInput(res.repo_info.branch || "main");
+        setIsDisconnected(false);
+      }
+    } catch {
+      setIsDisconnected(true);
+    }
+  };
+
+  const handleOpenGitHubInstall = () => {
+    if (!installUrl) return;
+    const popup = window.open(
+      installUrl,
+      "randseed-github-install",
+      "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
+    );
+    if (!popup) {
+      setLinkError("GitHub could not be opened. Please allow popups and try again.");
+      return;
+    }
+    popup.focus();
   };
 
   const initialName = location.state?.gameName || (game ? game.name : "New Game");
@@ -102,6 +132,18 @@ export function GameConsole(): React.ReactElement {
   useEffect(() => {
     if (!gameId) return;
     let isMounted = true;
+    const installationStorageKey = `randseed:github-install:${gameId}`;
+    const handleInstallationStorage = (event: StorageEvent) => {
+      if (event.key !== installationStorageKey || !event.newValue) return;
+      const parsedInstallationId = Number(event.newValue);
+      if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
+      setInstallationId(parsedInstallationId);
+      setShowConnectModal(true);
+      window.localStorage.removeItem(installationStorageKey);
+      void refreshRepoInfo();
+    };
+
+    window.addEventListener("storage", handleInstallationStorage);
     githubApi.getInstallInfo(gameId).then(info => {
       if (isMounted && info.install_url) setInstallUrl(info.install_url);
     }).catch(() => {});
@@ -113,7 +155,27 @@ export function GameConsole(): React.ReactElement {
       }
     }).catch(() => setIsDisconnected(true));
 
-    return () => { isMounted = false; };
+    const params = new URLSearchParams(window.location.search);
+    const callbackInstallationId = Number(params.get("installation_id"));
+    if (
+      params.get("github_installed") === "true" &&
+      Number.isSafeInteger(callbackInstallationId) &&
+      callbackInstallationId > 0
+    ) {
+      window.localStorage.setItem(installationStorageKey, String(callbackInstallationId));
+      setInstallationId(callbackInstallationId);
+      setShowConnectModal(true);
+      if (window.opener && window.opener !== window) {
+        window.close();
+      } else {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("storage", handleInstallationStorage);
+    };
   }, [gameId]);
 
   // Close dropdown on outside click
@@ -132,10 +194,6 @@ export function GameConsole(): React.ReactElement {
   const handleSaveName = () => {
     const trimmed = tempName.trim();
     if (trimmed) {
-      if (!isGameNameUnique(trimmed, gameId)) {
-        setNameError(`Game Name "${trimmed}" is already taken. Game names must be unique.`);
-        return;
-      }
       setNameError(null);
       setGameName(trimmed);
       if (gameId) {
@@ -167,11 +225,12 @@ export function GameConsole(): React.ReactElement {
       return;
     }
     try {
+      await ensureGamePersisted(gameId, game?.name || gameName);
       const res = await githubApi.linkGameRepo(gameId, {
         repository: repoInput.trim(),
         branch: branchInput.trim() || 'main',
         build_dir: buildDirInput.trim() || 'dist',
-        installation_id: Number(new URLSearchParams(window.location.search).get("installation_id")) || undefined,
+        installation_id: installationId || undefined,
       });
       if (res && res.success && res.binding) {
         setRepoInfo(prev => ({
@@ -183,6 +242,7 @@ export function GameConsole(): React.ReactElement {
         }));
         setIsDisconnected(false);
         setShowConnectModal(false);
+        await refreshRepoInfo();
       } else {
         setLinkError(res.error || "Failed to link repository.");
       }
@@ -549,9 +609,7 @@ export function GameConsole(): React.ReactElement {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (installUrl) window.open(installUrl, "_blank", "noopener,noreferrer");
-                  }}
+                  onClick={handleOpenGitHubInstall}
                   disabled={!installUrl}
                   style={{
                     display: 'inline-flex',

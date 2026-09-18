@@ -8,6 +8,7 @@ export interface CreateGamePayload {
 
 export interface UpdateGamePayload {
   name?: string;
+  shortName?: string;
   status?: string;
   displayVersion?: string;
   profile?: {
