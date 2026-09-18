@@ -1,6 +1,64 @@
 import type { Env } from "../types";
 import { errorResponse, jsonResponse } from "../utils/response";
 import { getAuthenticatedUser } from "../middleware/auth";
+import { renderShareMetadataHtml, resolveShareImage } from "../utils/shareMetadata";
+
+export async function handleBountyPageRequest(request: Request, env: Env): Promise<Response | null> {
+  if (!env.ASSETS || !["GET", "HEAD"].includes(request.method)) return null;
+
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/(?:dashboard\/)?bounties\/([^/]+)$/);
+  if (!match) return null;
+
+  let bountyId: string;
+  try {
+    bountyId = decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+
+  try {
+    const bounty = await env.DB.prepare(
+      "SELECT title, description, full_description, video_url, state FROM bounties WHERE id = ?",
+    ).bind(bountyId).first<{
+      title: string;
+      description: string | null;
+      full_description: string | null;
+      video_url: string | null;
+      state: string;
+    }>();
+    if (!bounty || bounty.state === "DRAFT") return null;
+
+    const pageUrl = new URL(request.url);
+    pageUrl.search = "";
+    pageUrl.hash = "";
+    const image = resolveShareImage(bounty.video_url, pageUrl.toString());
+    const templateResponse = await env.ASSETS.fetch(
+      new Request(new URL("/index.html", request.url), { method: "GET", headers: request.headers }),
+    );
+    if (!templateResponse.ok) return templateResponse;
+
+    const metadataHtml = renderShareMetadataHtml(await templateResponse.text(), {
+      title: `${bounty.title} - Creator Center`,
+      description: bounty.description || bounty.full_description || "Explore this creator bounty on Randseed.",
+      url: pageUrl.toString(),
+      image: image.url,
+      imageType: image.type,
+    });
+    const headers = new Headers(templateResponse.headers);
+    headers.set("content-type", "text/html; charset=UTF-8");
+    headers.set("cache-control", "public, max-age=60, s-maxage=300");
+    headers.delete("content-length");
+    headers.delete("etag");
+
+    return new Response(request.method === "HEAD" ? null : metadataHtml, {
+      status: templateResponse.status,
+      headers,
+    });
+  } catch {
+    return null;
+  }
+}
 
 export async function handleBountyRoutes(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
