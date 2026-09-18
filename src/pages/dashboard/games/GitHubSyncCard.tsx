@@ -66,18 +66,32 @@ export function GitHubSyncCard({
   const [linkError, setLinkError] = useState<string | null>(null);
   const [installUrl, setInstallUrl] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
+  const [isOpeningGitHub, setIsOpeningGitHub] = useState(false);
 
-  // Load install URL & initial repo info from backend API
+  const handleConnectGitHub = async () => {
+    setIsOpeningGitHub(true);
+    setInstallError(null);
+    try {
+      const info = await githubApi.getInstallInfo(gameId);
+      if (!info.install_url) {
+        throw new Error("GitHub App installation URL was not returned.");
+      }
+      setInstallUrl(info.install_url);
+      window.location.assign(info.install_url);
+    } catch (error) {
+      setInstallError(
+        error instanceof Error
+          ? error.message
+          : "Unable to open GitHub. Please sign in to the Creator Portal and try again.",
+      );
+      setIsOpeningGitHub(false);
+    }
+  };
+
+  // Load only the connected repository on mount. The GitHub installation URL
+  // is created after the user explicitly clicks Connect GitHub.
   useEffect(() => {
     let isMounted = true;
-
-    githubApi.getInstallInfo(gameId).then(info => {
-      if (isMounted && info.install_url) {
-        setInstallUrl(info.install_url);
-      }
-    }).catch(() => {
-      if (isMounted) setInstallError("Unable to load the GitHub App authorization link.");
-    });
 
     githubApi.getGameRepo(gameId).then(res => {
       if (isMounted && res.success && res.repo_info) {
@@ -87,6 +101,11 @@ export function GitHubSyncCard({
     }).catch(() => {
       if (isMounted) setIsDisconnected(true);
     });
+
+    if (new URLSearchParams(window.location.search).get("github_installed") === "true") {
+      setShowConnectModal(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
 
     return () => {
       isMounted = false;
@@ -304,7 +323,8 @@ export function GitHubSyncCard({
         <button 
           type="button"
           className="primary-action"
-          onClick={() => setShowConnectModal(true)}
+          onClick={() => void handleConnectGitHub()}
+          disabled={isOpeningGitHub}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -316,12 +336,19 @@ export function GitHubSyncCard({
             fontWeight: 600,
             fontSize: '14px',
             border: 'none',
-            cursor: 'pointer',
+            cursor: isOpeningGitHub ? 'wait' : 'pointer',
+            opacity: isOpeningGitHub ? 0.7 : 1,
             boxShadow: '0 2px 4px rgba(124, 58, 237, 0.25)'
           }}
         >
-          <Github size={16} /> Connect with {GITHUB_APP_SLUG}
+          <Github size={16} /> {isOpeningGitHub ? "Opening GitHub..." : "Connect GitHub"}
         </button>
+
+        {installError && (
+          <div style={{ margin: '16px auto 0', maxWidth: '460px', color: '#b91c1c', fontSize: '12px' }}>
+            {installError}
+          </div>
+        )}
 
         {/* Connect Repository Modal */}
         {renderConnectModal()}
@@ -365,14 +392,10 @@ export function GitHubSyncCard({
                   Grant repository access to the official RandSeed GitHub App.
                 </p>
               </div>
-              <a
-                href={installUrl || undefined}
-                target="_blank"
-                rel="noreferrer"
-                aria-disabled={!installUrl}
-                onClick={event => {
-                  if (!installUrl) event.preventDefault();
-                }}
+              <button
+                type="button"
+                onClick={() => void handleConnectGitHub()}
+                disabled={isOpeningGitHub}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -383,15 +406,14 @@ export function GitHubSyncCard({
                   borderRadius: '8px',
                   fontSize: '12px',
                   fontWeight: 600,
-                  textDecoration: 'none',
                   whiteSpace: 'nowrap',
-                  opacity: installUrl ? 1 : 0.5,
-                  pointerEvents: installUrl ? 'auto' : 'none'
+                  opacity: isOpeningGitHub ? 0.5 : 1,
+                  cursor: isOpeningGitHub ? 'wait' : 'pointer'
                 }}
               >
-                <span>Authorize on GitHub</span>
+                <span>{isOpeningGitHub ? "Opening GitHub..." : "Continue to GitHub"}</span>
                 <ArrowUpRight size={13} />
-              </a>
+              </button>
             </div>
             {installError && <div style={{ marginTop: '10px', color: '#b91c1c', fontSize: '12px' }}>{installError}</div>}
           </div>
