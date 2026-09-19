@@ -14,7 +14,7 @@ function statusLabel(status: string): string {
 }
 
 function statusStyle(status: string): React.CSSProperties {
-  if (status === "published") return { background: "#e6f6ec", color: "#1e874b" };
+  if (status === "ready" || status === "published") return { background: "#e6f6ec", color: "#1e874b" };
   if (["failed", "cancelled", "superseded"].includes(status)) return { background: "#fef2f2", color: "#b91c1c" };
   if (["building", "uploading", "publishing", "queued"].includes(status)) return { background: "#fff1d9", color: "#8a5314" };
   return { background: "#eef2ff", color: "#4f46e5" };
@@ -186,7 +186,7 @@ export function GameDeployments(): React.ReactElement {
                 </div>
                 
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  {dep.status === 'published' && (
+                  {(dep.status === 'ready' || dep.status === 'published') && (
                     <>
                       <button className="primary-action" style={{ background: 'transparent', color: 'var(--portal-purple)', border: '1px solid var(--portal-purple)' }} onClick={() => setPrivateLinkModal(dep.id)}>
                         <ExternalLink size={16} /> Private Link
@@ -196,7 +196,7 @@ export function GameDeployments(): React.ReactElement {
                       </button>
                     </>
                   )}
-                  {['pending', 'queued', 'building', 'uploading', 'publishing'].includes(dep.status) && (
+                  {['pending', 'queued', 'building', 'uploading', 'verifying', 'publishing'].includes(dep.status) && (
                     <button className="primary-action" disabled style={{ opacity: 0.5 }}>
                       <Clock size={16} /> Under Review
                     </button>

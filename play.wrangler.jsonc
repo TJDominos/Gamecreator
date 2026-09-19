@@ -1,7 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gamecreator-play-dev",
-  "main": "worker/src/play.ts",
+  "main": "rust-worker/build/index.js",
+  "build": {
+    "command": "WORKER_FEATURES=play sh scripts/build-rust-worker.sh"
+  },
   "compatibility_date": "2026-07-19",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },

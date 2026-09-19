@@ -26,7 +26,7 @@ put the secret values in a browser `VITE_*` variable or a user GitHub workflow:
 
 ---
 
-## 2. Cloudflare D1 Database Schema (`0002_github_sync.sql`)
+## 2. Cloudflare D1 Database Schema (`0002_github_sync.sql`, `0005`-`0015`)
 
 ### `github_installations`
 Stores user or organization authorization records when the creator installs the RandSeed GitHub App:
@@ -53,28 +53,23 @@ Binds an individual game to a specific repository and branch:
 - `sandbox_url` (TEXT): Preview link (e.g. `https://randseed.org/g_101`)
 - `build_dir` (TEXT): Bundle output directory (default `'dist'`)
 
-### `game_deployments`
-Deployment and build audit history:
-- `id` (TEXT PK): e.g. `dep_...`
-- `game_id` (TEXT FK): Target game
-- `commit_sha` (TEXT): Deployed commit SHA
-- `commit_message` (TEXT): Commit message
-- `branch` (TEXT): Target branch
-- `status` (TEXT): `'pending'`, `'building'`, `'deployed'`, `'failed'`
-- `sandbox_url` (TEXT): Deployed preview URL
-- `deployer` (TEXT): `'github_action'`, `'webhook'`, or `'manual'`
-- `created_at` (INTEGER): Timestamp
+The historical `game_deployments` table is retired by migration `0015`. The
+active deployment audit source is `deployment_records` from `0005`, together
+with its upload session, immutable artifact, pointer, and event tables.
 
 ---
 
 ## 3. Deployment pipeline (`0005_deployment_pipeline.sql`)
 
 The deployment pipeline uses `deployment_records` as the state machine source
-of truth. `deployment_upload_sessions` and `deployment_upload_files` authorize
-short-lived, manifest-bound R2 uploads. `game_release_pointers` selects the
-active immutable deployment, and `deployment_events` deduplicates GitHub
-webhook deliveries. The deployment record stores `build_dir`, so the workflow
-manifest root must match the linked repository's configured build directory.
+of truth. A successful upload transitions a deployment to `ready` and updates
+`game_sandbox_pointers`; it does not publish the game. `deployment_upload_sessions`
+and `deployment_upload_files` authorize short-lived, manifest-bound R2 uploads.
+`game_release_pointers` selects the public immutable deployment, while
+`private_releases` selects a verified deployment for an opaque private link.
+`deployment_events` deduplicates GitHub webhook deliveries. The deployment
+record stores `build_dir`, so the workflow manifest root must match the linked
+repository's configured build directory.
 
 The dev R2 bucket is `gamecreator-artifacts-dev`; test and production use their
 own named-environment buckets from `wrangler.jsonc`.
@@ -82,7 +77,7 @@ own named-environment buckets from `wrangler.jsonc`.
 The Play Worker must not bind Creator `ASSETS`, JWT secrets, or Creator API
 credentials.
 
-## 4. Backend endpoints (`worker/src/routes/github.ts` and `worker/src/routes/deployments.ts`)
+## 4. Backend endpoints (Rust Creator Worker)
 
 | Route | Method | Auth | Description |
 | :--- | :--- | :--- | :--- |
@@ -95,15 +90,21 @@ credentials.
 | `/api/webhooks/github` | `POST` | HMAC SHA-256 | Receives GitHub webhooks (`push`, `workflow_run`, `installation`) |
 | `/api/deployments/:id/upload-session` | `POST` | GitHub Actions OIDC | Creates a manifest-bound short-lived upload session |
 | `/api/deployments/:id/artifact/:path` | `PUT` | Upload session token | Uploads one declared file to immutable R2 storage |
-| `/api/deployments/:id/upload-complete` | `POST` | GitHub Actions OIDC | Verifies checksums and publishes the release pointer |
+| `/api/deployments/:id/upload-complete` | `POST` | GitHub Actions OIDC | Verifies checksums and creates a `ready` sandbox version |
 | `/api/games/:gameId/deployments` | `GET` | Authenticated owner | Lists deployment state and build errors |
 | `/api/games/:gameId/private-releases` | `POST` | Authenticated owner | Creates an expiring or permanent private release link |
 | `/api/games/:gameId/private-releases/:releaseId` | `DELETE` | Authenticated owner | Revokes a private release link |
+| `/api/games/:gameId/public-releases` | `POST` | Authenticated owner | Publishes an approved, privately released version |
+| `/api/games/:gameId/rollback` | `POST` | Authenticated owner | Changes the public pointer without changing the sandbox pointer |
 
 The legacy `/api/sandbox/deploy` endpoint returns `410` and does not accept
 long-lived deployment tokens.
 
-The Play Worker serves sandbox files from the active release pointer and private
-files only after validating the hashed opaque token, expiry, revocation state,
-published deployment, and completed upload session. Runtime responses include
-strict CSP and cross-origin security headers.
+The release flow is `repo link -> build/upload -> ready sandbox version ->
+private release -> public review/approval -> public release`. The Play Worker
+serves sandbox files from `game_sandbox_pointers`, public files only from
+`game_release_pointers` when the game is `PUBLIC_ACTIVE`, and private files
+only after validating the hashed opaque token, expiry, revocation state, and
+verified deployment. Runtime responses include strict CSP and cross-origin
+security headers. Private releases bypass shared and in-process pointer
+caches so revocation and expiry take effect immediately.

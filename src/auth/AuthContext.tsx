@@ -122,8 +122,9 @@ function readProfiles(): Record<string, UserProfile> {
 }
 
 function createOrganizationId(): string {
-  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `RS-ORG-${suffix}`;
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return `RS-ORG-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }
 
 export function AuthProvider({
@@ -139,7 +140,7 @@ export function AuthProvider({
 
   const processSsoCode = useCallback(async (ssoCode: string, redirectUri: string, state: string) => {
     try {
-      console.log("Processing SSO Token via Cloudflare Worker/Mock...");
+      console.log("Processing SSO token via Cloudflare Worker...");
 
       try {
         if (state !== sessionStorage.getItem(SSO_STATE_KEY)) throw new Error("SSO state mismatch");

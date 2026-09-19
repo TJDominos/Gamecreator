@@ -4,7 +4,13 @@ Linear issue: `TW2-3689`
 Suggested branch: `tj/tw2-3689-开发者分布式构建`
 Parent issue: `TW2-3590`
 
-目标架构：GitHub App 负责身份、仓库授权、Webhook 和 workflow dispatch；creator 仓库中的 GitHub Action 负责在用户 runner 上构建和上传；Worker 负责鉴权、编排、状态和发布；R2 保存不可变制品；D1 保存部署事实；Play Worker/Cloudflare Edge 负责访问和路由。
+目标架构：GitHub App 负责身份、仓库授权、Webhook 和 workflow dispatch；creator 仓库中的 GitHub Action 负责在用户 runner 上构建和上传；Rust Creator Worker 负责鉴权、编排和发布；R2 保存不可变制品；D1 保存部署事实；Rust Play Worker/Cloudflare Edge 负责访问和路由。
+
+The release contract is explicit: repository link -> build/upload -> verified
+`ready` sandbox version -> private release -> public review/approval -> public
+release. Upload completion never changes the public pointer. Rollback changes
+only the public pointer, and private release revocation/expiry bypasses shared
+and in-process caches.
 
 ## 9 个主 TODO
 
@@ -93,7 +99,9 @@ Parent issue: `TW2-3590`
   - 禁止覆盖历史 deployment 的对象。
 - [ ] **P0 以 D1 为事实源并原子发布**
   - 校验通过后按 `uploading -> verifying -> ready -> publishing` 更新。
-  - 使用 D1 transaction/CAS 同时保护 deployment 状态和 active pointer。
+  - Use D1 batch/CAS statements and verify affected-row metadata for every conditional state or pointer update.
+  - Deployment completion updates `game_sandbox_pointers`; it does not publish the public release.
+  - Private publishing selects an explicit verified `ready` deployment. Public publishing is a separate approval-gated operation.
   - 发布失败时保留旧 active pointer，不能暴露 publishing 或半成品 deployment。
 - [ ] **P0 增加历史版本回滚 API**
   - 只能回滚到已验证且存在的 `ready`/`published` deployment。
@@ -104,7 +112,7 @@ Parent issue: `TW2-3590`
   - Private Link 支持有效期、撤销和安全 token 校验。
   - 处理缓存导致的撤销延迟，避免撤销后继续长时间可访问。
 - [ ] **P1 增加 Sandbox、Preview、Public 指针分离**
-  - 明确 `active_deployment_id`、`preview_deployment_id` 和 sandbox 指针的生命周期。
+  - 明确 public `game_release_pointers` and sandbox `game_sandbox_pointers` 的生命周期；private releases are explicit token-bound records.
   - 支持发布前预览、审核后公开发布和快速回滚。
 
 ## 5. CI/CD 记录与 Creator 控制台
@@ -120,7 +128,7 @@ Parent issue: `TW2-3590`
   - 保存 deployment ID、tenant/game、repository、installation、branch、完整 SHA、delivery ID、run ID/attempt、status、artifact hash/size、preview/live URL、error code/message 和各阶段时间。
   - 不向浏览器返回 installation token、OIDC token、upload token 或 GitHub 私钥。
 - [ ] **P0 控制台状态必须来自 D1**
-  - Phase 1 使用 2 到 5 秒轮询 deployment detail。
+  - Phase 1 使用 2 到 5 秒轮询 deployment detail；`ready` is a sandbox build, not a public release.
   - 断线重连后重新从 Worker 获取事实状态。
   - 显示 GitHub 最新 commit 与已部署 commit 的差异，不把 API/network 失败显示为同步成功。
 - [ ] **P0 记录和脱敏构建日志**

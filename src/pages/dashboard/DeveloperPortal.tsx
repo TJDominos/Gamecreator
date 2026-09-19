@@ -38,7 +38,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router";
-import { getStoredGames, createNextNewGame, createNextNewGameAsync, syncGamesWithBackend, GAMES_UPDATED_EVENT } from "./games/gameData";
+import { getStoredGames, createNextNewGameAsync, syncGamesWithBackend, GAMES_UPDATED_EVENT } from "./games/gameData";
 import { CreatorAccessGate, DashboardAccessGate } from "./DashboardAccessGate";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";

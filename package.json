@@ -16,6 +16,7 @@
     "worker:rust:deploy:dev": "npm run build && npx wrangler deploy --config wrangler.jsonc --env dev",
     "worker:rust:test": "npm run worker:rust:check && npm run lint",
     "worker:play:dev": "npx wrangler dev --config play.wrangler.jsonc --env dev",
+    "worker:play:build": "WORKER_FEATURES=play sh scripts/build-rust-worker.sh",
     "worker:deploy": "npm run worker:deploy:dev",
     "worker:deploy:dev": "npm run build && npx wrangler deploy --env dev",
     "worker:play:deploy:dev": "npx wrangler deploy --config play.wrangler.jsonc --env dev",
@@ -27,6 +28,8 @@
     "d1:migrate:private:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0006_private_releases.sql",
     "d1:migrate:games:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0007_games.sql --yes",
     "d1:migrate:public-identity:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0013_public_game_identity.sql --yes",
+    "d1:migrate:release-pointers:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0014_tw2_3689_release_pointers.sql --yes",
+    "d1:migrate:cleanup:dev": "npx wrangler d1 execute gamecreator-d1 --env dev --remote --file=./migrations/0015_remove_legacy_game_deployments.sql --yes",
     "r2:list": "npx wrangler r2 bucket list",
     "r2:create:dev": "npx wrangler r2 bucket create gamecreator-artifacts-dev"
   },

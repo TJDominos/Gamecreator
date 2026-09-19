@@ -1,18 +1,48 @@
-mod auth;
-mod admin;
-mod bounties;
 mod db;
-mod deployments;
-mod games;
-mod github;
-mod organizations;
 mod play;
+#[cfg(not(feature = "play"))]
+mod auth;
+#[cfg(not(feature = "play"))]
+mod admin;
+#[cfg(not(feature = "play"))]
+mod bounties;
+#[cfg(not(feature = "play"))]
+mod deployments;
+#[cfg(not(feature = "play"))]
+mod games;
+#[cfg(not(feature = "play"))]
+mod github;
+#[cfg(not(feature = "play"))]
+mod organizations;
+#[cfg(not(feature = "play"))]
 mod response;
 
 use serde_json::json;
 use worker::*;
 
 #[event(fetch)]
+#[cfg(feature = "play")]
+pub async fn main(request: Request, env: Env, _ctx: Context) -> Result<Response> {
+    if request.path() == "/health" || request.path() == "/api/health" {
+        return Response::from_json(&json!({
+            "status": "ok",
+            "service": "randseed-gamecreator-play-rust"
+        }));
+    }
+    if !matches!(request.method(), Method::Get | Method::Head) {
+        let mut response = Response::error("Method not allowed", 405)?;
+        response.headers_mut().set("Allow", "GET, HEAD")?;
+        return Ok(response);
+    }
+    match play::route(&request, &env).await {
+        Ok(Some(response)) => Ok(response),
+        Ok(None) => Ok(Response::error("Game not found", 404)?),
+        Err(_) => Ok(Response::error("Internal server error", 500)?),
+    }
+}
+
+#[event(fetch)]
+#[cfg(not(feature = "play"))]
 pub async fn main(mut request: Request, env: Env, _ctx: Context) -> Result<Response> {
     if request.method() == Method::Options {
         return response::options(&request, &env);
@@ -26,10 +56,14 @@ pub async fn main(mut request: Request, env: Env, _ctx: Context) -> Result<Respo
                 "service": "randseed-gamecreator-worker-rust"
             }), 200)
         }
-        _ => dispatch(&mut request, &env).await,
+        _ => match dispatch(&mut request, &env).await {
+            Ok(response) => Ok(response),
+            Err(_) => response::error(&request, &env, "Internal server error", 500, "INTERNAL_ERROR"),
+        },
     }
 }
 
+#[cfg(not(feature = "play"))]
 async fn dispatch(request: &mut Request, env: &Env) -> Result<Response> {
     let path = request.path();
 

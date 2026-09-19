@@ -55,7 +55,7 @@ function statusLabel(status: string): string {
 }
 
 function statusStyle(status: string): React.CSSProperties {
-  if (status === "published") return { background: "#e6f6ec", color: "#1e874b", border: "1px solid #bbf7d0" };
+  if (status === "ready" || status === "published") return { background: "#e6f6ec", color: "#1e874b", border: "1px solid #bbf7d0" };
   if (["failed", "cancelled", "superseded"].includes(status)) return { background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" };
   if (["building", "uploading", "publishing", "queued"].includes(status)) return { background: "#fff1d9", color: "#8a5314", border: "1px solid #fed7aa" };
   return { background: "#eef2ff", color: "#4f46e5", border: "1px solid #c7d2fe" };
@@ -134,11 +134,11 @@ export function Publish(): React.ReactElement {
       setDeployments(list);
       setLoadError(null);
 
-      // Auto-select the latest published deployment if none is selected yet
+      // Auto-select the latest verified deployment if none is selected yet
       setSelectedDeploymentId((prev) => {
         if (prev && list.some(d => d.id === prev)) return prev;
-        const firstPublished = list.find(d => d.status === "published");
-        return firstPublished ? firstPublished.id : (list[0]?.id || null);
+        const firstVerified = list.find(d => d.status === "ready" || d.status === "published");
+        return firstVerified ? firstVerified.id : (list[0]?.id || null);
       });
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Unable to load version history");
@@ -154,10 +154,14 @@ export function Publish(): React.ReactElement {
       setIsLoadingActiveRelease(true);
       const res = await githubApi.getActivePrivateRelease(gameId);
       if (res.success) {
-        setActivePrivateRelease(res.active_release || null);
+        const activeRelease = res.active_release || null;
+        setActivePrivateRelease(activeRelease);
+        if (activeRelease) {
+          setSelectedDeploymentId(activeRelease.deployment_id);
+        }
       }
     } catch {
-      // Backend may be running without D1 in mock environment, fallback to local state gracefully
+      setLoadError("Unable to load the active private release.");
     } finally {
       setIsLoadingActiveRelease(false);
     }
@@ -303,6 +307,10 @@ export function Publish(): React.ReactElement {
   // Submit for Public Release Audit
   const handleExecuteGoPublic = async () => {
     if (!gameId || !selectedDeploymentId || !game) return;
+    if (!activePrivateRelease || activePrivateRelease.deployment_id !== selectedDeploymentId) {
+      setModalError("Select the deployment with the active private release before submitting it for public review.");
+      return;
+    }
     const publicGame = { ...game, shortName: shortNameInput.trim().toLowerCase() };
     const publicValidation = validateGameForPublicPublish(publicGame);
     if (!publicValidation.valid) {
@@ -348,7 +356,10 @@ export function Publish(): React.ReactElement {
   };
 
   const selectedDeployment = deployments.find(d => d.id === selectedDeploymentId);
-  const isSelectedPublished = selectedDeployment?.status === "published";
+  const isSelectedVerified = selectedDeployment?.status === "ready" || selectedDeployment?.status === "published";
+  const isSelectedPrivateRelease = Boolean(
+    activePrivateRelease && activePrivateRelease.deployment_id === selectedDeploymentId,
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -452,7 +463,7 @@ export function Publish(): React.ReactElement {
             <button
               type="button"
               onClick={handleInitiatePrivatePublish}
-              disabled={!selectedDeploymentId || !isSelectedPublished}
+              disabled={!selectedDeploymentId || !isSelectedVerified}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -466,10 +477,10 @@ export function Publish(): React.ReactElement {
                 color: "var(--portal-purple)",
                 border: "1px solid var(--portal-purple)",
                 borderRadius: "9px",
-                opacity: (!selectedDeploymentId || !isSelectedPublished) ? 0.5 : 1,
-                cursor: (!selectedDeploymentId || !isSelectedPublished) ? "not-allowed" : "pointer"
+                opacity: (!selectedDeploymentId || !isSelectedVerified) ? 0.5 : 1,
+                cursor: (!selectedDeploymentId || !isSelectedVerified) ? "not-allowed" : "pointer"
               }}
-              title={!isSelectedPublished ? "Select a published build to generate private link" : ""}
+              title={!isSelectedVerified ? "Select a verified build to generate private link" : ""}
             >
               <Lock size={15} />
               Private Publish
@@ -486,7 +497,7 @@ export function Publish(): React.ReactElement {
               setShortNameInput(game?.shortName || "");
               setShowGoPublicModal(true);
             }}
-            disabled={!selectedDeploymentId || !isSelectedPublished || !validation.valid}
+            disabled={!selectedDeploymentId || !isSelectedPrivateRelease || !isSelectedVerified || !validation.valid}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -494,10 +505,10 @@ export function Publish(): React.ReactElement {
               padding: "10px 20px",
               fontSize: "13px",
               fontWeight: 600,
-              opacity: (!selectedDeploymentId || !isSelectedPublished || !validation.valid) ? 0.5 : 1,
-              cursor: (!selectedDeploymentId || !isSelectedPublished || !validation.valid) ? "not-allowed" : "pointer"
+              opacity: (!selectedDeploymentId || !isSelectedPrivateRelease || !isSelectedVerified || !validation.valid) ? 0.5 : 1,
+              cursor: (!selectedDeploymentId || !isSelectedPrivateRelease || !isSelectedVerified || !validation.valid) ? "not-allowed" : "pointer"
             }}
-            title={!validation.valid ? "Resolve name uniqueness and cover image before going public" : ""}
+            title={!activePrivateRelease ? "Create a private release before submitting for public review" : !isSelectedPrivateRelease ? "Select the deployment with the active private release" : !validation.valid ? "Resolve name uniqueness and cover image before going public" : ""}
           >
             <Rocket size={15} />
             {game?.status === 'PUBLIC_ACTIVE' ? "Update Public Version" : "Go Public"}
@@ -938,11 +949,11 @@ export function Publish(): React.ReactElement {
                 <button
                   type="button"
                   className="primary-action"
-                  disabled={isPublishingPrivate || !validation.valid || !isSelectedPublished || !customVersionInput.trim() || !privateExpiryDays || privateExpiryDays < 1 || privateExpiryDays > 60}
+                  disabled={isPublishingPrivate || !validation.valid || !isSelectedVerified || !customVersionInput.trim() || (privateExpiryDays !== null && (privateExpiryDays < 1 || privateExpiryDays > 60))}
                   onClick={() => void handleExecutePrivatePublish(false)}
                   style={{
-                    opacity: (isPublishingPrivate || !validation.valid || !isSelectedPublished || !customVersionInput.trim() || !privateExpiryDays || privateExpiryDays < 1 || privateExpiryDays > 60) ? 0.5 : 1,
-                    cursor: (isPublishingPrivate || !validation.valid || !isSelectedPublished || !customVersionInput.trim() || !privateExpiryDays || privateExpiryDays < 1 || privateExpiryDays > 60) ? "not-allowed" : "pointer"
+                    opacity: (isPublishingPrivate || !validation.valid || !isSelectedVerified || !customVersionInput.trim() || (privateExpiryDays !== null && (privateExpiryDays < 1 || privateExpiryDays > 60))) ? 0.5 : 1,
+                    cursor: (isPublishingPrivate || !validation.valid || !isSelectedVerified || !customVersionInput.trim() || (privateExpiryDays !== null && (privateExpiryDays < 1 || privateExpiryDays > 60))) ? "not-allowed" : "pointer"
                   }}
                 >
                   {isPublishingPrivate ? "Generating Link..." : "Generate Private Link"}

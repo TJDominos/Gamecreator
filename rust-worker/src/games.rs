@@ -68,11 +68,15 @@ fn creator(request: &Request, env: &Env) -> Result<auth::Claims> {
     Ok(claims)
 }
 
-fn game_json(row: &Value, pointer: Option<&Value>, binding: Option<&Value>) -> Value {
-    let version = pointer.and_then(|item| item.get("version")).and_then(Value::as_i64).map(|value| format!("v{value}")).or_else(|| db::string(row, "version")).unwrap_or_else(|| "---".to_string());
+fn game_json(row: &Value, pointer: Option<&Value>, sandbox_pointer: Option<&Value>, binding: Option<&Value>) -> Value {
+    let public_version = pointer.and_then(|item| item.get("version")).and_then(Value::as_i64).map(|value| format!("v{value}"));
+    let sandbox_version = sandbox_pointer.and_then(|item| item.get("version")).and_then(Value::as_i64).map(|value| format!("v{value}"));
+    let version = public_version.clone().or_else(|| sandbox_version.clone()).or_else(|| db::string(row, "version")).unwrap_or_else(|| "---".to_string());
     json!({
         "id": db::string(row, "id"), "name": db::string(row, "name"), "shortName": db::string(row, "short_name").unwrap_or_default(),
         "status": db::string(row, "status"), "version": version, "displayVersion": db::string(row, "display_version").unwrap_or_default(),
+        "publicDeploymentId": pointer.and_then(|item| db::string(item, "active_deployment_id")), "publicVersion": public_version,
+        "sandboxDeploymentId": sandbox_pointer.and_then(|item| db::string(item, "deployment_id")), "sandboxVersion": sandbox_version,
         "players": db::string(row, "players").unwrap_or_else(|| "---".to_string()), "visitors": db::string(row, "visitors").unwrap_or_else(|| "---".to_string()),
         "revenue": db::string(row, "revenue").unwrap_or_else(|| "---".to_string()), "availableBalance": db::string(row, "available_balance").unwrap_or_else(|| "---".to_string()),
         "escrowedBalance": db::string(row, "escrowed_balance").unwrap_or_else(|| "---".to_string()), "createdAt": row.get("created_at"),
@@ -89,8 +93,9 @@ async fn list(request: &Request, env: &Env) -> Result<Response> {
     for row in rows {
         let id = db::string(&row, "id").unwrap_or_default();
         let pointer = db::first(&database, "SELECT version, active_deployment_id FROM game_release_pointers WHERE game_id = ?", &[json!(id.clone())]).await?;
+        let sandbox_pointer = db::first(&database, "SELECT version, deployment_id FROM game_sandbox_pointers WHERE game_id = ?", &[json!(id.clone())]).await?;
         let binding = db::first(&database, "SELECT * FROM game_repo_bindings WHERE game_id = ?", &[json!(id)]).await?;
-        games.push(game_json(&row, pointer.as_ref(), binding.as_ref()));
+        games.push(game_json(&row, pointer.as_ref(), sandbox_pointer.as_ref(), binding.as_ref()));
     }
     response::json(request, env, &json!({ "success": true, "games": games }), 200)
 }
@@ -101,8 +106,9 @@ async fn get(game_id: &str, request: &Request, env: &Env) -> Result<Response> {
     let row = db::first(&database, "SELECT * FROM games WHERE id = ? AND (creator_principal = ? OR ? = 'admin')", &[json!(game_id), json!(claims.principal_id.clone()), json!(claims.role)]).await?;
     let Some(row) = row else { return response::error(request, env, "Game not found", 404, "NOT_FOUND"); };
     let pointer = db::first(&database, "SELECT version, active_deployment_id FROM game_release_pointers WHERE game_id = ?", &[json!(game_id)]).await?;
+    let sandbox_pointer = db::first(&database, "SELECT version, deployment_id FROM game_sandbox_pointers WHERE game_id = ?", &[json!(game_id)]).await?;
     let binding = db::first(&database, "SELECT * FROM game_repo_bindings WHERE game_id = ?", &[json!(game_id)]).await?;
-    response::json(request, env, &json!({ "success": true, "game": game_json(&row, pointer.as_ref(), binding.as_ref()) }), 200)
+    response::json(request, env, &json!({ "success": true, "game": game_json(&row, pointer.as_ref(), sandbox_pointer.as_ref(), binding.as_ref()) }), 200)
 }
 
 async fn create(request: &mut Request, env: &Env) -> Result<Response> {
@@ -129,6 +135,8 @@ async fn update(game_id: &str, request: &mut Request, env: &Env) -> Result<Respo
     let short_name = body.get("shortName").and_then(Value::as_str).map(|value| value.trim().to_lowercase()).or_else(|| db::string(&existing, "short_name")).unwrap_or_default();
     if !short_name.is_empty() && !short_name.chars().all(|value| value.is_ascii_lowercase() || value.is_ascii_digit() || value == '-') { return response::error(request, env, "Short name may contain only lowercase letters, numbers, and hyphens", 400, "INVALID_SHORT_NAME"); }
     let status = body.get("status").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "status")).unwrap_or_else(|| "DRAFT".to_string());
+    if status == "PUBLIC_ACTIVE" { return response::error(request, env, "Public active status can only be set by the public release operation", 409, "PUBLIC_RELEASE_REQUIRED"); }
+    if status == "APPROVED" && !auth::has_role(&claims, "admin") { return response::error(request, env, "Only an administrator can approve a game for public release", 403, "PUBLIC_APPROVAL_REQUIRED"); }
     let display = body.get("displayVersion").or_else(|| profile.get("displayVersion")).and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "display_version")).unwrap_or_default();
     let description = profile.get("description").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "description"));
     let cover = profile.get("coverImage").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "cover_image"));

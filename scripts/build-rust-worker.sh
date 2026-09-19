@@ -19,6 +19,7 @@ fi
 rustup target add wasm32-unknown-unknown
 
 worker_build_version="0.8.4"
+worker_features="${WORKER_FEATURES:-creator}"
 worker_build_bin="${HOME}/.cargo/bin/worker-build"
 worker_build_marker="${HOME}/.cache/randseed-worker-build-${worker_build_version}-rustls-platform-verifier"
 if [ ! -x "$worker_build_bin" ] || [ ! -f "$worker_build_marker" ]; then
@@ -40,4 +41,4 @@ if [ ! -x "$worker_build_bin" ] || [ ! -f "$worker_build_marker" ]; then
   : > "$worker_build_marker"
 fi
 cd rust-worker
-worker-build --release --no-opt
+worker-build --release --no-opt --no-default-features --features "$worker_features"

@@ -58,6 +58,10 @@ export interface Game {
   status: GameStatus;
   players: string; // e.g. "1,204" or "---"
   version: string; // e.g. "v1.2.0" or "---"
+  publicDeploymentId?: string | null;
+  publicVersion?: string | null;
+  sandboxDeploymentId?: string | null;
+  sandboxVersion?: string | null;
   displayVersion?: string; // Player-facing custom version chosen by creator based on deployment version
   visitors: string; // e.g. "2,500" or "---"
   revenue: string; // e.g. "$342.00" or "---"
@@ -69,8 +73,6 @@ export interface Game {
   createdAt?: number;
 }
 
-const LEGACY_MOCK_GAME_IDS = new Set(["g_101", "g_102", "g_999"]);
-
 export const STORAGE_KEY = "randseed_creator_games";
 export const GAMES_UPDATED_EVENT = "randseed_games_updated";
 
@@ -80,10 +82,7 @@ export function getStoredGames(): Game[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.filter((game): game is Game => game && !LEGACY_MOCK_GAME_IDS.has(game.id));
-    }
-    return [];
+    return Array.isArray(parsed) ? parsed.filter((game): game is Game => Boolean(game?.id)) : [];
   } catch (err) {
     console.error("Failed to load stored games", err);
     return [];
@@ -159,15 +158,10 @@ function generateGameId(): string {
  * Synchronizes local cached games with backend database API
  */
 export async function syncGamesWithBackend(): Promise<Game[]> {
-  try {
-    const backendGames = await gameApi.getGames();
-    const games = Array.isArray(backendGames) ? backendGames : [];
-    saveStoredGames(games);
-    return games;
-  } catch (err) {
-    console.warn("Backend games sync failed, keeping local cache:", err);
-  }
-  return getStoredGames();
+  const backendGames = await gameApi.getGames();
+  const games = Array.isArray(backendGames) ? backendGames : [];
+  saveStoredGames(games);
+  return games;
 }
 
 export async function ensureGamePersisted(gameId: string, gameName: string): Promise<void> {
@@ -182,46 +176,6 @@ export async function ensureGamePersisted(gameId: string, gameName: string): Pro
 /**
  * Creates a new draft game persisted to backend D1 database
  */
-export function createNextNewGame(): Game {
-  const name = getNextNewGameName();
-  const id = generateGameId();
-  
-  const newGame: Game = {
-    id,
-    name,
-    status: 'DRAFT',
-    version: '---', // Version is bound to deployments, starts at '---'
-    players: '---',
-    visitors: '---',
-    revenue: '---',
-    availableBalance: '---',
-    escrowedBalance: '---',
-    createdAt: Date.now(),
-    profile: {
-      description: '',
-      coverImage: '',
-      animationUrl: ''
-    },
-  };
-
-  const currentGames = getStoredGames();
-  const games = [newGame, ...currentGames];
-  saveStoredGames(games);
-
-  // Persist to backend database asynchronously
-  gameApi.createGame({ id, name }).then((persistedGame) => {
-    if (persistedGame && persistedGame.id) {
-      // Refresh local copy with server-assigned attributes
-      const freshList = getStoredGames().map(g => g.id === id ? { ...g, ...persistedGame } : g);
-      saveStoredGames(freshList);
-    }
-  }).catch((err) => {
-    console.error("Failed to persist new game to backend database:", err);
-  });
-
-  return newGame;
-}
-
 /**
  * Creates a new draft game and explicitly awaits backend persistence
  */
@@ -235,9 +189,8 @@ export async function createNextNewGameAsync(): Promise<Game> {
     const games = [backendGame, ...currentGames.filter(g => g.id !== backendGame.id)];
     saveStoredGames(games);
     return backendGame;
-  } catch (err) {
-    console.warn("Direct backend create failed, falling back to local optimistic creation:", err);
-    return createNextNewGame();
+  } catch (error) {
+    throw error instanceof Error ? error : new Error("Unable to create game");
   }
 }
 

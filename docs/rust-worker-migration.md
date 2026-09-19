@@ -12,6 +12,7 @@ npm run worker:rust:check
 npm run worker:rust:test
 npm run worker:rust:dev
 npm run worker:rust:deploy:dev
+npm run worker:play:build
 ```
 
 `worker:rust:check` requires the `wasm32-unknown-unknown` Rust target. The host-target check (`cargo check --manifest-path rust-worker/Cargo.toml`) is useful for local API diagnostics but is not a deploy validation.
@@ -28,6 +29,17 @@ Deploy the Play data plane independently:
 ```sh
 npm run worker:play:deploy:dev
 ```
+
+Creator and Play reuse the same `rust-worker` crate and output path. Wrangler
+selects the `creator` or `play` Cargo feature for each deployment; the Play
+feature exposes only read-only D1/R2 delivery routes.
+
+The Rust Creator control plane provides rollback through
+`POST /api/games/:gameId/rollback` and sanitized deployment logs through
+`GET /api/deployments/:deploymentId/logs`. Release objects use immutable
+deployment-specific prefixes, publication uses a D1 compare-and-swap pointer,
+and the Rust Play feature uses the Cloudflare Cache API without compiling D1
+write helpers.
 
 ## Development scope
 

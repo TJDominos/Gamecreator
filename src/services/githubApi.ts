@@ -87,6 +87,15 @@ export interface PrivateReleaseResponse {
   error?: string;
 }
 
+export interface PublicReleaseResponse {
+  success: boolean;
+  game_id?: string;
+  deployment_id?: string;
+  status?: "PUBLIC_ACTIVE";
+  public_url?: string;
+  error?: string;
+}
+
 export interface SyncStatusResponse {
   success: boolean;
   game_id?: string;
@@ -202,6 +211,26 @@ export const githubApi = {
     return request<PrivateReleaseResponse>(
       `/api/games/${encodeURIComponent(gameId)}/private-releases/${encodeURIComponent(releaseId)}`,
       { method: "DELETE" },
+    );
+  },
+
+  async publishPublicRelease(gameId: string, deploymentId: string): Promise<PublicReleaseResponse> {
+    return request<PublicReleaseResponse>(
+      `/api/games/${encodeURIComponent(gameId)}/public-releases`,
+      {
+        method: "POST",
+        body: JSON.stringify({ deployment_id: deploymentId }),
+      },
+    );
+  },
+
+  async rollbackPublicRelease(gameId: string, deploymentId: string): Promise<PublicReleaseResponse> {
+    return request<PublicReleaseResponse>(
+      `/api/games/${encodeURIComponent(gameId)}/rollback`,
+      {
+        method: "POST",
+        body: JSON.stringify({ deployment_id: deploymentId }),
+      },
     );
   },
 };

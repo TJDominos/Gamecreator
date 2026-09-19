@@ -71,21 +71,21 @@ async fn github_response<T: DeserializeOwned>(
     body: Option<Value>,
 ) -> std::result::Result<T, GithubError> {
     let mut headers = Headers::new();
-    headers.set("Accept", "application/vnd.github+json").map_err(|error| GithubError::new(502, error.to_string()))?;
-    headers.set("Authorization", &format!("Bearer {token}")).map_err(|error| GithubError::new(502, error.to_string()))?;
-    headers.set("User-Agent", "RandSeed-Gamecreator-Worker").map_err(|error| GithubError::new(502, error.to_string()))?;
-    headers.set("X-GitHub-Api-Version", "2022-11-28").map_err(|error| GithubError::new(502, error.to_string()))?;
+    headers.set("Accept", "application/vnd.github+json").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    headers.set("Authorization", &format!("Bearer {token}")).map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    headers.set("User-Agent", "RandSeed-Gamecreator-Worker").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    headers.set("X-GitHub-Api-Version", "2022-11-28").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
     let body = body.map(|value| JsValue::from_str(&value.to_string()));
-    if body.is_some() { headers.set("Content-Type", "application/json").map_err(|error| GithubError::new(502, error.to_string()))?; }
+    if body.is_some() { headers.set("Content-Type", "application/json").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?; }
     let mut init = RequestInit::new();
     init.with_method(method).with_headers(headers).with_body(body);
-    let outbound = Request::new_with_init(url, &init).map_err(|error| GithubError::new(502, error.to_string()))?;
-    let mut response = Fetch::Request(outbound).send().await.map_err(|error| GithubError::new(502, error.to_string()))?;
+    let outbound = Request::new_with_init(url, &init).map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    let mut response = Fetch::Request(outbound).send().await.map_err(|_| GithubError::new(502, "GitHub request failed"))?;
     let status = response.status_code();
     if !(200..300).contains(&status) {
         return Err(GithubError::new(status, format!("GitHub API request failed ({status})")));
     }
-    response.json().await.map_err(|error| GithubError::new(502, error.to_string()))
+    response.json().await.map_err(|_| GithubError::new(502, "Invalid GitHub response"))
 }
 
 async fn github_status(
@@ -95,16 +95,16 @@ async fn github_status(
     body: Option<Value>,
 ) -> std::result::Result<u16, GithubError> {
     let mut headers = Headers::new();
-    headers.set("Accept", "application/vnd.github+json").map_err(|error| GithubError::new(502, error.to_string()))?;
-    headers.set("Authorization", &format!("Bearer {token}")).map_err(|error| GithubError::new(502, error.to_string()))?;
-    headers.set("User-Agent", "RandSeed-Gamecreator-Worker").map_err(|error| GithubError::new(502, error.to_string()))?;
-    headers.set("X-GitHub-Api-Version", "2022-11-28").map_err(|error| GithubError::new(502, error.to_string()))?;
+    headers.set("Accept", "application/vnd.github+json").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    headers.set("Authorization", &format!("Bearer {token}")).map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    headers.set("User-Agent", "RandSeed-Gamecreator-Worker").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    headers.set("X-GitHub-Api-Version", "2022-11-28").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
     let body = body.map(|value| JsValue::from_str(&value.to_string()));
-    if body.is_some() { headers.set("Content-Type", "application/json").map_err(|error| GithubError::new(502, error.to_string()))?; }
+    if body.is_some() { headers.set("Content-Type", "application/json").map_err(|_| GithubError::new(502, "GitHub request setup failed"))?; }
     let mut init = RequestInit::new();
     init.with_method(method).with_headers(headers).with_body(body);
-    let outbound = Request::new_with_init(url, &init).map_err(|error| GithubError::new(502, error.to_string()))?;
-    let response = Fetch::Request(outbound).send().await.map_err(|error| GithubError::new(502, error.to_string()))?;
+    let outbound = Request::new_with_init(url, &init).map_err(|_| GithubError::new(502, "GitHub request setup failed"))?;
+    let response = Fetch::Request(outbound).send().await.map_err(|_| GithubError::new(502, "GitHub request failed"))?;
     Ok(response.status_code())
 }
 
@@ -112,10 +112,10 @@ fn app_jwt(env: &Env) -> std::result::Result<String, GithubError> {
     let app_id = env.var("GITHUB_APP_ID").map(|value| value.to_string()).map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))?;
     let private_key = env.secret("GITHUB_APP_PRIVATE_KEY").map(|value| value.to_string()).or_else(|_| env.var("GITHUB_APP_PRIVATE_KEY").map(|value| value.to_string())).map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))?;
     let key_text = private_key.replace("\\n", "\n");
-    let key = RsaPrivateKey::from_pkcs8_pem(&key_text).or_else(|_| RsaPrivateKey::from_pkcs1_pem(&key_text)).map_err(|error| GithubError::new(503, format!("Invalid GitHub App private key: {error}")))?;
+    let key = RsaPrivateKey::from_pkcs8_pem(&key_text).or_else(|_| RsaPrivateKey::from_pkcs1_pem(&key_text)).map_err(|_| GithubError::new(503, "Invalid GitHub App private key"))?;
     let now = js_sys::Date::now() as i64 / 1000;
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"RS256","typ":"JWT"}"#);
-    let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&json!({ "iat": now - 60, "exp": now + 9 * 60, "iss": app_id })).map_err(|error| GithubError::new(503, error.to_string()))?);
+    let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&json!({ "iat": now - 60, "exp": now + 9 * 60, "iss": app_id })).map_err(|_| GithubError::new(503, "Unable to create GitHub App token"))?);
     let message = format!("{header}.{payload}");
     let signature = SigningKey::<Sha256>::new(key).sign(message.as_bytes());
     Ok(format!("{message}.{}", URL_SAFE_NO_PAD.encode(signature.to_bytes())))
@@ -172,7 +172,7 @@ async fn dispatch_workflow(env: &Env, installation_id: i64, repository: &str, br
     Ok(())
 }
 
-pub async fn verify_github_oidc(token: &str, env: &Env, repository: &str, commit_sha: &str, branch: &str, workflow: &str) -> std::result::Result<(), String> {
+pub async fn verify_github_oidc(token: &str, env: &Env, repository: &str, commit_sha: &str, branch: &str, workflow: &str) -> std::result::Result<String, String> {
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 { return Err("Invalid OIDC token".to_string()); }
     let header: Value = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(parts[0]).map_err(|_| "Invalid OIDC token")?).map_err(|_| "Invalid OIDC token")?;
@@ -190,6 +190,7 @@ pub async fn verify_github_oidc(token: &str, env: &Env, repository: &str, commit
     let workflow_suffix = format!("/.github/workflows/{workflow}@refs/heads/{branch}");
     let workflow_matches = claims.get("workflow").and_then(Value::as_str) == Some(workflow) || claims.get("workflow_ref").and_then(Value::as_str).map(|value| value.ends_with(&workflow_suffix)).unwrap_or(false) || claims.get("job_workflow_ref").and_then(Value::as_str).map(|value| value.ends_with(&workflow_suffix)).unwrap_or(false);
     if !workflow_matches { return Err("GitHub OIDC workflow mismatch".to_string()); }
+    let run_id = claims.get("run_id").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| claims.get("run_id").and_then(Value::as_i64).map(|value| value.to_string())).ok_or_else(|| "GitHub OIDC run_id is missing".to_string())?;
     let jwks_url = Url::parse(&format!("{GITHUB_OIDC_ISSUER}/.well-known/jwks")).map_err(|_| "Unable to fetch GitHub OIDC keys".to_string())?;
     let mut jwks = Fetch::Url(jwks_url).send().await.map_err(|_| "Unable to fetch GitHub OIDC keys".to_string())?;
     if !(200..300).contains(&jwks.status_code()) { return Err("Unable to fetch GitHub OIDC keys".to_string()); }
@@ -200,7 +201,8 @@ pub async fn verify_github_oidc(token: &str, env: &Env, repository: &str, commit
     let public_key = RsaPublicKey::new(BigUint::from_bytes_be(&modulus), BigUint::from_bytes_be(&exponent)).map_err(|_| "Invalid GitHub OIDC signing key".to_string())?;
     let verifier = VerifyingKey::<Sha256>::new(public_key);
     let signature = RsaSignature::try_from(URL_SAFE_NO_PAD.decode(parts[2]).map_err(|_| "Invalid OIDC token" )?.as_slice()).map_err(|_| "Invalid OIDC signature".to_string())?;
-    verifier.verify(format!("{}.{}", parts[0], parts[1]).as_bytes(), &signature).map_err(|_| "Invalid GitHub OIDC signature".to_string())
+    verifier.verify(format!("{}.{}", parts[0], parts[1]).as_bytes(), &signature).map_err(|_| "Invalid GitHub OIDC signature".to_string())?;
+    Ok(run_id)
 }
 
 async fn import_workflow(game_id: &str, request: &mut Request, env: &Env) -> Result<Response> {
@@ -329,7 +331,7 @@ async fn webhook(request: &mut Request, env: &Env) -> Result<Response> {
                 let dispatch = dispatch_workflow(env, installation_id, &db::string(&deployment, "repository").unwrap_or_default(), &db::string(&deployment, "branch").unwrap_or_default(), deployment_id, &db::string(&deployment, "commit_sha").unwrap_or_default(), &db::string(&deployment, "game_id").unwrap_or_default()).await;
                 match dispatch {
                     Ok(()) => { db::run(&database, "UPDATE deployment_records SET status = 'queued' WHERE id = ? AND status = 'pending'", &[json!(deployment_id)]).await?; }
-                    Err(error) => { db::run(&database, "UPDATE deployment_records SET status = 'failed', error_code = 'WORKFLOW_DISPATCH_FAILED', error_message = ?, finished_at = ? WHERE id = ? AND status = 'pending'", &[json!(error.message), json!(js_sys::Date::now() as i64), json!(deployment_id)]).await?; }
+                    Err(_error) => { db::run(&database, "UPDATE deployment_records SET status = 'failed', error_code = 'WORKFLOW_DISPATCH_FAILED', error_message = 'GitHub workflow dispatch failed', finished_at = ? WHERE id = ? AND status = 'pending'", &[json!(js_sys::Date::now() as i64), json!(deployment_id)]).await?; }
                 }
             }
         }
@@ -352,7 +354,7 @@ async fn create_pending(database: &worker::d1::D1Database, payload: &Value, deli
     if let Some(row) = db::first(database, "SELECT id FROM deployment_records WHERE game_id = ? AND commit_sha = ?", &[json!(game_id.clone()), json!(sha)]).await? { return Ok(db::string(&row, "id")); }
     let id = format!("dep_{}", uuid::Uuid::new_v4().simple());
     let now = js_sys::Date::now() as i64;
-    db::run(database, "UPDATE deployment_records SET status = 'superseded', error_code = 'NEWER_COMMIT', finished_at = ? WHERE game_id = ? AND status IN ('pending', 'queued', 'building', 'uploading')", &[json!(now), json!(game_id.clone())]).await?;
+    db::run(database, "UPDATE deployment_records SET status = 'superseded', error_code = 'NEWER_COMMIT', finished_at = ? WHERE game_id = ? AND status IN ('pending', 'queued', 'building', 'build_succeeded', 'uploading')", &[json!(now), json!(game_id.clone())]).await?;
     db::run(database, "INSERT INTO deployment_records (id, tenant_id, game_id, repository, installation_id, branch, build_dir, commit_sha, commit_message, github_delivery_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)", &[json!(id.clone()), json!(db::string(&binding, "owner_principal").unwrap_or_default()), json!(game_id), json!(repository), binding.get("installation_id").cloned().unwrap_or(Value::Null), json!(branch), json!(db::string(&binding, "build_dir").unwrap_or_else(|| "dist".to_string())), json!(sha), payload.pointer("/head_commit/message").cloned().unwrap_or(Value::Null), json!(delivery), json!(now)]).await?;
     Ok(Some(id))
 }
@@ -365,10 +367,29 @@ async fn advance_workflow(database: &worker::d1::D1Database, payload: &Value, ev
     let run_id = workflow.get("run_id").or_else(|| workflow.get("id")).and_then(Value::as_i64).map(|value| value.to_string()).unwrap_or_default();
     let deployment = db::first(database, "SELECT * FROM deployment_records WHERE repository = ? AND commit_sha = ? AND (? = '' OR github_run_id = ? OR github_run_id IS NULL) ORDER BY created_at DESC LIMIT 1", &[json!(repository), json!(commit_sha), json!(run_id.clone()), json!(run_id.clone())]).await?;
     let Some(deployment) = deployment else { return Ok(None); };
+    if let Some(existing_run_id) = db::string(&deployment, "github_run_id") { if !run_id.is_empty() && existing_run_id != run_id { return Ok(None); } }
     let action = workflow.get("status").and_then(Value::as_str).or_else(|| payload.get("action").and_then(Value::as_str));
     let conclusion = workflow.get("conclusion").and_then(Value::as_str);
     let status = if event == "workflow_run" && conclusion == Some("success") { Some("build_succeeded") } else if let Some(conclusion) = conclusion.filter(|value| *value != "success") { Some(if conclusion == "cancelled" { "cancelled" } else { "failed" }) } else if matches!(action, Some("queued") | Some("in_progress")) { Some("building") } else { None };
     let attempt = workflow.get("run_attempt").and_then(Value::as_i64);
-    db::run(database, "UPDATE deployment_records SET status = COALESCE(?, status), started_at = COALESCE(started_at, ?), github_run_id = COALESCE(NULLIF(?, ''), github_run_id), workflow_run_attempt = COALESCE(?, workflow_run_attempt) WHERE id = ? AND status IN ('pending', 'queued', 'building', 'build_succeeded')", &[json!(status), json!(js_sys::Date::now() as i64), json!(run_id), json!(attempt), deployment.get("id").cloned().unwrap_or(Value::Null)]).await?;
+    let current_status = db::string(&deployment, "status").unwrap_or_else(|| "pending".to_string());
+    if let Some(next_status) = status.as_deref() { if !transition_allowed(&current_status, next_status) { return Ok(Some(db::string(&deployment, "id").unwrap_or_default())); } }
+    let next_status = status.map(ToOwned::to_owned).unwrap_or_else(|| current_status.clone());
+    db::run(database, "UPDATE deployment_records SET status = ?, started_at = COALESCE(started_at, ?), github_run_id = COALESCE(NULLIF(?, ''), github_run_id), workflow_run_attempt = COALESCE(?, workflow_run_attempt) WHERE id = ? AND status = ?", &[json!(next_status), json!(js_sys::Date::now() as i64), json!(run_id), json!(attempt), deployment.get("id").cloned().unwrap_or(Value::Null), json!(current_status)]).await?;
     Ok(db::string(&deployment, "id"))
+}
+
+fn transition_allowed(current: &str, next: &str) -> bool {
+    if current == next { return true; }
+    match current {
+        "pending" => matches!(next, "queued" | "failed" | "cancelled" | "superseded"),
+        "queued" => matches!(next, "building" | "build_succeeded" | "failed" | "cancelled" | "superseded"),
+        "building" => matches!(next, "build_succeeded" | "failed" | "cancelled" | "superseded"),
+        "build_succeeded" => matches!(next, "uploading" | "failed" | "cancelled" | "superseded"),
+        "uploading" => matches!(next, "verifying" | "failed" | "cancelled" | "superseded"),
+        "verifying" => matches!(next, "ready" | "failed" | "cancelled" | "superseded"),
+        "ready" => matches!(next, "publishing" | "failed" | "cancelled" | "superseded"),
+        "publishing" => matches!(next, "published" | "failed" | "cancelled" | "superseded"),
+        _ => false,
+    }
 }
