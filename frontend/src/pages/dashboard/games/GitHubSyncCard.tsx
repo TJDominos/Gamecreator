@@ -19,7 +19,7 @@ import {
   GitPullRequest
 } from "lucide-react";
 import { ensureGamePersisted, GameRepoInfo } from "./gameData";
-import { githubApi, type GitHubRepositoryOption } from "../../../services/githubApi";
+import { githubApi, type GitHubBranchOption, type GitHubRepositoryOption } from "../../../services/githubApi";
 import workflowTemplate from "../../../../../docs/templates/randseed-deploy.yml?raw";
 
 const GITHUB_APP_SLUG = "RDcreatordev";
@@ -72,7 +72,9 @@ export function GitHubSyncCard({
   const [isOpeningGitHub, setIsOpeningGitHub] = useState(false);
   const [installationId, setInstallationId] = useState<number | null>(null);
   const [availableRepositories, setAvailableRepositories] = useState<GitHubRepositoryOption[]>([]);
+  const [availableBranches, setAvailableBranches] = useState<GitHubBranchOption[]>([]);
   const [isLoadingRepositories, setIsLoadingRepositories] = useState(false);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const lastHandledInstallationId = useRef<number | null>(null);
 
   const refreshRepoInfo = async () => {
@@ -126,26 +128,41 @@ export function GitHubSyncCard({
       }
       const repositories = response.repositories || [];
       setAvailableRepositories(repositories);
-      const selected = repositories.find(repository => repository.full_name === repoInput) || repositories[0];
-      setRepoInput(selected?.full_name || "");
-      setBranchInput(selected?.default_branch || repositories[0]?.default_branch || "main");
+      setRepoInput("");
+      setBranchInput("");
+      setAvailableBranches([]);
       if (repositories.length === 0) {
         setLinkError("No repositories are available from this GitHub App installation.");
-      } else if (repositories.length === 1 && selected) {
-        setIsLinking(true);
-        try {
-          await linkRepository(selected.full_name, selected.default_branch || "main", nextInstallationId);
-        } catch (error) {
-          setLinkError(error instanceof Error ? error.message : "Failed to link repository.");
-        } finally {
-          setIsLinking(false);
-        }
       }
     } catch (error) {
       setAvailableRepositories([]);
       setLinkError(error instanceof Error ? error.message : "Unable to load GitHub repositories.");
     } finally {
       setIsLoadingRepositories(false);
+    }
+  };
+
+  const handleRepositoryChange = async (repository: string) => {
+    setRepoInput(repository);
+    setBranchInput("");
+    setAvailableBranches([]);
+    setLinkError(null);
+    if (!repository || !installationId) return;
+
+    setIsLoadingBranches(true);
+    try {
+      const response = await githubApi.listBranches(installationId, repository);
+      if (!response.success) {
+        throw new Error(response.error || "Unable to load repository branches.");
+      }
+      const branches = response.branches || [];
+      setAvailableBranches(branches);
+      if (branches.length === 1) setBranchInput(branches[0].name);
+      if (branches.length === 0) setLinkError("No branches are available in this repository.");
+    } catch (error) {
+      setLinkError(error instanceof Error ? error.message : "Unable to load repository branches.");
+    } finally {
+      setIsLoadingBranches(false);
     }
   };
 
@@ -280,6 +297,10 @@ export function GitHubSyncCard({
     e.preventDefault();
     if (!repoInput.trim() || !repoInput.includes("/")) {
       setLinkError("Please enter a valid GitHub repository in the format 'owner/repository'.");
+      return;
+    }
+    if (!branchInput.trim()) {
+      setLinkError("Please select a branch before linking the repository.");
       return;
     }
 
@@ -471,7 +492,7 @@ export function GitHubSyncCard({
             {installError && <div style={{ marginTop: '10px', color: '#b91c1c', fontSize: '12px' }}>{installError}</div>}
           </div>
 
-          {/* Step 2: Form to link repo */}
+          {/* Repository and branch selection */}
           <form onSubmit={handleLinkRepository}>
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
@@ -479,11 +500,7 @@ export function GitHubSyncCard({
               </label>
               <select
                 value={repoInput}
-                onChange={e => {
-                  const repository = availableRepositories.find(item => item.full_name === e.target.value);
-                  setRepoInput(e.target.value);
-                  if (repository) setBranchInput(repository.default_branch || "main");
-                }}
+                onChange={e => void handleRepositoryChange(e.target.value)}
                 required
                 disabled={isLoadingRepositories}
                 style={{
@@ -505,22 +522,19 @@ export function GitHubSyncCard({
                     {repository.full_name}{repository.private ? " (Private)" : ""}
                   </option>
                 ))}
-                {repoInfo.repository && !availableRepositories.some(repository => repository.full_name === repoInfo.repository) && (
-                  <option value={repoInfo.repository}>{repoInfo.repository}</option>
-                )}
               </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                  Branch
+                  Step 3: Branch <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="main"
+                <select
                   value={branchInput}
                   onChange={e => setBranchInput(e.target.value)}
+                  required
+                  disabled={!repoInput || isLoadingBranches || availableBranches.length === 0}
                   style={{
                     width: '100%',
                     padding: '10px 14px',
@@ -530,7 +544,16 @@ export function GitHubSyncCard({
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
-                />
+                >
+                  <option value="" disabled>
+                    {!repoInput ? "Select a repository first..." : isLoadingBranches ? "Loading branches..." : "Select a branch..."}
+                  </option>
+                  {availableBranches.map(branch => (
+                    <option key={branch.name} value={branch.name}>
+                      {branch.name}{branch.protected ? " (Protected)" : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
@@ -580,7 +603,7 @@ export function GitHubSyncCard({
               </button>
               <button
                 type="submit"
-                disabled={isLinking}
+                disabled={isLinking || isLoadingRepositories || isLoadingBranches || !repoInput || !branchInput || availableBranches.length === 0}
                 style={{
                   padding: '9px 20px',
                   borderRadius: '8px',
@@ -589,7 +612,7 @@ export function GitHubSyncCard({
                   color: '#fff',
                   fontSize: '13px',
                   fontWeight: 600,
-                  cursor: isLinking ? 'wait' : 'pointer',
+                  cursor: isLinking || isLoadingRepositories || isLoadingBranches ? 'wait' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px'

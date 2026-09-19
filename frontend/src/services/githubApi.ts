@@ -13,9 +13,20 @@ export interface GitHubRepositoryOption {
   private: boolean;
 }
 
+export interface GitHubBranchOption {
+  name: string;
+  protected: boolean;
+}
+
 export interface GitHubRepositoriesResponse {
   success: boolean;
   repositories?: GitHubRepositoryOption[];
+  error?: string;
+}
+
+export interface GitHubBranchesResponse {
+  success: boolean;
+  branches?: GitHubBranchOption[];
   error?: string;
 }
 
@@ -133,6 +144,13 @@ export const githubApi = {
   async listRepositories(installationId: number): Promise<GitHubRepositoriesResponse> {
     return request<GitHubRepositoriesResponse>(
       `/api/github/repositories?installation_id=${encodeURIComponent(installationId)}`,
+      { method: "GET" },
+    );
+  },
+
+  async listBranches(installationId: number, repository: string): Promise<GitHubBranchesResponse> {
+    return request<GitHubBranchesResponse>(
+      `/api/github/branches?installation_id=${encodeURIComponent(installationId)}&repository=${encodeURIComponent(repository)}`,
       { method: "GET" },
     );
   },

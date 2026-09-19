@@ -80,6 +80,7 @@ pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>>
     match (request.method(), path.as_str()) {
         (Method::Get, "/api/github/install") => Ok(Some(install(request, env).await?)),
         (Method::Get, "/api/github/repositories") => Ok(Some(list_repositories(request, env).await?)),
+        (Method::Get, "/api/github/branches") => Ok(Some(list_branches(request, env).await?)),
         (Method::Get, "/api/github/callback") => Ok(Some(callback(request, env).await?)),
         (Method::Post, "/api/github/claim") => Ok(Some(claim_installation(request, env).await?)),
         (Method::Post, "/api/github/webhook") => Ok(Some(webhook(request, env).await?)),
@@ -257,6 +258,25 @@ async fn installation_repositories(env: &Env, installation_id: i64) -> std::resu
     Ok(repositories)
 }
 
+async fn repository_branches(env: &Env, installation_id: i64, repository: &str) -> std::result::Result<Vec<Value>, GithubError> {
+    let token = installation_token(env, installation_id).await?;
+    let path = github_repo_path(repository);
+    let mut branches = Vec::new();
+    for page in 1..=10 {
+        let value: Value = github_response(&format!("{GITHUB_API}/repos/{path}/branches?per_page=100&page={page}"), &token, Method::Get, None).await?;
+        let page_branches = value.as_array().cloned().unwrap_or_default();
+        let page_len = page_branches.len();
+        branches.extend(page_branches.into_iter().filter_map(|branch| {
+            Some(json!({
+                "name": branch.get("name")?.as_str()?,
+                "protected": branch.get("protected").and_then(Value::as_bool).unwrap_or(false),
+            }))
+        }));
+        if page_len < 100 { break; }
+    }
+    Ok(branches)
+}
+
 async fn repository_info(env: &Env, installation_id: i64, repository: &str, branch: &str) -> std::result::Result<(String, String), GithubError> {
     let token = installation_token(env, installation_id).await?;
     let path = github_repo_path(repository);
@@ -392,6 +412,26 @@ async fn list_repositories(request: &Request, env: &Env) -> Result<Response> {
         Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
     };
     response::json(request, env, &json!({ "success": true, "repositories": repositories }), 200)
+}
+
+async fn list_branches(request: &Request, env: &Env) -> Result<Response> {
+    let claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
+    let url = request.url()?;
+    let installation_id = url.query_pairs().find(|(key, _)| key == "installation_id").and_then(|(_, value)| value.parse::<i64>().ok());
+    let repository = url.query_pairs().find(|(key, _)| key == "repository").map(|(_, value)| value.to_string()).unwrap_or_default();
+    let Some(installation_id) = installation_id.filter(|value| *value > 0) else { return response::error(request, env, "Missing required 'installation_id' parameter", 400, "MISSING_INSTALLATION_ID"); };
+    if repository.split('/').count() != 2 || repository.split('/').any(|part| part.is_empty()) || repository.contains(char::is_whitespace) {
+        return response::error(request, env, "Invalid repository", 400, "INVALID_REPOSITORY");
+    }
+    let database = db::database(env)?;
+    if db::first(&database, "SELECT installation_id FROM github_installations WHERE installation_id = ? AND owner_principal = ?", &[json!(installation_id), json!(claims.principal_id)]).await?.is_none() {
+        return response::error(request, env, "GitHub installation is not owned by the authenticated creator", 403, "FORBIDDEN");
+    }
+    let branches = match repository_branches(env, installation_id, &repository).await {
+        Ok(value) => value,
+        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
+    };
+    response::json(request, env, &json!({ "success": true, "branches": branches }), 200)
 }
 
 async fn callback(request: &Request, env: &Env) -> Result<Response> {
