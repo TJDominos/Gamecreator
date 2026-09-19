@@ -431,7 +431,7 @@ function Dashboard(): React.ReactElement {
     // Synchronize games from backend database
     syncGamesWithBackend().then((fresh) => {
       if (fresh) setGames(fresh);
-    });
+    }).catch(() => undefined);
 
     const handleUpdate = () => {
       setGames(getStoredGames());

@@ -66,6 +66,7 @@ export function GameConsole(): React.ReactElement {
   const [linkError, setLinkError] = useState<string | null>(null);
   const [installUrl, setInstallUrl] = useState<string | null>(null);
   const [installationId, setInstallationId] = useState<number | null>(null);
+  const [isOpeningGitHub, setIsOpeningGitHub] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +107,31 @@ export function GameConsole(): React.ReactElement {
       return;
     }
     popup.focus();
+  };
+
+  const handleConnectGitHub = async () => {
+    setIsOpeningGitHub(true);
+    setLinkError(null);
+    try {
+      const info = await githubApi.getInstallInfo(gameId || "");
+      if (!info.install_url) {
+        throw new Error("GitHub App installation URL was not returned.");
+      }
+      setInstallUrl(info.install_url);
+      const popup = window.open(
+        info.install_url,
+        "randseed-github-install",
+        "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
+      );
+      if (!popup) {
+        throw new Error("GitHub could not be opened. Please allow popups and try again.");
+      }
+      popup.focus();
+    } catch (error) {
+      setLinkError(error instanceof Error ? error.message : "Unable to open GitHub. Please try again.");
+    } finally {
+      setIsOpeningGitHub(false);
+    }
   };
 
   const initialName = location.state?.gameName || (game ? game.name : "New Game");
@@ -191,13 +217,16 @@ export function GameConsole(): React.ReactElement {
 
   const isMetaLocked = ['PENDING_REVIEW', 'APPROVED', 'PUBLIC_ACTIVE', 'MAINTENANCE', 'ARCHIVED'].includes(status);
 
-  const handleSaveName = () => {
+  const handleSaveName = async () => {
     const trimmed = tempName.trim();
     if (trimmed) {
-      setNameError(null);
-      setGameName(trimmed);
-      if (gameId) {
-        updateGame(gameId, { name: trimmed });
+      try {
+        if (gameId) await updateGame(gameId, { name: trimmed });
+        setNameError(null);
+        setGameName(trimmed);
+      } catch (error) {
+        setNameError(error instanceof Error ? error.message : "Unable to save game name");
+        return;
       }
     } else {
       setTempName(gameName);
@@ -205,10 +234,12 @@ export function GameConsole(): React.ReactElement {
     setIsEditing(false);
   };
 
-  const handleStatusChange = (newStatus: GameStatus) => {
-    setStatus(newStatus);
-    if (gameId) {
-      updateGame(gameId, { status: newStatus });
+  const handleStatusChange = async (newStatus: GameStatus) => {
+    try {
+      if (gameId) await updateGame(gameId, { status: newStatus });
+      setStatus(newStatus);
+    } catch (error) {
+      setNameError(error instanceof Error ? error.message : "Unable to update game status");
     }
   };
 
@@ -322,7 +353,15 @@ export function GameConsole(): React.ReactElement {
             <div ref={menuRef} style={{ position: 'relative' }}>
             <button
               type="button"
-              onClick={() => setShowGithubMenu(prev => !prev)}
+              onClick={() => {
+                if (hasActiveRepo) {
+                  setShowGithubMenu(prev => !prev);
+                } else {
+                  void handleConnectGitHub();
+                }
+              }}
+              disabled={isOpeningGitHub}
+              aria-busy={isOpeningGitHub}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -334,7 +373,8 @@ export function GameConsole(): React.ReactElement {
                 borderRadius: '8px',
                 fontSize: '13px',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: isOpeningGitHub ? 'wait' : 'pointer',
+                opacity: isOpeningGitHub ? 0.7 : 1,
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                 transition: 'background 0.15s ease'
               }}
@@ -342,7 +382,7 @@ export function GameConsole(): React.ReactElement {
               <Github size={16} />
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
                 <span style={{ fontSize: '13px', fontWeight: 600 }}>
-                  {hasActiveRepo ? repoInfo.repository.split('/')[1] || repoInfo.repository : "GitHub"}
+                  {isOpeningGitHub ? "Opening GitHub..." : hasActiveRepo ? repoInfo.repository.split('/')[1] || repoInfo.repository : "GitHub"}
                 </span>
                 {hasActiveRepo && (
                   <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400 }}>
@@ -350,11 +390,11 @@ export function GameConsole(): React.ReactElement {
                   </span>
                 )}
               </div>
-              <ChevronDown size={14} style={{ marginLeft: '4px', opacity: 0.8 }} />
+              {hasActiveRepo && <ChevronDown size={14} style={{ marginLeft: '4px', opacity: 0.8 }} />}
             </button>
 
             {/* Dropdown Card */}
-            {showGithubMenu && (
+            {showGithubMenu && hasActiveRepo && (
               <div
                 style={{
                   position: 'absolute',
@@ -369,8 +409,7 @@ export function GameConsole(): React.ReactElement {
                   zIndex: 50
                 }}
               >
-                {hasActiveRepo ? (
-                  <div>
+                <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #f3f4f6' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#f3f4f6', display: 'grid', placeItems: 'center' }}>
@@ -469,44 +508,7 @@ export function GameConsole(): React.ReactElement {
                         <Link2Off size={14} /> Disconnect Repo
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ textAlign: 'center', padding: '8px 4px 16px' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f3f4f6', display: 'grid', placeItems: 'center', margin: '0 auto 8px' }}>
-                        <Github size={20} color="#6b7280" />
-                      </div>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>No Repository Connected</div>
-                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                        Connect your GitHub repo to trigger automatic builds and deploys.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowGithubMenu(false);
-                        setShowConnectModal(true);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px 14px',
-                        background: '#111827',
-                        color: '#fff',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Github size={14} /> Connect Repository
-                    </button>
-                  </div>
-                )}
+                </div>
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { request } from "./apiClient";
+import { ApiError, request } from "./apiClient";
 import type { Game } from "../pages/dashboard/games/gameData";
 
 export interface CreateGamePayload {
@@ -17,6 +17,9 @@ export interface UpdateGamePayload {
     animationUrl?: string;
     savedAt?: string;
     displayVersion?: string;
+    category?: string;
+    ageRating?: string;
+    deviceSupport?: string;
   };
 }
 
@@ -36,7 +39,10 @@ export const gameApi = {
     const res = await request<{ success: boolean; games: Game[] }>("/api/games", {
       method: "GET",
     });
-    return res.games || [];
+    if (res.success !== true || !Array.isArray(res.games)) {
+      throw new ApiError("Invalid games response", 502, "INVALID_RESPONSE");
+    }
+    return res.games;
   },
 
   /**
@@ -47,6 +53,9 @@ export const gameApi = {
       `/api/games/${encodeURIComponent(id)}`,
       { method: "GET" },
     );
+    if (res.success !== true || !res.game) {
+      throw new ApiError("Invalid game response", 502, "INVALID_RESPONSE");
+    }
     return res.game;
   },
 
@@ -58,6 +67,9 @@ export const gameApi = {
       method: "POST",
       body: JSON.stringify(payload || {}),
     });
+    if (res.success !== true || !res.game) {
+      throw new ApiError("Invalid game response", 502, "INVALID_RESPONSE");
+    }
     return res.game;
   },
 
@@ -72,7 +84,10 @@ export const gameApi = {
         body: JSON.stringify(payload),
       },
     );
-    return !!res.success;
+    if (res.success !== true) {
+      throw new ApiError(res.message || "Game update failed", 502, "INVALID_RESPONSE");
+    }
+    return true;
   },
 
   /**
@@ -83,7 +98,10 @@ export const gameApi = {
       `/api/games/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     );
-    return !!res.success;
+    if (res.success !== true) {
+      throw new ApiError("Game deletion failed", 502, "INVALID_RESPONSE");
+    }
+    return true;
   },
 
   /**

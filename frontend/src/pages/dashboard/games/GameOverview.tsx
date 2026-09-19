@@ -79,7 +79,7 @@ export function GameOverview(): React.ReactElement {
   // --- Independent Save Handlers ---
 
   // 1. Independent Save: Description
-  const handleSaveDescription = () => {
+  const handleSaveDescription = async () => {
     if (!gameId) return;
     if (!description.trim()) {
       setFormErrors(prev => ({ ...prev, description: "Description is required." }));
@@ -95,26 +95,30 @@ export function GameOverview(): React.ReactElement {
     setSavingField("desc");
     setFormErrors(prev => ({ ...prev, description: undefined }));
 
-    updateGame(gameId, {
-      profile: {
-        description: description.trim(),
-        coverImage: coverImage.trim(),
-        animationUrl: animationUrl.trim(),
-        category: category as any,
-        ageRating: ageRating as any,
-        deviceSupport: deviceSupport as any,
-        savedAt: new Date().toISOString()
-      }
-    });
-
-    setSavingField(null);
-    setDescSuccess(true);
-    setToast({ message: "Game description saved.", tone: "success" });
-    setTimeout(() => setDescSuccess(false), 3000);
+    try {
+      await updateGame(gameId, {
+        profile: {
+          description: description.trim(),
+          coverImage: coverImage.trim(),
+          animationUrl: animationUrl.trim(),
+          category: category as any,
+          ageRating: ageRating as any,
+          deviceSupport: deviceSupport as any,
+          savedAt: new Date().toISOString()
+        }
+      });
+      setDescSuccess(true);
+      setToast({ message: "Game description saved.", tone: "success" });
+      setTimeout(() => setDescSuccess(false), 3000);
+    } catch (error) {
+      setToast({ message: error instanceof Error ? error.message : "Unable to save game description.", tone: "error" });
+    } finally {
+      setSavingField(null);
+    }
   };
 
   // 2. Independent Save: Cover Image
-  const handleSaveCoverImage = () => {
+  const handleSaveCoverImage = async () => {
     if (!gameId) return;
     if (!coverImage.trim()) {
       setFormErrors(prev => ({ ...prev, coverImage: "Cover image is required." }));
@@ -125,50 +129,58 @@ export function GameOverview(): React.ReactElement {
     setSavingField("cover");
     setFormErrors(prev => ({ ...prev, coverImage: undefined }));
 
-    updateGame(gameId, {
-      coverImage: coverImage.trim(),
-      profile: {
-        description: description.trim(),
+    try {
+      await updateGame(gameId, {
         coverImage: coverImage.trim(),
-        animationUrl: animationUrl.trim(),
-        category: category as any,
-        ageRating: ageRating as any,
-        deviceSupport: deviceSupport as any,
-        savedAt: new Date().toISOString()
-      }
-    });
-
-    setSavingField(null);
-    setCoverSuccess(true);
-    setToast({ message: "Cover image saved.", tone: "success" });
-    setTimeout(() => setCoverSuccess(false), 3000);
+        profile: {
+          description: description.trim(),
+          coverImage: coverImage.trim(),
+          animationUrl: animationUrl.trim(),
+          category: category as any,
+          ageRating: ageRating as any,
+          deviceSupport: deviceSupport as any,
+          savedAt: new Date().toISOString()
+        }
+      });
+      setCoverSuccess(true);
+      setToast({ message: "Cover image saved.", tone: "success" });
+      setTimeout(() => setCoverSuccess(false), 3000);
+    } catch (error) {
+      setToast({ message: error instanceof Error ? error.message : "Unable to save cover image.", tone: "error" });
+    } finally {
+      setSavingField(null);
+    }
   };
 
   // 3. Independent Save: Game Animation
-  const handleSaveAnimation = () => {
+  const handleSaveAnimation = async () => {
     if (!gameId) return;
     setSavingField("anim");
     setFormErrors(prev => ({ ...prev, animation: undefined }));
 
-    updateGame(gameId, {
-      profile: {
-        description: description.trim(),
-        coverImage: coverImage.trim(),
-        animationUrl: animationUrl.trim(),
-        category: category as any,
-        ageRating: ageRating as any,
-        deviceSupport: deviceSupport as any,
-        savedAt: new Date().toISOString()
-      }
-    });
-
-    setSavingField(null);
-    setAnimSuccess(true);
-    setToast({ message: "Game animation saved.", tone: "success" });
-    setTimeout(() => setAnimSuccess(false), 3000);
+    try {
+      await updateGame(gameId, {
+        profile: {
+          description: description.trim(),
+          coverImage: coverImage.trim(),
+          animationUrl: animationUrl.trim(),
+          category: category as any,
+          ageRating: ageRating as any,
+          deviceSupport: deviceSupport as any,
+          savedAt: new Date().toISOString()
+        }
+      });
+      setAnimSuccess(true);
+      setToast({ message: "Game animation saved.", tone: "success" });
+      setTimeout(() => setAnimSuccess(false), 3000);
+    } catch (error) {
+      setToast({ message: error instanceof Error ? error.message : "Unable to save game animation.", tone: "error" });
+    } finally {
+      setSavingField(null);
+    }
   };
 
-  const handleSaveMeta = () => {
+  const handleSaveMeta = async () => {
     if (!gameId) return;
     
     // Validate
@@ -181,22 +193,26 @@ export function GameOverview(): React.ReactElement {
     setSavingField("meta");
     setFormErrors(prev => ({ ...prev, meta: undefined }));
 
-    updateGame(gameId, {
-      profile: {
-        description: description.trim(),
-        coverImage: coverImage.trim(),
-        animationUrl: animationUrl.trim(),
-        category: category as any,
-        ageRating: ageRating as any,
-        deviceSupport: deviceSupport as any,
-        savedAt: new Date().toISOString()
-      }
-    });
-
-    setSavingField(null);
-    setMetaSuccess(true);
-    setToast({ message: "Game meta options saved.", tone: "success" });
-    setTimeout(() => setMetaSuccess(false), 3000);
+    try {
+      await updateGame(gameId, {
+        profile: {
+          description: description.trim(),
+          coverImage: coverImage.trim(),
+          animationUrl: animationUrl.trim(),
+          category: category as any,
+          ageRating: ageRating as any,
+          deviceSupport: deviceSupport as any,
+          savedAt: new Date().toISOString()
+        }
+      });
+      setMetaSuccess(true);
+      setToast({ message: "Game meta options saved.", tone: "success" });
+      setTimeout(() => setMetaSuccess(false), 3000);
+    } catch (error) {
+      setToast({ message: error instanceof Error ? error.message : "Unable to save game metadata.", tone: "error" });
+    } finally {
+      setSavingField(null);
+    }
   };
 
   const gameVersion = game?.version && game.version !== '' ? game.version : '---';

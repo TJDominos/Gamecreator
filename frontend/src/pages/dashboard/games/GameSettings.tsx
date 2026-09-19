@@ -12,6 +12,7 @@ export function GameSettings(): React.ReactElement {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const canHardDelete = ['DRAFT', 'DEVELOPMENT'].includes(status);
   const canArchive = ['PRIVATE_TESTING', 'REJECTED', 'APPROVED', 'MAINTENANCE'].includes(status);
@@ -23,6 +24,7 @@ export function GameSettings(): React.ReactElement {
       <p style={{ color: 'var(--portal-muted)', fontSize: '14px', marginBottom: '24px' }}>
         Destructive actions and visibility controls, governed by the game's current status.
       </p>
+      {actionError && <p style={{ color: '#e53e3e', fontSize: '13px', marginBottom: '16px' }}>{actionError}</p>}
 
       <div style={{ background: '#fff', border: '1px solid #fed7d7', borderRadius: '12px', overflow: 'hidden' }}>
         {canHardDelete ? (
@@ -55,21 +57,36 @@ export function GameSettings(): React.ReactElement {
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               {status === 'PENDING_REVIEW' && (
-                 <button onClick={() => {
-                   if (gameId) updateGame(gameId, { status: 'DEVELOPMENT' });
-                   setStatus('DEVELOPMENT');
+                 <button onClick={async () => {
+                   try {
+                     if (gameId) await updateGame(gameId, { status: 'DEVELOPMENT' });
+                     setActionError(null);
+                     setStatus('DEVELOPMENT');
+                   } catch (error) {
+                     setActionError(error instanceof Error ? error.message : 'Unable to update game status');
+                   }
                  }} style={{ padding: '8px 16px', background: '#f59e0b', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>Withdraw Review</button>
               )}
               {status === 'PUBLIC_ACTIVE' && (
-                 <button onClick={() => {
-                   if (gameId) updateGame(gameId, { status: 'MAINTENANCE' });
-                   setStatus('MAINTENANCE');
+                 <button onClick={async () => {
+                   try {
+                     if (gameId) await updateGame(gameId, { status: 'MAINTENANCE' });
+                     setActionError(null);
+                     setStatus('MAINTENANCE');
+                   } catch (error) {
+                     setActionError(error instanceof Error ? error.message : 'Unable to update game status');
+                   }
                  }} style={{ padding: '8px 16px', background: '#f59e0b', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>Enter Maintenance</button>
               )}
               <button 
-                onClick={() => {
-                  if (gameId) updateGame(gameId, { status: 'ARCHIVED' });
-                  setStatus('ARCHIVED');
+                onClick={async () => {
+                  try {
+                    if (gameId) await updateGame(gameId, { status: 'ARCHIVED' });
+                    setActionError(null);
+                    setStatus('ARCHIVED');
+                  } catch (error) {
+                    setActionError(error instanceof Error ? error.message : 'Unable to archive game');
+                  }
                 }}
                 disabled={!canArchive} 
                 style={{ 
@@ -127,8 +144,15 @@ export function GameSettings(): React.ReactElement {
                 onClick={async () => {
                   if (gameId && !isDeleting && deleteConfirmText === game?.name) {
                     setIsDeleting(true);
-                    await deleteGame(gameId);
-                    navigate("/dashboard");
+                    setActionError(null);
+                    try {
+                      await deleteGame(gameId);
+                      navigate("/dashboard");
+                    } catch (error) {
+                      setActionError(error instanceof Error ? error.message : "Unable to delete game");
+                    } finally {
+                      setIsDeleting(false);
+                    }
                   }
                 }}
                 disabled={isDeleting || deleteConfirmText !== game?.name}

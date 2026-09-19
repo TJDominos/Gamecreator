@@ -80,7 +80,7 @@ fn game_json(row: &Value, pointer: Option<&Value>, sandbox_pointer: Option<&Valu
         "players": db::string(row, "players").unwrap_or_else(|| "---".to_string()), "visitors": db::string(row, "visitors").unwrap_or_else(|| "---".to_string()),
         "revenue": db::string(row, "revenue").unwrap_or_else(|| "---".to_string()), "availableBalance": db::string(row, "available_balance").unwrap_or_else(|| "---".to_string()),
         "escrowedBalance": db::string(row, "escrowed_balance").unwrap_or_else(|| "---".to_string()), "createdAt": row.get("created_at"),
-        "profile": { "description": db::string(row, "description").unwrap_or_default(), "coverImage": db::string(row, "cover_image").unwrap_or_default(), "animationUrl": db::string(row, "animation_url").unwrap_or_default(), "displayVersion": db::string(row, "display_version").unwrap_or_default() },
+        "profile": { "description": db::string(row, "description").unwrap_or_default(), "coverImage": db::string(row, "cover_image").unwrap_or_default(), "animationUrl": db::string(row, "animation_url").unwrap_or_default(), "displayVersion": db::string(row, "display_version").unwrap_or_default(), "category": db::string(row, "category"), "ageRating": db::string(row, "age_rating"), "deviceSupport": db::string(row, "device_support") },
         "repoInfo": binding.map(|item| json!({ "repository": db::string(item, "repo_full_name"), "branch": db::string(item, "default_branch"), "lastCommitSha": db::string(item, "last_synced_commit").unwrap_or_else(|| "---".to_string()), "lastCommitMessage": db::string(item, "last_commit_message").unwrap_or_else(|| "---".to_string()), "lastSyncedAt": item.get("last_synced_at"), "isSynced": db::string(item, "sync_status").as_deref() == Some("synced"), "syncMethod": db::string(item, "sync_method"), "sandboxUrl": db::string(item, "sandbox_url") }))
     })
 }
@@ -113,19 +113,30 @@ async fn get(game_id: &str, request: &Request, env: &Env) -> Result<Response> {
 
 async fn create(request: &mut Request, env: &Env) -> Result<Response> {
     let claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
-    let body = request.json::<Value>().await.unwrap_or_else(|_| json!({}));
+    let body = match request.json::<Value>().await {
+        Ok(value) if value.is_object() => value,
+        _ => return response::error(request, env, "Invalid JSON body", 400, "INVALID_JSON"),
+    };
     let database = db::database(env)?;
     let supplied = body.get("name").and_then(Value::as_str).unwrap_or_default().trim().to_string();
     let name = if supplied.is_empty() { "new game".to_string() } else { supplied };
     let id = body.get("id").and_then(Value::as_str).filter(|value| !value.is_empty()).map(ToOwned::to_owned).unwrap_or_else(|| format!("g_{}", uuid::Uuid::new_v4().simple()));
+    if db::first(&database, "SELECT id FROM games WHERE id = ?", &[json!(id.clone())]).await?.is_some() {
+        return response::error(request, env, "A game with this ID already exists", 409, "GAME_ID_CONFLICT");
+    }
     let now = js_sys::Date::now() as i64;
-    db::run(&database, "INSERT INTO games (id, creator_principal, name, status, version, visitors, players, revenue, available_balance, escrowed_balance, created_at, updated_at) VALUES (?, ?, ?, 'DRAFT', '---', '---', '---', '---', '---', '---', ?, ?)", &[json!(id.clone()), json!(claims.principal_id), json!(name.clone()), json!(now), json!(now)]).await?;
+    if db::run_changes(&database, "INSERT INTO games (id, creator_principal, name, status, version, visitors, players, revenue, available_balance, escrowed_balance, created_at, updated_at) VALUES (?, ?, ?, 'DRAFT', '---', '---', '---', '---', '---', '---', ?, ?)", &[json!(id.clone()), json!(claims.principal_id), json!(name.clone()), json!(now), json!(now)]).await? != 1 {
+        return response::error(request, env, "Game could not be created", 500, "CREATE_FAILED");
+    }
     response::json(request, env, &json!({ "success": true, "game": { "id": id, "name": name, "shortName": "", "status": "DRAFT", "version": "---", "players": "---", "visitors": "---", "revenue": "---", "availableBalance": "---", "escrowedBalance": "---", "createdAt": now, "profile": { "description": "", "coverImage": "", "animationUrl": "" } } }), 201)
 }
 
 async fn update(game_id: &str, request: &mut Request, env: &Env) -> Result<Response> {
     let claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
-    let body = request.json::<Value>().await.unwrap_or_else(|_| json!({}));
+    let body = match request.json::<Value>().await {
+        Ok(value) if value.is_object() => value,
+        _ => return response::error(request, env, "Invalid JSON body", 400, "INVALID_JSON"),
+    };
     let database = db::database(env)?;
     let existing = db::first(&database, "SELECT * FROM games WHERE id = ? AND (creator_principal = ? OR ? = 'admin')", &[json!(game_id), json!(claims.principal_id.clone()), json!(claims.role)]).await?;
     let Some(existing) = existing else { return response::error(request, env, "Game not found", 404, "NOT_FOUND"); };
@@ -135,19 +146,38 @@ async fn update(game_id: &str, request: &mut Request, env: &Env) -> Result<Respo
     let short_name = body.get("shortName").and_then(Value::as_str).map(|value| value.trim().to_lowercase()).or_else(|| db::string(&existing, "short_name")).unwrap_or_default();
     if !short_name.is_empty() && !short_name.chars().all(|value| value.is_ascii_lowercase() || value.is_ascii_digit() || value == '-') { return response::error(request, env, "Short name may contain only lowercase letters, numbers, and hyphens", 400, "INVALID_SHORT_NAME"); }
     let status = body.get("status").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "status")).unwrap_or_else(|| "DRAFT".to_string());
+    if !matches!(status.as_str(), "DRAFT" | "DEVELOPMENT" | "PRIVATE_TESTING" | "PENDING_REVIEW" | "REJECTED" | "APPROVED" | "PUBLIC_ACTIVE" | "MAINTENANCE" | "ARCHIVED") {
+        return response::error(request, env, "Invalid game status", 400, "INVALID_STATUS");
+    }
     if status == "PUBLIC_ACTIVE" { return response::error(request, env, "Public active status can only be set by the public release operation", 409, "PUBLIC_RELEASE_REQUIRED"); }
     if status == "APPROVED" && !auth::has_role(&claims, "admin") { return response::error(request, env, "Only an administrator can approve a game for public release", 403, "PUBLIC_APPROVAL_REQUIRED"); }
     let display = body.get("displayVersion").or_else(|| profile.get("displayVersion")).and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "display_version")).unwrap_or_default();
     let description = profile.get("description").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "description"));
     let cover = profile.get("coverImage").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "cover_image"));
     let animation = profile.get("animationUrl").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "animation_url"));
-    db::run(&database, "UPDATE games SET name = ?, short_name = ?, status = ?, display_version = ?, description = ?, cover_image = ?, animation_url = ?, updated_at = ? WHERE id = ?", &[json!(name), json!(short_name), json!(status), json!(display), json!(description), json!(cover), json!(animation), json!(js_sys::Date::now() as i64), json!(game_id)]).await?;
+    let category = profile.get("category").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "category"));
+    let age_rating = profile.get("ageRating").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "age_rating"));
+    let device_support = profile.get("deviceSupport").and_then(Value::as_str).map(ToOwned::to_owned).or_else(|| db::string(&existing, "device_support"));
+    if let Some(value) = category.as_deref() {
+        if !matches!(value, "Arcade" | "Card & Board" | "Casino" | "Music" | "Puzzle" | "Role-Playing" | "Simulation" | "Sports" | "Strategy" | "Trivia" | "Word") { return response::error(request, env, "Invalid game category", 400, "INVALID_CATEGORY"); }
+    }
+    if let Some(value) = age_rating.as_deref() {
+        if !matches!(value, "All Ages" | "18+" | "NSFW") { return response::error(request, env, "Invalid age rating", 400, "INVALID_AGE_RATING"); }
+    }
+    if let Some(value) = device_support.as_deref() {
+        if !matches!(value, "PC" | "Mobile" | "Responsive") { return response::error(request, env, "Invalid device support", 400, "INVALID_DEVICE_SUPPORT"); }
+    }
+    if db::run_changes(&database, "UPDATE games SET name = ?, short_name = ?, status = ?, display_version = ?, description = ?, cover_image = ?, animation_url = ?, category = ?, age_rating = ?, device_support = ?, updated_at = ? WHERE id = ? AND (creator_principal = ? OR ? = 'admin')", &[json!(name), json!(short_name), json!(status), json!(display), json!(description), json!(cover), json!(animation), json!(category), json!(age_rating), json!(device_support), json!(js_sys::Date::now() as i64), json!(game_id), json!(claims.principal_id), json!(claims.role)]).await? != 1 {
+        return response::error(request, env, "Game not found", 404, "NOT_FOUND");
+    }
     response::json(request, env, &json!({ "success": true }), 200)
 }
 
 async fn delete(game_id: &str, request: &Request, env: &Env) -> Result<Response> {
     let claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
     let database = db::database(env)?;
-    db::run(&database, "DELETE FROM games WHERE id = ? AND (creator_principal = ? OR ? = 'admin')", &[json!(game_id), json!(claims.principal_id), json!(claims.role)]).await?;
+    if db::run_changes(&database, "DELETE FROM games WHERE id = ? AND (creator_principal = ? OR ? = 'admin')", &[json!(game_id), json!(claims.principal_id), json!(claims.role)]).await? != 1 {
+        return response::error(request, env, "Game not found", 404, "NOT_FOUND");
+    }
     response::json(request, env, &json!({ "success": true }), 200)
 }

@@ -187,30 +187,38 @@ export function Publish(): React.ReactElement {
   }, [gameId]);
 
   // Handle saving the creator's customized player-facing display version
-  const handleSaveDisplayVersion = () => {
+  const handleSaveDisplayVersion = async () => {
     if (!gameId) return;
     const trimmed = customVersionInput.trim() || "v1.0.0";
-    const res = updateGame(gameId, {
-      displayVersion: trimmed,
-      version: trimmed
-    });
-    if (res) {
-      setGame(res);
-      setVersionSaveSuccess(true);
-      setIsEditingVersion(false);
-      setTimeout(() => setVersionSaveSuccess(false), 2500);
+    try {
+      const res = await updateGame(gameId, {
+        displayVersion: trimmed,
+        version: trimmed
+      });
+      if (res) {
+        setGame(res);
+        setVersionSaveSuccess(true);
+        setIsEditingVersion(false);
+        setTimeout(() => setVersionSaveSuccess(false), 2500);
+      }
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : "Unable to save display version");
     }
   };
 
   // Inline rename if game name uniqueness failed
-  const handleUpdateName = (e: React.FormEvent) => {
+  const handleUpdateName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!gameId || !editNameInput.trim()) return;
-    const res = updateGame(gameId, { name: editNameInput.trim() });
-    if (res) {
-      setGame(res);
-      setNameSaveMsg("Game name updated. Re-checking uniqueness...");
-      setTimeout(() => setNameSaveMsg(null), 3000);
+    try {
+      const res = await updateGame(gameId, { name: editNameInput.trim() });
+      if (res) {
+        setGame(res);
+        setNameSaveMsg("Game name updated. Re-checking uniqueness...");
+        setTimeout(() => setNameSaveMsg(null), 3000);
+      }
+    } catch (error) {
+      setNameSaveMsg(error instanceof Error ? error.message : "Unable to update game name");
     }
   };
 
@@ -265,7 +273,7 @@ export function Publish(): React.ReactElement {
         });
         // Update game status to PRIVATE_TESTING if it was DRAFT
         if (game?.status === 'DRAFT' || game?.status === 'DEVELOPMENT') {
-          updateGame(gameId, { status: 'PRIVATE_TESTING' });
+          await updateGame(gameId, { status: 'PRIVATE_TESTING' });
         }
         setShowReplaceConfirmModal(false);
         setShowPrivateModal(true);
@@ -321,13 +329,8 @@ export function Publish(): React.ReactElement {
     setIsPublishingPublic(true);
     setModalError(null);
     try {
-      await gameApi.updateGame(gameId, {
+      const updated = await updateGame(gameId, {
         name: game.name.trim(),
-        shortName: publicGame.shortName,
-        status: 'PENDING_REVIEW',
-        displayVersion: customVersionInput.trim() || game?.version || 'v1.0.0'
-      });
-      const updated = updateGame(gameId, {
         shortName: publicGame.shortName,
         status: 'PENDING_REVIEW',
         displayVersion: customVersionInput.trim() || game.version || 'v1.0.0'
@@ -341,15 +344,17 @@ export function Publish(): React.ReactElement {
     }
   };
 
-  const handleExecuteDelist = () => {
+  const handleExecuteDelist = async () => {
     if (!gameId) return;
     setIsDelisting(true);
     try {
-      updateGame(gameId, {
+      await updateGame(gameId, {
         status: 'DEVELOPMENT'
       });
       setShowDelistModal(false);
       setDelistReason("");
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : "Unable to delist game");
     } finally {
       setIsDelisting(false);
     }

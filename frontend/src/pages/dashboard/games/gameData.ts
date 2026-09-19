@@ -1,4 +1,5 @@
 import { gameApi } from "../../../services/gameApi";
+import { ApiError } from "../../../services/apiClient";
 
 export type GameStatus =
   | 'DRAFT'
@@ -160,6 +161,14 @@ function generateGameId(): string {
 export async function syncGamesWithBackend(): Promise<Game[]> {
   const backendGames = await gameApi.getGames();
   const games = Array.isArray(backendGames) ? backendGames : [];
+  const cachedGames = getStoredGames();
+  const cachedDrafts = cachedGames.filter((game) => game.status === "DRAFT");
+  if (games.length === 0 && cachedDrafts.length > 0) {
+    await Promise.all(cachedDrafts.map((game) => ensureGamePersisted(game.id, game.name)));
+    const persistedGames = await gameApi.getGames();
+    saveStoredGames(persistedGames);
+    return persistedGames;
+  }
   saveStoredGames(games);
   return games;
 }
@@ -168,7 +177,10 @@ export async function ensureGamePersisted(gameId: string, gameName: string): Pro
   try {
     await gameApi.getGame(gameId);
     return;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) {
+      throw error;
+    }
     await gameApi.createGame({ id: gameId, name: gameName.trim() || "New Game" });
   }
 }
@@ -197,7 +209,7 @@ export async function createNextNewGameAsync(): Promise<Game> {
 /**
  * Updates game profile and metadata, persisting to backend
  */
-export function updateGame(id: string, updates: Partial<Game>): Game | undefined {
+export async function updateGame(id: string, updates: Partial<Game>): Promise<Game | undefined> {
   const games = getStoredGames();
   const index = games.findIndex((g) => g.id === id);
   if (index === -1) return undefined;
@@ -217,24 +229,24 @@ export function updateGame(id: string, updates: Partial<Game>): Game | undefined
           coverImage: updates.profile.coverImage ?? current.profile?.coverImage ?? '',
           animationUrl: updates.profile.animationUrl ?? current.profile?.animationUrl ?? '',
           savedAt: updates.profile.savedAt ?? new Date().toISOString(),
-          displayVersion: updates.profile.displayVersion ?? updates.displayVersion ?? current.profile?.displayVersion ?? current.displayVersion ?? ''
+          displayVersion: updates.profile.displayVersion ?? updates.displayVersion ?? current.profile?.displayVersion ?? current.displayVersion ?? '',
+          category: updates.profile.category ?? current.profile?.category,
+          ageRating: updates.profile.ageRating ?? current.profile?.ageRating,
+          deviceSupport: updates.profile.deviceSupport ?? current.profile?.deviceSupport,
         }
       : current.profile
   };
 
-  games[index] = updatedGame;
-  saveStoredGames(games);
-
-  // Send update to backend API
-  gameApi.updateGame(id, {
+  await gameApi.updateGame(id, {
     name: updatedGame.name,
     shortName: updatedGame.shortName,
     status: updatedGame.status,
-    profile: updatedGame.profile
-  }).catch(err => {
-    console.error(`Failed to update game ${id} on backend:`, err);
+    displayVersion: updatedGame.displayVersion,
+    profile: updatedGame.profile,
   });
 
+  games[index] = updatedGame;
+  saveStoredGames(games);
   return updatedGame;
 }
 
@@ -244,17 +256,9 @@ export function updateGame(id: string, updates: Partial<Game>): Game | undefined
 export async function deleteGame(id: string): Promise<boolean> {
   const games = getStoredGames();
   const filtered = games.filter((g) => g.id !== id);
-  
-  if (filtered.length !== games.length) {
-    saveStoredGames(filtered);
-  }
 
-  // Delete from backend API
-  try {
-    await gameApi.deleteGame(id);
-  } catch (err) {
-    console.error(`Failed to delete game ${id} on backend:`, err);
-  }
+  await gameApi.deleteGame(id);
+  if (filtered.length !== games.length) saveStoredGames(filtered);
 
   return true;
 }

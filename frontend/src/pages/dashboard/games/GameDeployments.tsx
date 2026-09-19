@@ -62,14 +62,18 @@ export function GameDeployments(): React.ReactElement {
     setNameSaveMsg(null);
   };
 
-  const handleUpdateName = (e: React.FormEvent) => {
+  const handleUpdateName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!gameId || !editNameInput.trim()) return;
-    const res = updateGame(gameId, { name: editNameInput.trim() });
-    if (res) {
-      setGame(res);
-      setNameSaveMsg("Game name updated. Re-checking uniqueness...");
-      setTimeout(() => setNameSaveMsg(null), 3000);
+    try {
+      const res = await updateGame(gameId, { name: editNameInput.trim() });
+      if (res) {
+        setGame(res);
+        setNameSaveMsg("Game name updated. Re-checking uniqueness...");
+        setTimeout(() => setNameSaveMsg(null), 3000);
+      }
+    } catch (error) {
+      setNameSaveMsg(error instanceof Error ? error.message : "Unable to update game name");
     }
   };
 
