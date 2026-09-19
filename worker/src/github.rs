@@ -115,7 +115,10 @@ async fn github_response<T: DeserializeOwned>(
 }
 
 async fn github_user_profile(env: &Env, code: &str) -> std::result::Result<GithubUserProfile, GithubError> {
-    let client_id = env.var("GITHUB_CLIENT_ID").map(|value| value.to_string()).map_err(|_| GithubError::new(503, "GitHub OAuth credentials are not configured"))?;
+    let client_id = env.var("GITHUB_CLIENT_ID")
+        .map(|value| value.to_string())
+        .or_else(|_| env.secret("GITHUB_CLIENT_ID").map(|value| value.to_string()))
+        .map_err(|_| GithubError::new(503, "GitHub OAuth credentials are not configured"))?;
     let client_secret = env.secret("GITHUB_CLIENT_SECRET").map(|value| value.to_string()).or_else(|_| env.var("GITHUB_CLIENT_SECRET").map(|value| value.to_string())).map_err(|_| GithubError::new(503, "GitHub OAuth credentials are not configured"))?;
 
     let mut headers = Headers::new();
