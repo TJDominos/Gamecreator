@@ -39,6 +39,7 @@ import {
   useNavigate,
 } from "react-router";
 import { createNextNewGameAsync, syncGamesWithBackend } from "./games/gameData";
+import { githubApi } from "../../services/githubApi";
 import { useGamesStore } from "../../state/gamesStore";
 import { CreatorAccessGate, DashboardAccessGate } from "./DashboardAccessGate";
 import { useAuth } from "../../auth/AuthContext";
@@ -302,6 +303,19 @@ function PortalShell(): React.ReactElement {
   const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const installationId = Number(params.get("installation_id"));
+    if (params.get("github_installation_pending") !== "true" || !Number.isSafeInteger(installationId) || installationId <= 0) return;
+    const gameId = window.localStorage.getItem("randseed:github-pending-game-id");
+    if (!gameId) return;
+    window.localStorage.removeItem("randseed:github-pending-game-id");
+    void githubApi.claimInstallation(installationId, gameId).then((result) => {
+      if (!result.success) return;
+      navigate(`/dashboard/games/${encodeURIComponent(gameId)}/publish?github_installed=true&installation_id=${installationId}`, { replace: true });
+    });
+  }, [location.search, navigate]);
 
   const navItems = React.useMemo(() => {
     return [...navigation];

@@ -56,6 +56,8 @@ pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>>
         (Method::Get, "/api/github/install") => Ok(Some(install(request, env).await?)),
         (Method::Get, "/api/github/repositories") => Ok(Some(list_repositories(request, env).await?)),
         (Method::Get, "/api/github/callback") => Ok(Some(callback(request, env).await?)),
+        (Method::Post, "/api/github/claim") => Ok(Some(claim_installation(request, env).await?)),
+        (Method::Post, "/api/github/webhook") => Ok(Some(webhook(request, env).await?)),
         (Method::Post, "/api/webhooks/github") => Ok(Some(webhook(request, env).await?)),
         (Method::Post, "/api/sandbox/deploy") => Ok(Some(response::error(request, env, "Legacy deployment tokens are disabled; use GitHub Actions OIDC and the deployment upload API", 410, "LEGACY_DEPLOY_DISABLED")?)),
         _ => {
@@ -170,10 +172,7 @@ async fn github_status(
 }
 
 fn app_jwt(env: &Env) -> std::result::Result<String, GithubError> {
-    let app_id = env.var("GITHUB_APP_ID")
-        .map(|value| value.to_string())
-        .or_else(|_| env.secret("GITHUB_APP_ID").map(|value| value.to_string()))
-        .map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))?;
+    let app_id = github_app_id(env)?;
     let private_key = env.secret("GITHUB_APP_PRIVATE_KEY").map(|value| value.to_string()).or_else(|_| env.var("GITHUB_APP_PRIVATE_KEY").map(|value| value.to_string())).map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))?;
     let key_text = private_key.replace("\\n", "\n");
     let key = RsaPrivateKey::from_pkcs8_pem(&key_text).or_else(|_| RsaPrivateKey::from_pkcs1_pem(&key_text)).map_err(|_| GithubError::new(503, "Invalid GitHub App private key"))?;
@@ -183,6 +182,24 @@ fn app_jwt(env: &Env) -> std::result::Result<String, GithubError> {
     let message = format!("{header}.{payload}");
     let signature = SigningKey::<Sha256>::new(key).sign(message.as_bytes());
     Ok(format!("{message}.{}", URL_SAFE_NO_PAD.encode(signature.to_bytes())))
+}
+
+fn github_app_id(env: &Env) -> std::result::Result<String, GithubError> {
+    env.var("GITHUB_APP_ID")
+        .map(|value| value.to_string())
+        .or_else(|_| env.secret("GITHUB_APP_ID").map(|value| value.to_string()))
+        .map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))
+}
+
+fn verified_installation(installation: &Value, env: &Env) -> std::result::Result<(String, String, Value), GithubError> {
+    let expected_app_id = github_app_id(env)?.parse::<i64>().map_err(|_| GithubError::new(503, "Invalid GitHub App ID"))?;
+    if installation.get("app_id").and_then(Value::as_i64) != Some(expected_app_id) {
+        return Err(GithubError::new(403, "GitHub installation does not belong to this App"));
+    }
+    let account = installation.pointer("/account/login").and_then(Value::as_str).filter(|value| !value.is_empty()).ok_or_else(|| GithubError::new(502, "GitHub installation has no account"))?;
+    let account_type = installation.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
+    let permissions = installation.get("permissions").cloned().unwrap_or_else(|| json!({}));
+    Ok((account.to_string(), account_type.to_string(), permissions))
 }
 
 async fn installation_token(env: &Env, installation_id: i64) -> std::result::Result<String, GithubError> {
@@ -360,14 +377,32 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
         return response::error(request, env, &format!("GitHub authorization failed: {}", error_description.unwrap_or(error)), 400, "GITHUB_OAUTH_DENIED");
     }
     let installation_id = url.query_pairs().find(|(key, _)| key == "installation_id").and_then(|(_, value)| value.parse::<i64>().ok());
-    let state = url.query_pairs().find(|(key, _)| key == "state").map(|(_, value)| value.to_string()).unwrap_or_default();
+    let state = url.query_pairs().find(|(key, _)| key == "state").map(|(_, value)| value.to_string()).filter(|value| !value.is_empty());
     let code = url.query_pairs().find(|(key, _)| key == "code").map(|(_, value)| value.to_string()).filter(|value| !value.is_empty());
 
     let Some(installation_id) = installation_id.filter(|value| *value > 0) else {
         return response::error(request, env, "Missing installation_id in callback", 400, "MISSING_PARAM");
     };
 
-    let Some(claims) = auth::secret(env).ok().and_then(|secret| auth::verify(&state, &secret)) else {
+    if state.is_none() {
+        let installation = match installation_info(env, installation_id).await {
+            Ok(value) => value,
+            Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
+        };
+        if let Err(error) = verified_installation(&installation, env) {
+            return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR");
+        }
+        if let Err(error) = installation_repositories(env, installation_id).await {
+            return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR");
+        }
+        let main_url = env.var("MAIN_SITE_URL").map(|value| value.to_string()).unwrap_or_default();
+        let redirect = format!("{main_url}/dashboard?github_installation_pending=true&installation_id={installation_id}");
+        let mut response = Response::empty()?.with_status(302);
+        response.headers_mut().set("Location", &redirect)?;
+        return Ok(response);
+    }
+
+    let Some(claims) = auth::secret(env).ok().and_then(|secret| auth::verify(state.as_deref().unwrap_or_default(), &secret)) else {
         return response::error(request, env, "Invalid or expired installation state", 400, "INVALID_STATE");
     };
 
@@ -403,11 +438,10 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
         Ok(value) => value,
         Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
     };
-    let Some(account) = installation.pointer("/account/login").and_then(Value::as_str).filter(|value| !value.is_empty()) else {
-        return response::error(request, env, "GitHub installation has no account", 502, "GITHUB_API_ERROR");
+    let (account, account_type, permissions) = match verified_installation(&installation, env) {
+        Ok(value) => value,
+        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
     };
-    let account_type = installation.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
-    let permissions = installation.get("permissions").cloned().unwrap_or_else(|| json!({}));
     if db::run_changes(
         &database,
         "UPDATE github_oauth_states SET used_at = ? WHERE nonce = ? AND principal_id = ? AND (? = game_id OR (? IS NULL AND game_id IS NULL)) AND used_at IS NULL AND expires_at > ?",
@@ -441,6 +475,37 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
     let mut response = Response::empty()?.with_status(302);
     response.headers_mut().set("Location", &redirect)?;
     Ok(response)
+}
+
+async fn claim_installation(request: &mut Request, env: &Env) -> Result<Response> {
+    let claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
+    let body = request.json::<Value>().await.unwrap_or_else(|_| json!({}));
+    let installation_id = body.get("installation_id").and_then(Value::as_i64).filter(|value| *value > 0);
+    let game_id = body.get("game_id").and_then(Value::as_str).map(str::to_owned).filter(|value| !value.trim().is_empty());
+    let Some(installation_id) = installation_id else { return response::error(request, env, "Missing required 'installation_id' parameter", 400, "MISSING_INSTALLATION_ID"); };
+    let Some(game_id) = game_id else { return response::error(request, env, "Missing required 'game_id' parameter", 400, "MISSING_GAME_ID"); };
+    if !owns_game(&game_id, &claims, env).await? { return response::error(request, env, "You do not have access to this game", 403, "FORBIDDEN"); }
+    let installation = match installation_info(env, installation_id).await {
+        Ok(value) => value,
+        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
+    };
+    let (account, account_type, permissions) = match verified_installation(&installation, env) {
+        Ok(value) => value,
+        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
+    };
+    let database = db::database(env)?;
+    if let Some(existing) = db::first(&database, "SELECT owner_principal FROM github_installations WHERE installation_id = ?", &[json!(installation_id)]).await? {
+        if db::string(&existing, "owner_principal").as_deref() != Some(claims.principal_id.as_str()) {
+            return response::error(request, env, "GitHub installation is already claimed by another creator", 409, "INSTALLATION_CLAIMED");
+        }
+    }
+    let now = js_sys::Date::now() as i64;
+    db::run(
+        &database,
+        "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, updated_at = excluded.updated_at",
+        &[json!(format!("gh_inst_{installation_id}")), json!(installation_id), json!(account), json!(account_type), json!(claims.principal_id), json!(permissions.to_string()), json!(now), json!(now)],
+    ).await?;
+    response::json(request, env, &json!({ "success": true, "installation_id": installation_id }), 200)
 }
 
 async fn get_repo(game_id: &str, request: &Request, env: &Env) -> Result<Response> {

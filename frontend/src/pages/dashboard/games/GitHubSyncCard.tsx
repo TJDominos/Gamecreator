@@ -169,6 +169,7 @@ export function GitHubSyncCard({
         throw new Error("GitHub App installation URL was not returned.");
       }
       setInstallUrl(info.install_url);
+      window.localStorage.setItem("randseed:github-pending-game-id", gameId);
       window.location.assign(info.install_url);
     } catch (error) {
       setInstallError(
