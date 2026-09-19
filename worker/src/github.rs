@@ -290,7 +290,9 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
     let account_type = installation.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
     let permissions = installation.get("permissions").cloned().unwrap_or_else(|| json!({}));
     let now = js_sys::Date::now() as i64;
-    db::run(&db::database(env)?, "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, updated_at = excluded.updated_at", &[json!(format!("gh_inst_{installation_id}")), json!(installation_id), json!(account), json!(account_type), json!(claims.principal_id), json!(permissions.to_string()), json!(now), json!(now)]).await?;
+    let database = db::database(env)?;
+    let installation_statement = db::statement(&database, "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, updated_at = excluded.updated_at", &[json!(format!("gh_inst_{installation_id}")), json!(installation_id), json!(account), json!(account_type), json!(claims.principal_id), json!(permissions.to_string()), json!(now), json!(now)])?;
+    db::run(&database, "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, updated_at = excluded.updated_at", &[json!(format!("gh_inst_{installation_id}")), json!(installation_id), json!(account), json!(account_type), json!(claims.principal_id), json!(permissions.to_string()), json!(now), json!(now)]).await?;
     let main_url = env.var("MAIN_SITE_URL").map(|value| value.to_string()).unwrap_or_default();
     let redirect_path = claims.game_id.as_deref().map(|game_id| format!("/dashboard/games/{}/publish", urlencoding::encode(game_id))).unwrap_or_else(|| "/dashboard/games".to_string());
     let redirect = format!("{main_url}{redirect_path}?github_installed=true&installation_id={installation_id}");
@@ -323,15 +325,26 @@ async fn link_repo(game_id: &str, request: &mut Request, env: &Env) -> Result<Re
         Ok(value) => value,
         Err(error) => return response::error(request, env, &error.message, 502, "GITHUB_API_ERROR"),
     };
+    let existing_binding = db::first(&database, "SELECT installation_id, repo_full_name FROM game_repo_bindings WHERE game_id = ?", &[json!(game_id)]).await?;
+    if let Some(existing_binding) = existing_binding {
+        let existing_installation = existing_binding.get("installation_id").and_then(Value::as_i64);
+        let same_repository = db::string(&existing_binding, "repo_full_name")
+            .map(|value| value.eq_ignore_ascii_case(&repository))
+            .unwrap_or(false);
+        if existing_installation != Some(installation) || !same_repository {
+            return response::error(request, env, "This game is already locked to a different GitHub repository", 409, "REPOSITORY_LOCKED");
+        }
+    }
     let now = js_sys::Date::now() as i64;
-    db::run(&database, "INSERT INTO game_repo_bindings (game_id, installation_id, repo_full_name, default_branch, sync_token_hash, sync_method, sync_status, sandbox_url, build_dir, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'github_action', 'outdated', ?, ?, ?, ?) ON CONFLICT(game_id) DO UPDATE SET installation_id = excluded.installation_id, repo_full_name = excluded.repo_full_name, default_branch = excluded.default_branch, sync_token_hash = excluded.sync_token_hash, sync_method = excluded.sync_method, sync_status = excluded.sync_status, sandbox_url = excluded.sandbox_url, build_dir = excluded.build_dir, updated_at = excluded.updated_at", &[json!(game_id), json!(installation), json!(repository.clone()), json!(branch.clone()), json!(format!("oidc-only:{game_id}:{now}")), json!(format!("/sandbox/{game_id}")), json!(build_dir), json!(now), json!(now)]).await?;
+    db::run(&database, "INSERT INTO game_repo_bindings (game_id, installation_id, repo_full_name, default_branch, sync_token_hash, sync_method, sync_status, sandbox_url, build_dir, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'github_action', 'outdated', ?, ?, ?, ?) ON CONFLICT(game_id) DO UPDATE SET installation_id = excluded.installation_id, repo_full_name = excluded.repo_full_name, default_branch = excluded.default_branch, sync_token_hash = excluded.sync_token_hash, sync_method = excluded.sync_method, sync_status = excluded.sync_status, sandbox_url = excluded.sandbox_url, build_dir = excluded.build_dir, updated_at = excluded.updated_at", &[json!(game_id), json!(installation), json!(repository.clone()), json!(branch.clone()), json!(format!("oidc-only:{game_id}:{now}")), json!(format!("/sandbox/{game_id}")), json!(build_dir), json!(now)]).await?;
     response::json(request, env, &json!({ "success": true, "message": "Repository successfully linked!", "binding": { "game_id": game_id, "repository": repository, "branch": branch, "sandbox_url": format!("/sandbox/{game_id}"), "deployment_auth": "github_actions_oidc" } }), 200)
 }
 
 async fn unlink_repo(game_id: &str, request: &Request, env: &Env) -> Result<Response> {
     let claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
     if !owns_game(game_id, &claims, env).await? { return response::error(request, env, "You do not have access to this game", 403, "FORBIDDEN"); }
-    db::run(&db::database(env)?, "DELETE FROM game_repo_bindings WHERE game_id = ?", &[json!(game_id)]).await?;
+    let database = db::database(env)?;
+    db::run(&database, "DELETE FROM game_repo_bindings WHERE game_id = ?", &[json!(game_id)]).await?;
     response::json(request, env, &json!({ "success": true, "message": format!("Repository unlinked from game {game_id}") }), 200)
 }
 

@@ -13,16 +13,11 @@ import {
   ExternalLink, 
   ChevronDown, 
   Link2Off, 
-  RefreshCw, 
-  ShieldCheck, 
   ArrowUpRight, 
-  AlertCircle,
   Copy 
 } from "lucide-react";
-import { ensureGamePersisted, getGameById, updateGame, GAMES_UPDATED_EVENT, type GameRepoInfo } from "./gameData";
-import { githubApi, type GitHubRepositoryOption } from "../../../services/githubApi";
-
-const GITHUB_APP_SLUG = "RDcreatordev";
+import { getGameById, updateGame, GAMES_UPDATED_EVENT, type GameRepoInfo } from "./gameData";
+import { githubApi } from "../../../services/githubApi";
 
 export type GameStatus = 'DRAFT' | 'DEVELOPMENT' | 'PRIVATE_TESTING' | 'PENDING_REVIEW' | 'REJECTED' | 'APPROVED' | 'PUBLIC_ACTIVE' | 'MAINTENANCE' | 'ARCHIVED';
 
@@ -55,20 +50,7 @@ export function GameConsole(): React.ReactElement {
   const [repoInfo, setRepoInfo] = useState<GameRepoInfo>(emptyRepoInfo);
   const [isDisconnected, setIsDisconnected] = useState(true);
   const [showGithubMenu, setShowGithubMenu] = useState(false);
-  const [showConnectModal, setShowConnectModal] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
-
-  // Connect modal state
-  const [repoInput, setRepoInput] = useState("");
-  const [branchInput, setBranchInput] = useState("main");
-  const [buildDirInput, setBuildDirInput] = useState("dist");
-  const [isLinking, setIsLinking] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const [installUrl, setInstallUrl] = useState<string | null>(null);
-  const [installationId, setInstallationId] = useState<number | null>(null);
-  const [isOpeningGitHub, setIsOpeningGitHub] = useState(false);
-  const [availableRepositories, setAvailableRepositories] = useState<GitHubRepositoryOption[]>([]);
-  const [isLoadingRepositories, setIsLoadingRepositories] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -88,80 +70,10 @@ export function GameConsole(): React.ReactElement {
       const res = await githubApi.getGameRepo(gameId);
       if (res.success && res.repo_info) {
         setRepoInfo(res.repo_info);
-        setRepoInput(res.repo_info.repository);
-        setBranchInput(res.repo_info.branch || "main");
         setIsDisconnected(false);
       }
     } catch {
       setIsDisconnected(true);
-    }
-  };
-
-  const loadRepositories = async (nextInstallationId: number) => {
-    setIsLoadingRepositories(true);
-    setLinkError(null);
-    try {
-      const response = await githubApi.listRepositories(nextInstallationId);
-      if (!response.success) {
-        throw new Error(response.error || "Unable to load GitHub repositories.");
-      }
-      const repositories = response.repositories || [];
-      setAvailableRepositories(repositories);
-      setRepoInput(current => repositories.some(repository => repository.full_name === current)
-        ? current
-        : repositories[0]?.full_name || "");
-      const selected = repositories.find(repository => repository.full_name === repoInput);
-      setBranchInput(selected?.default_branch || repositories[0]?.default_branch || "main");
-      if (repositories.length === 0) {
-        setLinkError("No repositories are available from this GitHub App installation.");
-      }
-    } catch (error) {
-      setAvailableRepositories([]);
-      setLinkError(error instanceof Error ? error.message : "Unable to load GitHub repositories.");
-    } finally {
-      setIsLoadingRepositories(false);
-    }
-  };
-
-  const handleInstallationReady = (nextInstallationId: number) => {
-    setInstallationId(nextInstallationId);
-    setIsOpeningGitHub(false);
-    setLinkError(null);
-    setShowConnectModal(true);
-    void loadRepositories(nextInstallationId);
-  };
-
-  const handleConnectGitHub = async () => {
-    setIsOpeningGitHub(true);
-    setLinkError(null);
-    const popup = window.open(
-      "about:blank",
-      "randseed-github-install",
-      "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
-    );
-    if (!popup) {
-      setLinkError("GitHub could not be opened. Please allow popups and try again.");
-      setIsOpeningGitHub(false);
-      return;
-    }
-    try {
-      const info = await githubApi.getInstallInfo(gameId || "");
-      if (!info.install_url) {
-        throw new Error("GitHub App installation URL was not returned.");
-      }
-      setInstallUrl(info.install_url);
-      popup.location.href = info.install_url;
-      popup.focus();
-      const closePollId = window.setInterval(() => {
-        if (popup.closed) {
-          window.clearInterval(closePollId);
-          setIsOpeningGitHub(false);
-        }
-      }, 500);
-    } catch (error) {
-      popup.close();
-      setLinkError(error instanceof Error ? error.message : "Unable to open GitHub. Please try again.");
-      setIsOpeningGitHub(false);
     }
   };
 
@@ -185,23 +97,10 @@ export function GameConsole(): React.ReactElement {
     return () => window.removeEventListener(GAMES_UPDATED_EVENT, handleUpdate);
   }, [gameId]);
 
-  // Sync install info & game repo from API
+  // Sync the current repository binding for the header.
   useEffect(() => {
     if (!gameId) return;
     let isMounted = true;
-
-    const handleInstallationMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.data?.type !== "randseed:github-installed") return;
-      const parsedInstallationId = Number(event.data.installationId);
-      if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
-      handleInstallationReady(parsedInstallationId);
-      void refreshRepoInfo();
-    };
-
-    window.addEventListener("message", handleInstallationMessage);
-    githubApi.getInstallInfo(gameId).then(info => {
-      if (isMounted && info.install_url) setInstallUrl(info.install_url);
-    }).catch(() => {});
 
     githubApi.getGameRepo(gameId).then(res => {
       if (isMounted && res.success && res.repo_info) {
@@ -210,28 +109,8 @@ export function GameConsole(): React.ReactElement {
       }
     }).catch(() => setIsDisconnected(true));
 
-    const params = new URLSearchParams(window.location.search);
-    const callbackInstallationId = Number(params.get("installation_id"));
-    if (
-      params.get("github_installed") === "true" &&
-      Number.isSafeInteger(callbackInstallationId) &&
-      callbackInstallationId > 0
-    ) {
-      if (window.opener && window.opener !== window) {
-        window.opener.postMessage(
-          { type: "randseed:github-installed", installationId: callbackInstallationId },
-          window.location.origin,
-        );
-        window.close();
-      } else {
-        handleInstallationReady(callbackInstallationId);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
-
     return () => {
       isMounted = false;
-      window.removeEventListener("message", handleInstallationMessage);
     };
   }, [gameId]);
 
@@ -274,47 +153,6 @@ export function GameConsole(): React.ReactElement {
     }
   };
 
-  const handleLinkRepository = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!repoInput.trim()) {
-      setLinkError("Repository name is required.");
-      return;
-    }
-    setIsLinking(true);
-    setLinkError(null);
-    if (!gameId) {
-      setLinkError("A game is required before connecting a repository.");
-      return;
-    }
-    try {
-      await ensureGamePersisted(gameId, game?.name || gameName);
-      const res = await githubApi.linkGameRepo(gameId, {
-        repository: repoInput.trim(),
-        branch: branchInput.trim() || 'main',
-        build_dir: buildDirInput.trim() || 'dist',
-        installation_id: installationId || undefined,
-      });
-      if (res && res.success && res.binding) {
-        setRepoInfo(prev => ({
-          ...prev,
-          repository: res.binding.repository,
-          branch: res.binding.branch,
-          lastSyncedAt: "Never",
-          isSynced: false
-        }));
-        setIsDisconnected(false);
-        setShowConnectModal(false);
-        await refreshRepoInfo();
-      } else {
-        setLinkError(res.error || "Failed to link repository.");
-      }
-    } catch (err) {
-      setLinkError(err instanceof Error ? err.message : "Failed to link repository");
-    } finally {
-      setIsLinking(false);
-    }
-  };
-
   const handleUnlinkConfirm = async () => {
     if (!gameId) return;
     try {
@@ -325,7 +163,7 @@ export function GameConsole(): React.ReactElement {
       setShowUnlinkModal(false);
       setIsDisconnected(true);
     } catch (err) {
-      setLinkError(err instanceof Error ? err.message : "Failed to disconnect repository");
+      setNameError(err instanceof Error ? err.message : "Failed to disconnect repository");
     }
   };
 
@@ -388,11 +226,9 @@ export function GameConsole(): React.ReactElement {
                 if (hasActiveRepo) {
                   setShowGithubMenu(prev => !prev);
                 } else {
-                  void handleConnectGitHub();
+                  window.dispatchEvent(new CustomEvent("randseed:open-github-connect", { detail: { gameId } }));
                 }
               }}
-              disabled={isOpeningGitHub}
-              aria-busy={isOpeningGitHub}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -404,8 +240,7 @@ export function GameConsole(): React.ReactElement {
                 borderRadius: '8px',
                 fontSize: '13px',
                 fontWeight: 600,
-                cursor: isOpeningGitHub ? 'wait' : 'pointer',
-                opacity: isOpeningGitHub ? 0.7 : 1,
+                cursor: 'pointer',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                 transition: 'background 0.15s ease'
               }}
@@ -413,7 +248,7 @@ export function GameConsole(): React.ReactElement {
               <Github size={16} />
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
                 <span style={{ fontSize: '13px', fontWeight: 600 }}>
-                  {isOpeningGitHub ? "Opening GitHub..." : hasActiveRepo ? repoInfo.repository.split('/')[1] || repoInfo.repository : "GitHub"}
+                  {hasActiveRepo ? repoInfo.repository.split('/')[1] || repoInfo.repository : "GitHub"}
                 </span>
                 {hasActiveRepo && (
                   <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400 }}>
@@ -486,32 +321,6 @@ export function GameConsole(): React.ReactElement {
                         </span>
                         <ArrowUpRight size={12} color="#9ca3af" />
                       </a>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowGithubMenu(false);
-                          setShowConnectModal(true);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 12px',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          color: '#374151',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          textAlign: 'left'
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <RefreshCw size={14} /> Switch / Reconnect Repo
-                      </button>
 
                       <button
                         type="button"
@@ -606,156 +415,6 @@ export function GameConsole(): React.ReactElement {
       </nav>
 
       <Outlet context={{ status, setStatus: handleStatusChange }} />
-
-      {/* Connect Modal */}
-      {showConnectModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 120, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.6)', padding: '20px' }}>
-          <div style={{ background: '#fff', borderRadius: '18px', padding: '32px', maxWidth: '540px', width: '100%', textAlign: 'left', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f5f3ff', display: 'grid', placeItems: 'center', color: '#7c3aed' }}>
-                  <Github size={22} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#111827' }}>Connect GitHub Repository</h3>
-                  <span style={{ fontSize: '12px', color: '#7c3aed', fontWeight: 600 }}>via GitHub App: {GITHUB_APP_SLUG}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowConnectModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#9ca3af' }}
-              >
-                &times;
-              </button>
-            </div>
-
-            <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <ShieldCheck size={16} color="#16a34a" /> Step 1: Authorize {GITHUB_APP_SLUG}
-                  </div>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>
-                    Grant repository access to the official RandSeed GitHub App.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleConnectGitHub()}
-                  disabled={isOpeningGitHub}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '7px 14px',
-                    background: '#111827',
-                    color: '#fff',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    border: 'none',
-                    cursor: isOpeningGitHub ? 'wait' : 'pointer',
-                    opacity: isOpeningGitHub ? 0.5 : 1
-                  }}
-                >
-                  <span>Authorize on GitHub</span>
-                  <ArrowUpRight size={13} />
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleLinkRepository}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                  Step 2: Select Repository <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={repoInput}
-                    onChange={e => {
-                      const repository = availableRepositories.find(item => item.full_name === e.target.value);
-                      setRepoInput(e.target.value);
-                      if (repository) setBranchInput(repository.default_branch || "main");
-                    }}
-                    required
-                    disabled={isLoadingRepositories}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box', appearance: 'none', backgroundColor: '#fff', cursor: 'pointer' }}
-                  >
-                    <option value="" disabled>
-                      {isLoadingRepositories ? "Loading authorized repositories..." : "Select an authorized repository..."}
-                    </option>
-                    {availableRepositories.map(repository => (
-                      <option key={repository.full_name} value={repository.full_name}>
-                        {repository.full_name}{repository.private ? " (Private)" : ""}
-                      </option>
-                    ))}
-                    {repoInfo.repository && !availableRepositories.some(repository => repository.full_name === repoInfo.repository) && (
-                      <option value={repoInfo.repository}>{repoInfo.repository}</option>
-                    )}
-                  </select>
-                  <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                    Branch
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="main"
-                    value={branchInput}
-                    onChange={e => setBranchInput(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                    Build Output Dir
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="dist"
-                    value={buildDirInput}
-                    onChange={e => setBuildDirInput(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              {linkError && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle size={16} />
-                  <span>{linkError}</span>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowConnectModal(false)}
-                  style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #d1d5db', background: 'transparent', color: '#374151', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLinking}
-                  style={{ padding: '9px 20px', borderRadius: '8px', border: 'none', background: '#7c3aed', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: isLinking ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                  {isLinking ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
-                  <span>{isLinking ? "Connecting..." : "Link Repository"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Unlink Confirmation Modal */}
       {showUnlinkModal && (

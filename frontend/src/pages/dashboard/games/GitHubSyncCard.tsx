@@ -88,6 +88,33 @@ export function GitHubSyncCard({
     }
   };
 
+  const linkRepository = async (repository: string, branch: string, nextInstallationId: number) => {
+    await ensureGamePersisted(gameId, gameName);
+    const response = await githubApi.linkGameRepo(gameId, {
+      repository,
+      branch: branch || "main",
+      build_dir: buildDirInput.trim() || "dist",
+      installation_id: nextInstallationId,
+    });
+    if (!response.success || !response.binding) {
+      throw new Error(response.error || "Failed to link repository. Please check permissions.");
+    }
+
+    setRepoInfo(prev => ({
+      ...prev,
+      repository: response.binding?.repository || repository,
+      branch: response.binding?.branch || branch,
+      sandboxUrl: response.binding?.sandbox_url || prev.sandboxUrl,
+      isSynced: false,
+      lastSyncedAt: "Never",
+    }));
+    setIsDisconnected(false);
+    setShowConnectModal(false);
+    await refreshRepoInfo();
+    setSyncFeedback(`Repository successfully linked to ${response.binding.repository} via ${GITHUB_APP_SLUG}.`);
+    setTimeout(() => setSyncFeedback(null), 8000);
+  };
+
   const loadRepositories = async (nextInstallationId: number) => {
     setIsLoadingRepositories(true);
     setLinkError(null);
@@ -98,13 +125,20 @@ export function GitHubSyncCard({
       }
       const repositories = response.repositories || [];
       setAvailableRepositories(repositories);
-      setRepoInput(current => repositories.some(repository => repository.full_name === current)
-        ? current
-        : repositories[0]?.full_name || "");
-      const selected = repositories.find(repository => repository.full_name === repoInput);
+      const selected = repositories.find(repository => repository.full_name === repoInput) || repositories[0];
+      setRepoInput(selected?.full_name || "");
       setBranchInput(selected?.default_branch || repositories[0]?.default_branch || "main");
       if (repositories.length === 0) {
         setLinkError("No repositories are available from this GitHub App installation.");
+      } else if (repositories.length === 1 && selected) {
+        setIsLinking(true);
+        try {
+          await linkRepository(selected.full_name, selected.default_branch || "main", nextInstallationId);
+        } catch (error) {
+          setLinkError(error instanceof Error ? error.message : "Failed to link repository.");
+        } finally {
+          setIsLinking(false);
+        }
       }
     } catch (error) {
       setAvailableRepositories([]);
@@ -173,7 +207,30 @@ export function GitHubSyncCard({
       void refreshRepoInfo();
     };
 
+    const callbackStorageKey = `randseed:github-installed:${gameId}`;
+    const handleInstallationStorage = (event: StorageEvent) => {
+      if (event.key !== callbackStorageKey || !event.newValue) return;
+      try {
+        const parsedInstallationId = Number(JSON.parse(event.newValue).installationId);
+        if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
+        window.localStorage.removeItem(callbackStorageKey);
+        handleInstallationReady(parsedInstallationId);
+        void refreshRepoInfo();
+      } catch {
+        window.localStorage.removeItem(callbackStorageKey);
+      }
+    };
+
     window.addEventListener("message", handleInstallationMessage);
+    window.addEventListener("storage", handleInstallationStorage);
+
+    const handleOpenConnect = (event: Event) => {
+      const detail = (event as CustomEvent<{ gameId?: string }>).detail;
+      if (!detail?.gameId || detail.gameId === gameId) {
+        setShowConnectModal(true);
+      }
+    };
+    window.addEventListener("randseed:open-github-connect", handleOpenConnect);
 
     githubApi.getGameRepo(gameId).then(res => {
       if (isMounted && res.success && res.repo_info) {
@@ -199,6 +256,12 @@ export function GitHubSyncCard({
           window.location.origin,
         );
         window.close();
+      } else if (window.name === "randseed-github-install") {
+        window.localStorage.setItem(
+          callbackStorageKey,
+          JSON.stringify({ installationId: callbackInstallationId }),
+        );
+        window.close();
       } else {
         handleInstallationReady(callbackInstallationId);
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -208,6 +271,8 @@ export function GitHubSyncCard({
     return () => {
       isMounted = false;
       window.removeEventListener("message", handleInstallationMessage);
+      window.removeEventListener("storage", handleInstallationStorage);
+      window.removeEventListener("randseed:open-github-connect", handleOpenConnect);
     };
   }, [gameId]);
 
@@ -249,32 +314,10 @@ export function GitHubSyncCard({
     setLinkError(null);
 
     try {
-      await ensureGamePersisted(gameId, gameName);
-      const res = await githubApi.linkGameRepo(gameId, {
-        repository: repoInput.trim(),
-        branch: branchInput.trim() || "main",
-        build_dir: buildDirInput.trim() || "dist",
-        installation_id: installationId || undefined,
-      });
-
-      if (res.success && res.binding) {
-        setRepoInfo(prev => ({
-          ...prev,
-          repository: res.binding?.repository || repoInput.trim(),
-          branch: res.binding?.branch || branchInput.trim(),
-          sandboxUrl: res.binding?.sandbox_url || prev.sandboxUrl,
-          isSynced: false,
-          lastSyncedAt: "Never",
-        }));
-
-        setIsDisconnected(false);
-        setShowConnectModal(false);
-        await refreshRepoInfo();
-        setSyncFeedback(`Repository successfully linked to ${res.binding.repository} via ${GITHUB_APP_SLUG}.`);
-        setTimeout(() => setSyncFeedback(null), 8000);
-      } else {
-        setLinkError(res.error || "Failed to link repository. Please check permissions.");
+      if (!installationId) {
+        throw new Error("GitHub authorization is required before linking a repository.");
       }
+      await linkRepository(repoInput.trim(), branchInput.trim() || "main", installationId);
     } catch (err) {
       setLinkError(err instanceof Error ? err.message : "Failed to link repository");
     } finally {
@@ -696,37 +739,8 @@ export function GitHubSyncCard({
               </span>
             </div>
 
-            {/* Action buttons (Change/Reconnect, Unlink & Open on GitHub) */}
+            {/* Action buttons (Unlink & Open on GitHub) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setRepoInput(repoInfo.repository);
-                  setBranchInput(repoInfo.branch);
-                  setShowConnectModal(true);
-                }}
-                disabled={isLocked}
-                title="Change or reconfigure connected repository"
-                style={{
-                  height: '34px',
-                  padding: '0 10px',
-                  borderRadius: '8px',
-                  border: '1px solid #e5e7eb',
-                  background: '#f9fafb',
-                  color: '#374151',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: isLocked ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <RefreshCw size={13} />
-                <span>Change</span>
-              </button>
-
               <button
                 type="button"
                 onClick={() => setShowUnlinkModal(true)}
