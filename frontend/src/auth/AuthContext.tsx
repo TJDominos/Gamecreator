@@ -10,7 +10,7 @@ import React, {
 import type { UserProfileInfo } from "../types/userProfile";
 import { WLAuthClient } from "./wlAuthClient";
 import { authApi } from "../services/authApi";
-import { AUTH_UNAUTHORIZED_EVENT } from "../services/apiClient";
+import { ApiError, AUTH_UNAUTHORIZED_EVENT } from "../services/apiClient";
 import {
   sessionActions,
   sessionSelectors,
@@ -30,6 +30,19 @@ const ORGANIZATIONS_KEY = "randseed_developer_organizations";
 const AUTH_SYNC_CHANNEL = "randseed_creator_auth_sync";
 const SSO_VERIFIER_KEY = "randseed_sso_code_verifier";
 const SSO_STATE_KEY = "randseed_sso_state";
+
+async function refreshWithRetry(): Promise<Awaited<ReturnType<typeof authApi.refresh>>> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await authApi.refresh();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) throw error;
+      if (attempt === 2) throw error;
+      await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  throw new Error("Unable to restore the login session.");
+}
 
 const ALLOWED_SSO_ORIGINS = [
   "https://randseed.org",
@@ -305,7 +318,7 @@ export function AuthProvider({
         // The access token stays memory-only. The HttpOnly refresh cookie can
         // restore a fresh access token without exposing a credential to JS.
         try {
-          const response = await authApi.refresh();
+          const response = await refreshWithRetry();
           const uid = response.user.principal_id;
           const cachedProfile = profileCache.read(uid);
           const restoredProfile: UserProfile = {
@@ -540,7 +553,7 @@ export function AuthProvider({
         }
       } else if (data.type === "LOGIN") {
         try {
-          const response = await authApi.refresh();
+          const response = await refreshWithRetry();
           sessionActions.establishAuthenticated(response.token!, response.user.principal_id);
           setAccountId(response.user.principal_id);
           profileActions.hydrate(data.payload?.profile ?? null);

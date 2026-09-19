@@ -53,6 +53,8 @@ export interface CreateOrgInput {
   socialLinks?: [string, string];
 }
 
+let refreshPromise: Promise<MeResponse> | null = null;
+
 export const authApi = {
   async verifySSO(ssoCode: string, redirectUri: string, codeVerifier: string): Promise<SsoExchangeResponse> {
     return request<SsoExchangeResponse>("/api/auth/sso", {
@@ -68,9 +70,14 @@ export const authApi = {
   },
 
   async refresh(): Promise<MeResponse> {
-    return request<MeResponse>("/api/auth/refresh", {
-      method: "POST",
-    });
+    if (!refreshPromise) {
+      refreshPromise = request<MeResponse>("/api/auth/refresh", {
+        method: "POST",
+      }).finally(() => {
+        refreshPromise = null;
+      });
+    }
+    return refreshPromise;
   },
 
   async logout(): Promise<void> {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   Github, 
   ExternalLink, 
@@ -73,6 +73,7 @@ export function GitHubSyncCard({
   const [installationId, setInstallationId] = useState<number | null>(null);
   const [availableRepositories, setAvailableRepositories] = useState<GitHubRepositoryOption[]>([]);
   const [isLoadingRepositories, setIsLoadingRepositories] = useState(false);
+  const lastHandledInstallationId = useRef<number | null>(null);
 
   const refreshRepoInfo = async () => {
     try {
@@ -149,6 +150,8 @@ export function GitHubSyncCard({
   };
 
   const handleInstallationReady = (nextInstallationId: number) => {
+    if (lastHandledInstallationId.current === nextInstallationId) return;
+    lastHandledInstallationId.current = nextInstallationId;
     setInstallationId(nextInstallationId);
     setIsOpeningGitHub(false);
     setInstallError(null);
@@ -157,6 +160,7 @@ export function GitHubSyncCard({
   };
 
   const handleConnectGitHub = async () => {
+    lastHandledInstallationId.current = null;
     setIsOpeningGitHub(true);
     setInstallError(null);
     const popup = window.open(
@@ -181,6 +185,24 @@ export function GitHubSyncCard({
         if (popup.closed) {
           window.clearInterval(closePollId);
           setIsOpeningGitHub(false);
+          return;
+        }
+        try {
+          const callbackUrl = new URL(popup.location.href);
+          const callbackInstallationId = Number(callbackUrl.searchParams.get("installation_id"));
+          if (
+            callbackUrl.origin === window.location.origin &&
+            callbackUrl.searchParams.get("github_installed") === "true" &&
+            Number.isSafeInteger(callbackInstallationId) &&
+            callbackInstallationId > 0
+          ) {
+            window.clearInterval(closePollId);
+            handleInstallationReady(callbackInstallationId);
+            void refreshRepoInfo();
+            popup.close();
+          }
+        } catch {
+          // Reading popup.location is blocked while the popup is on GitHub.
         }
       }, 500);
     } catch (error) {
@@ -250,6 +272,10 @@ export function GitHubSyncCard({
       Number.isSafeInteger(callbackInstallationId) &&
       callbackInstallationId > 0
     ) {
+      window.localStorage.setItem(
+        callbackStorageKey,
+        JSON.stringify({ installationId: callbackInstallationId }),
+      );
       if (window.opener && window.opener !== window) {
         window.opener.postMessage(
           { type: "randseed:github-installed", installationId: callbackInstallationId },
@@ -257,10 +283,6 @@ export function GitHubSyncCard({
         );
         window.close();
       } else if (window.name === "randseed-github-install") {
-        window.localStorage.setItem(
-          callbackStorageKey,
-          JSON.stringify({ installationId: callbackInstallationId }),
-        );
         window.close();
       } else {
         handleInstallationReady(callbackInstallationId);
