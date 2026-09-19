@@ -120,9 +120,10 @@ export function GitHubSyncCard({
     setIsLoadingRepositories(true);
     setLinkError(null);
     try {
-      const response = await githubApi.listRepositories(nextInstallationId);
+      // Use claimInstallation to bind the installation to the current authenticated creator
+      const response = await githubApi.claimInstallation(nextInstallationId);
       if (!response.success) {
-        throw new Error(response.error || "Unable to load GitHub repositories.");
+        throw new Error(response.error || "Unable to claim and load GitHub repositories.");
       }
       const repositories = response.repositories || [];
       setAvailableRepositories(repositories);
@@ -229,17 +230,17 @@ export function GitHubSyncCard({
       void refreshRepoInfo();
     };
 
-    const callbackStorageKey = `randseed:github-installed:${gameId}`;
+    const callbackBroadcastKey = "randseed:github-installed-broadcast";
     const handleInstallationStorage = (event: StorageEvent) => {
-      if (event.key !== callbackStorageKey || !event.newValue) return;
+      if ((event.key !== callbackStorageKey && event.key !== callbackBroadcastKey) || !event.newValue) return;
       try {
         const parsedInstallationId = Number(JSON.parse(event.newValue).installationId);
         if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
-        window.localStorage.removeItem(callbackStorageKey);
+        if (event.key) window.localStorage.removeItem(event.key);
         handleInstallationReady(parsedInstallationId);
         void refreshRepoInfo();
       } catch {
-        window.localStorage.removeItem(callbackStorageKey);
+        if (event.key) window.localStorage.removeItem(event.key);
       }
     };
 

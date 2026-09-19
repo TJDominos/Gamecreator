@@ -137,6 +137,22 @@ export const githubApi = {
     );
   },
 
+  async claimInstallation(installationId: number): Promise<{
+    success: boolean;
+    installation_id?: number;
+    account_login?: string;
+    repositories?: GitHubRepositoryOption[];
+    error?: string;
+  }> {
+    return request(
+      `/api/github/claim`,
+      {
+        method: "POST",
+        body: JSON.stringify({ installation_id: installationId }),
+      },
+    );
+  },
+
   /**
    * Fetches the current connected repository information for a game
    */

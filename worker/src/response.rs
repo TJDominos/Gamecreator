@@ -43,6 +43,12 @@ pub fn error(request: &Request, env: &Env, message: &str, status: u16, code: &st
     }), status)
 }
 
+pub fn html(body: &str) -> Result<Response> {
+    let mut response = Response::from_html(body)?;
+    response.headers_mut().set("Cache-Control", "no-store, no-cache, must-revalidate")?;
+    Ok(response)
+}
+
 pub fn options(request: &Request, env: &Env) -> Result<Response> {
     let mut response = Response::empty()?.with_status(204);
     let headers = cors(request, env)?;
