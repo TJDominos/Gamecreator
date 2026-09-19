@@ -386,7 +386,7 @@ export function GameConsole(): React.ReactElement {
       </div>
     </div>
 
-      <nav className="game-console-tabs" style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--portal-border)', marginBottom: '32px' }}>
+      <nav className="game-console-tabs" style={{ display: 'flex', alignItems: 'stretch', height: '45px', gap: '24px', borderBottom: '1px solid var(--portal-border)', marginBottom: '32px' }}>
         {[
           { to: `/dashboard/games/${gameId}`, end: true, label: "Overview", icon: LayoutDashboard },
           { to: `/dashboard/games/${gameId}/publish`, label: "Publish", icon: Rocket },
@@ -399,6 +399,8 @@ export function GameConsole(): React.ReactElement {
             style={({ isActive }) => ({
               display: 'flex',
               alignItems: 'center',
+              boxSizing: 'border-box',
+              height: '45px',
               gap: '8px',
               padding: '12px 4px',
               fontSize: '14px',
