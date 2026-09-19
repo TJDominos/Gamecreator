@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "gamecreator-worker-dev",
-	"main": "worker/src/index.ts",
+	"main": "rust-worker/build/index.js",
 	"compatibility_date": "2026-07-19",
 	"compatibility_flags": [
 		"nodejs_compat"
@@ -35,12 +35,24 @@
 		}
 	],
 	"vars": {
+		"ENVIRONMENT": "dev",
+		"IC_GATEWAY_URL": "https://ic0.app",
+		"WL_USER_CANISTER_ID": "b6m3r-zqaaa-aaaac-aacra-cai",
 		"MAIN_SITE_URL": "https://devcreator.randseed.org",
-		"ADMIN_EMAILS": "sns.bruce@gmail.com",
+		"ADMIN_EMAILS": "sns.bruce@gmail.com,tj@randseed.org",
 		"GITHUB_APP_SLUG": "RDcreatordev",
 		"SANDBOX_BASE_URL": "https://randseed.org",
-		"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org,https://creator.randseed.org,https://test.randseed.org,https://randseed.org"
+		"CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://devcreator.randseed.org",
+		"GITHUB_ACTION_WORKFLOW": "randseed-deploy.yml",
+		"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator",
+		"MAX_ARTIFACT_BYTES": "26214400"
 	},
+	"build": {
+		"command": "cd rust-worker && cargo install -q worker-build --version 0.8.4 && worker-build --release --no-opt"
+	},
+	"rules": [
+		{ "globs": ["**/*.wasm"], "type": "CompiledWasm", "fallthrough": true }
+	],
 	"env": {
 		"dev": {
 			"name": "gamecreator-worker-dev",
@@ -76,79 +88,61 @@
 					"binding": "ARTIFACTS",
 					"bucket_name": "gamecreator-artifacts-dev"
 				}
-			],
+			]
 		},
 		"test": {
-			"name": "randseed-gamecreator-worker-test",
-			"routes": [
-				{
-					"pattern": "testcreator.randseed.org",
-					"custom_domain": true
-				}
-			],
-			"d1_databases": [
-				{
-					"binding": "DB",
-					"database_name": "gamecreator-d1-test",
-					"database_id": "REPLACE_WITH_TEST_D1_DATABASE_ID",
-					"remote": true
-				}
-			],
+			"name": "gamecreator-worker-test",
+			"routes": [{ "pattern": "testcreator.randseed.org", "custom_domain": true }],
+			"d1_databases": [{
+				"binding": "DB",
+				"database_name": "gamecreator-d1-test",
+				"database_id": "REPLACE_WITH_TEST_D1_DATABASE_ID",
+				"remote": true
+			}],
+			"r2_buckets": [{
+				"binding": "ARTIFACTS",
+				"bucket_name": "gamecreator-artifacts-test"
+			}],
 			"vars": {
 				"ENVIRONMENT": "test",
 				"IC_GATEWAY_URL": "https://ic0.app",
-				"WL_USER_CANISTER_ID": "yc4z6-iaaaa-aaaaj-azw2q-cai",
+				"WL_USER_CANISTER_ID": "b6m3r-zqaaa-aaaac-aacra-cai",
 				"MAIN_SITE_URL": "https://testcreator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_TEST_GITHUB_APP_SLUG",
 				"SANDBOX_BASE_URL": "https://randseed.org",
 				"CORS_ORIGINS": "https://testcreator.randseed.org",
 				"GITHUB_ACTION_WORKFLOW": "randseed-deploy.yml",
-				"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator",
+				"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator-test",
 				"MAX_ARTIFACT_BYTES": "26214400"
-			},
-			"r2_buckets": [
-				{
-					"binding": "ARTIFACTS",
-					"bucket_name": "gamecreator-artifacts-test"
-				}
-			],
+			}
 		},
 		"production": {
-			"name": "randseed-gamecreator-worker-production",
-			"routes": [
-				{
-					"pattern": "creator.randseed.org",
-					"custom_domain": true
-				}
-			],
-			"d1_databases": [
-				{
-					"binding": "DB",
-					"database_name": "gamecreator-d1-production",
-					"database_id": "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID",
-					"remote": true
-				}
-			],
+			"name": "gamecreator-worker-production",
+			"routes": [{ "pattern": "creator.randseed.org", "custom_domain": true }],
+			"d1_databases": [{
+				"binding": "DB",
+				"database_name": "gamecreator-d1-production",
+				"database_id": "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID",
+				"remote": true
+			}],
+			"r2_buckets": [{
+				"binding": "ARTIFACTS",
+				"bucket_name": "gamecreator-artifacts-production"
+			}],
 			"vars": {
 				"ENVIRONMENT": "production",
 				"IC_GATEWAY_URL": "https://ic0.app",
-				"WL_USER_CANISTER_ID": "5vx25-waaaa-aaaam-qcyeq-cai",
+				"WL_USER_CANISTER_ID": "b6m3r-zqaaa-aaaac-aacra-cai",
 				"MAIN_SITE_URL": "https://creator.randseed.org",
 				"ADMIN_EMAILS": "sns.bruce@gmail.com",
 				"GITHUB_APP_SLUG": "REPLACE_WITH_PRODUCTION_GITHUB_APP_SLUG",
 				"SANDBOX_BASE_URL": "https://randseed.org",
 				"CORS_ORIGINS": "https://creator.randseed.org",
 				"GITHUB_ACTION_WORKFLOW": "randseed-deploy.yml",
-				"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator",
+				"GITHUB_OIDC_AUDIENCE": "randseed-gamecreator-production",
 				"MAX_ARTIFACT_BYTES": "26214400"
-			},
-			"r2_buckets": [
-				{
-					"binding": "ARTIFACTS",
-					"bucket_name": "gamecreator-artifacts-production"
-				}
-			]
+			}
 		}
 	}
 }

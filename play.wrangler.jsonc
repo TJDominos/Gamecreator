@@ -45,6 +45,42 @@
         "ENVIRONMENT": "dev",
         "GAME_CSP_CONNECT_SRC": "'self'"
       }
+    },
+    "test": {
+      "name": "gamecreator-play-test",
+      "routes": [{ "pattern": "test.randseed.org", "custom_domain": true }],
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "gamecreator-d1-test",
+        "database_id": "REPLACE_WITH_TEST_D1_DATABASE_ID",
+        "remote": true
+      }],
+      "r2_buckets": [{
+        "binding": "ARTIFACTS",
+        "bucket_name": "gamecreator-artifacts-test"
+      }],
+      "vars": {
+        "ENVIRONMENT": "test",
+        "GAME_CSP_CONNECT_SRC": "'self'"
+      }
+    },
+    "production": {
+      "name": "gamecreator-play-production",
+      "routes": [{ "pattern": "randseed.org", "custom_domain": true }],
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "gamecreator-d1-production",
+        "database_id": "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID",
+        "remote": true
+      }],
+      "r2_buckets": [{
+        "binding": "ARTIFACTS",
+        "bucket_name": "gamecreator-artifacts-production"
+      }],
+      "vars": {
+        "ENVIRONMENT": "production",
+        "GAME_CSP_CONNECT_SRC": "'self'"
+      }
     }
   }
 }

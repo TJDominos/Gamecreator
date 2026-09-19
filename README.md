@@ -72,9 +72,13 @@ The Play Worker has only the game D1 and R2 bindings. It does not bind Creator
 SPA assets, JWT secrets, or Creator API routes. It deploys directly to
 `workers_dev` with built-in Cloudflare Edge caching.
 
-The current Worker and D1 configuration is the `dev` environment. `test` and
-`production` are intentionally configured with placeholder D1 IDs and must not
-be deployed until their D1 databases, domains, and GitHub Apps are created.
+The `dev` environment has separate Rust Creator and Play Workers. The Creator
+Worker is `gamecreator-worker-dev` on `devcreator.randseed.org`; it owns the
+Creator control plane, D1 writes, and R2 upload validation. The Play Worker is
+`gamecreator-play-dev` at
+`https://gamecreator-play-dev.tjluckydominos.workers.dev`; it reads the shared
+development D1 and `gamecreator-artifacts-dev` R2 bucket to serve immutable
+game releases. It has no Creator JWT, ASSETS, or Creator API bindings.
 
 Run local development against `dev`:
 
@@ -82,12 +86,10 @@ Run local development against `dev`:
 npm run worker:dev
 ```
 
-Deploy explicitly to an environment:
+Deploy the development Worker:
 
 ```bash
 npm run worker:deploy:dev
-npm run worker:deploy:test
-npm run worker:deploy:production
 npm run worker:play:deploy:dev
 ```
 
@@ -107,13 +109,10 @@ deduplication. Apply it only after the base migrations have been applied. The
 dev Worker expects the R2 bucket `gamecreator-artifacts-dev`; inspect or create
 it with `npm run r2:list` and `npm run r2:create:dev`.
 
-Do not run a production deployment until the placeholder values in
-`wrangler.jsonc` have been replaced.
-
 ### Worker secrets
 
 Non-sensitive environment values are stored in `wrangler.jsonc`. Each named
-environment has its own Worker secrets. Set them once for every environment:
+environment has its own Worker secrets. Set them for `dev`:
 
 ```bash
 for secret in JWT_SECRET GITHUB_APP_ID GITHUB_APP_PRIVATE_KEY GITHUB_CLIENT_SECRET GITHUB_WEBHOOK_SECRET; do
@@ -121,8 +120,7 @@ for secret in JWT_SECRET GITHUB_APP_ID GITHUB_APP_PRIVATE_KEY GITHUB_CLIENT_SECR
 done
 ```
 
-Repeat with `--env test` and `--env production` after those environments are
-created. `GITHUB_APP_PRIVATE_KEY` must be the complete PEM private key generated
+`GITHUB_APP_PRIVATE_KEY` must be the complete PEM private key generated
 by the corresponding GitHub App. Use `.dev.vars.example` to create local
 `.dev.vars` values for `wrangler dev`; `.dev.vars` is ignored by Git.
 
@@ -130,10 +128,6 @@ The GitHub App callback and webhook URLs must point to the matching Worker:
 
 - Dev: `https://devcreator.randseed.org/api/github/callback` and
 	`https://devcreator.randseed.org/api/webhooks/github`
-- Test: `https://testcreator.randseed.org/api/github/callback` and
-	`https://testcreator.randseed.org/api/webhooks/github`
-- Production: `https://creator.randseed.org/api/github/callback` and
-	`https://creator.randseed.org/api/webhooks/github`
 
 ### Local GitHub App debugging
 
