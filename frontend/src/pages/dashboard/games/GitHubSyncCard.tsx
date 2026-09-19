@@ -163,15 +163,23 @@ export function GitHubSyncCard({
     lastHandledInstallationId.current = null;
     setIsOpeningGitHub(true);
     setInstallError(null);
+    const githubWindow = window.open("about:blank", "randseed-github-install", "popup,width=520,height=760");
     try {
+      if (!githubWindow) {
+        throw new Error("GitHub could not open in a new window. Please allow popups for the Creator Portal and try again.");
+      }
       const info = await githubApi.getInstallInfo(gameId);
       if (!info.install_url) {
         throw new Error("GitHub App installation URL was not returned.");
       }
       setInstallUrl(info.install_url);
       window.localStorage.setItem("randseed:github-pending-game-id", gameId);
-      window.location.assign(info.install_url);
+      if (!githubWindow.closed) {
+        githubWindow.location.href = info.install_url;
+        githubWindow.focus();
+      }
     } catch (error) {
+      if (githubWindow && !githubWindow.closed) githubWindow.close();
       setInstallError(
         error instanceof Error
           ? error.message
@@ -186,6 +194,23 @@ export function GitHubSyncCard({
   useEffect(() => {
     let isMounted = true;
 
+    const handleGithubInstallationMessage = (event: MessageEvent<{ type?: string; installation_id?: number }>) => {
+      const apiOrigin = new URL(WORKFLOW_API_URL, window.location.origin).origin;
+      if (event.origin !== window.location.origin && event.origin !== apiOrigin) return;
+      if (event.data?.type !== "randseed:github-installation") return;
+      const receivedInstallationId = event.data.installation_id;
+      if (!Number.isSafeInteger(receivedInstallationId) || receivedInstallationId <= 0) return;
+      void githubApi.claimInstallation(receivedInstallationId, gameId).then((result) => {
+        if (!result.success) {
+          setInstallError(result.error || "GitHub was installed, but it could not be claimed for this game.");
+          return;
+        }
+        handleInstallationReady(receivedInstallationId);
+      }).catch((error) => {
+        setInstallError(error instanceof Error ? error.message : "GitHub installation could not be claimed.");
+      });
+    };
+
     const handleOpenConnect = (event: Event) => {
       const detail = (event as CustomEvent<{ gameId?: string }>).detail;
       if (!detail?.gameId || detail.gameId === gameId) {
@@ -193,6 +218,7 @@ export function GitHubSyncCard({
       }
     };
     window.addEventListener("randseed:open-github-connect", handleOpenConnect);
+    window.addEventListener("message", handleGithubInstallationMessage);
 
     githubApi.getGameRepo(gameId).then(res => {
       if (isMounted && res.success && res.repo_info) {
@@ -219,6 +245,7 @@ export function GitHubSyncCard({
     return () => {
       isMounted = false;
       window.removeEventListener("randseed:open-github-connect", handleOpenConnect);
+      window.removeEventListener("message", handleGithubInstallationMessage);
     };
   }, [gameId]);
 

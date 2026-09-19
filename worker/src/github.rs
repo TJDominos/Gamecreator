@@ -50,6 +50,31 @@ fn github_callback_url(env: &Env) -> String {
         })
 }
 
+    fn installation_complete_response(env: &Env, installation_id: i64) -> Result<Response> {
+        let target_origin = env
+            .var("MAIN_SITE_URL")
+            .map(|value| value.to_string())
+            .unwrap_or_default()
+            .trim_end_matches('/')
+            .to_string();
+        let target_origin = serde_json::to_string(&target_origin).unwrap_or_else(|_| "\"\"".to_string());
+        response::html(&format!(
+            r#"<!doctype html>
+    <html lang="en">
+    <head><meta charset="utf-8"><title>GitHub connected</title></head>
+    <body>
+    <p>GitHub connected. This window will close automatically.</p>
+    <script>
+      const targetOrigin = {target_origin};
+      const message = {{ type: "randseed:github-installation", installation_id: {installation_id} }};
+      if (window.opener) window.opener.postMessage(message, targetOrigin || "*");
+      window.close();
+    </script>
+    </body>
+    </html>"#
+        ))
+    }
+
 pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>> {
     let path = request.path();
     match (request.method(), path.as_str()) {
@@ -395,11 +420,7 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
         if let Err(error) = installation_repositories(env, installation_id).await {
             return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR");
         }
-        let main_url = env.var("MAIN_SITE_URL").map(|value| value.to_string()).unwrap_or_default();
-        let redirect = format!("{main_url}/dashboard?github_installation_pending=true&installation_id={installation_id}");
-        let mut response = Response::empty()?.with_status(302);
-        response.headers_mut().set("Location", &redirect)?;
-        return Ok(response);
+        return installation_complete_response(env, installation_id);
     }
 
     let Some(claims) = auth::secret(env).ok().and_then(|secret| auth::verify(state.as_deref().unwrap_or_default(), &secret)) else {
@@ -469,12 +490,7 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
         ],
     ).await?;
 
-    let main_url = env.var("MAIN_SITE_URL").map(|value| value.to_string()).unwrap_or_default();
-    let redirect_path = claims.game_id.as_deref().map(|game_id| format!("/dashboard/games/{}/publish", urlencoding::encode(game_id))).unwrap_or_else(|| "/dashboard/games".to_string());
-    let redirect = format!("{main_url}{redirect_path}?github_installed=true&installation_id={installation_id}");
-    let mut response = Response::empty()?.with_status(302);
-    response.headers_mut().set("Location", &redirect)?;
-    Ok(response)
+    installation_complete_response(env, installation_id)
 }
 
 async fn claim_installation(request: &mut Request, env: &Env) -> Result<Response> {
