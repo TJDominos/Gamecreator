@@ -20,8 +20,11 @@ import {
 } from "lucide-react";
 import { ensureGamePersisted, GameRepoInfo } from "./gameData";
 import { githubApi } from "../../../services/githubApi";
+import workflowTemplate from "../../../../../docs/templates/randseed-deploy.yml?raw";
 
 const GITHUB_APP_SLUG = "RDcreatordev";
+const WORKFLOW_API_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "https://devcreator.randseed.org" : window.location.origin);
+const WORKFLOW_OIDC_AUDIENCE = import.meta.env.VITE_GITHUB_OIDC_AUDIENCE || "randseed-gamecreator";
 
 interface GitHubSyncCardProps {
   gameId: string;
@@ -251,74 +254,10 @@ export function GitHubSyncCard({
 
   const getWorkflowContent = () => {
     const buildDir = buildDirInput || "dist";
-    return [
-      "name: Deploy to RandSeed Sandbox",
-      "",
-      "on:",
-      "  workflow_dispatch:",
-      "    inputs:",
-      "      deployment_id:",
-      "        required: true",
-      "        type: string",
-      "      commit_sha:",
-      "        required: true",
-      "        type: string",
-      "      game_id:",
-      "        required: true",
-      "        type: string",
-      "",
-      "permissions:",
-      "  contents: read",
-      "  id-token: write",
-      "",
-      "jobs:",
-      "  build-and-deploy:",
-      "    runs-on: ubuntu-latest",
-      "    steps:",
-      "      - uses: actions/checkout@v4",
-      "        with:",
-      "          ref: ${{ inputs.commit_sha }}",
-      "      - uses: actions/setup-node@v4",
-      "        with:",
-      "          node-version: 20",
-      "      - run: npm ci && npm run build",
-      "      - name: Create manifest",
-      "        env:",
-      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
-      "          COMMIT_SHA: ${{ inputs.commit_sha }}",
-      "        run: |",
-      "          node <<'NODE' > /tmp/randseed-manifest.json",
-      "          const fs = require('fs'), path = require('path'), crypto = require('crypto');",
-      `          const root = '${buildDir}';`,
-      "          const files = [];",
-      "          function walk(dir) { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full); else { const relative = path.relative(root, full).split(path.sep).join('/'); const bytes = fs.readFileSync(full); files.push({ path: relative, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), size: bytes.length }); } } }",
-      "          walk(root); files.sort((a, b) => a.path.localeCompare(b.path));",
-      `          console.log(JSON.stringify({ deployment_id: process.env.DEPLOYMENT_ID, commit_sha: process.env.COMMIT_SHA, root: '${buildDir}', files, total_bytes: files.reduce((sum, file) => sum + file.size, 0) }));`,
-      "          NODE",
-      "      - name: Request upload session",
-      "        env:",
-      "          RANDSEED_API_URL: https://devcreator.randseed.org",
-      "          OIDC_AUDIENCE: randseed-gamecreator",
-      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
-      "        run: |",
-      "          OIDC_TOKEN=$(curl -fsS -H \"Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN\" \"$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$OIDC_AUDIENCE\" | node -e \"let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).value))\")",
-      "          echo \"::add-mask::$OIDC_TOKEN\"; echo \"OIDC_TOKEN=$OIDC_TOKEN\" >> \"$GITHUB_ENV\"",
-      "          node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('/tmp/randseed-manifest.json'));process.stdout.write(JSON.stringify({manifest:m}))\" | curl -fsS -X POST \"$RANDSEED_API_URL/api/deployments/$DEPLOYMENT_ID/upload-session\" -H \"Authorization: Bearer $OIDC_TOKEN\" -H 'Content-Type: application/json' --data-binary @- > /tmp/randseed-session.json",
-      "      - name: Upload static files",
-      "        env:",
-      "          RANDSEED_API_URL: https://devcreator.randseed.org",
-      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
-      "        run: |",
-      "          UPLOAD_TOKEN=$(node -e \"console.log(require('/tmp/randseed-session.json').upload_token)\"); UPLOAD_BASE_URL=$(node -e \"console.log(require('/tmp/randseed-session.json').upload_base_url)\"); echo \"::add-mask::$UPLOAD_TOKEN\"",
-      "          node -e \"const m=require('/tmp/randseed-manifest.json');for(const f of m.files)console.log(f.path+'\\t'+f.size)\" | while IFS=$'\\t' read -r FILE_PATH FILE_SIZE; do ENCODED_PATH=$(node -e \"console.log(encodeURIComponent(process.argv[1]))\" \"$FILE_PATH\"); curl -fsS -X PUT \"$UPLOAD_BASE_URL/$ENCODED_PATH\" -H \"Authorization: Bearer $UPLOAD_TOKEN\" -H \"Content-Length: $FILE_SIZE\" --data-binary \"${buildDir}/$FILE_PATH\" > /dev/null; done",
-      "      - name: Verify and publish",
-      "        env:",
-      "          RANDSEED_API_URL: https://devcreator.randseed.org",
-      "          DEPLOYMENT_ID: ${{ inputs.deployment_id }}",
-      "        run: |",
-      "          curl -fsS -X POST \"$RANDSEED_API_URL/api/deployments/$DEPLOYMENT_ID/upload-complete\" -H \"Authorization: Bearer $OIDC_TOKEN\" -H 'Content-Type: application/json' --data \"$(node -e \"const fs=require('fs');console.log(JSON.stringify({manifest:JSON.parse(fs.readFileSync('/tmp/randseed-manifest.json'))}))\")\"",
-      "",
-    ].join("\n");
+    return workflowTemplate
+      .replaceAll("__RANDSEED_BUILD_DIR__", buildDir)
+      .replaceAll("__RANDSEED_API_URL__", WORKFLOW_API_URL)
+      .replaceAll("__RANDSEED_OIDC_AUDIENCE__", WORKFLOW_OIDC_AUDIENCE);
   };
 
   const handleCopyWorkflow = () => {

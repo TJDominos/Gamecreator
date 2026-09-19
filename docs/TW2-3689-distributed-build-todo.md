@@ -28,8 +28,8 @@ and in-process caches.
 
 ## 1. Creator GitHub Action 与接入流程
 
-- [ ] **P0 提供 creator 可一键导入或复制的 `randseed-deploy.yml` 模板**
-  - 模板放在仓库内可版本化的位置，例如 `docs/templates/randseed-deploy.yml`，并由 Dashboard 提供复制/下载入口。
+- [x] **P0 提供 creator 可一键导入或复制的 `randseed-deploy.yml` 模板**
+  - 模板已放在 `docs/templates/randseed-deploy.yml`，并由 Dashboard 提供复制/下载和 PR 导入入口。
   - 推荐 GitHub App 创建安装分支、提交 workflow 并创建 Pull Request；不直接写入默认分支，不自动合并。
   - 一键 PR 需要 installation token 具备 `Contents: write` 和 `Pull requests: write`；现有只读安装需要用户重新授权升级权限。
   - App token 只在 Worker 服务端使用，前端不得获得 installation token。
@@ -41,8 +41,8 @@ and in-process caches.
   - 使用 GitHub OIDC 请求 `/api/deployments/:id/upload-session`，使用返回的短期 upload token 逐文件上传，再调用 `/api/deployments/:id/upload-complete`。
   - 所有 token 写入环境变量前必须 mask；失败时不得输出 Authorization、OIDC、upload token、私有仓库 URL 或环境变量内容。
   - 模板 README 要说明需要的仓库 workflow 权限、build directory、Worker API URL 和安装方式。
-- [ ] **P0 将 Dashboard 的复制文本改为模板单一来源**
-  - 删除 `GitHubSyncCard.tsx` 内维护的长字符串副本，避免模板和服务端契约漂移。
+- [x] **P0 将 Dashboard 的复制文本改为模板单一来源**
+  - `GitHubSyncCard.tsx` 从版本化模板读取内容，避免模板和服务端契约漂移。
   - 复制前按实际 repository、branch、build directory、API environment 和 workflow 名称渲染必要参数。
 - [ ] **P1 检查仓库 workflow 是否存在并提供指导**
   - 缺少模板时显示复制/创建提示。

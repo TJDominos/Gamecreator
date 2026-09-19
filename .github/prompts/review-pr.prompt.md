@@ -39,9 +39,9 @@ Identify which domains apply based on the PR diff and description:
 | :--- | :--- |
 | **Worker / API** | `worker/**/*.ts`, route handlers, middleware, request validation, response envelopes |
 | **D1 / Database** | `migrations/*.sql`, SQL queries, indexes, transactions, schema changes |
-| **Frontend / State** | `src/**/*.{ts,tsx}`, Zustand stores, Context, data fetching, caching, debounce, forms |
+| **Frontend / State** | `frontend/src/**/*.{ts,tsx}`, Zustand stores, Context, data fetching, caching, debounce, forms |
 | **Security / Auth** | JWT verification, RBAC (`hasRequiredRole`), secrets, CORS, audit logging, rate limiting |
-| **UI / Accessibility** | `src/**/*.{tsx,css}`, RS Design System tokens, responsive layout, 5-state handling |
+| **UI / Accessibility** | `frontend/src/**/*.{tsx,css}`, RS Design System tokens, responsive layout, 5-state handling |
 | **Release / Config** | `wrangler.jsonc`, build scripts, environment bindings, migration deploy order |
 
 ---
@@ -49,7 +49,7 @@ Identify which domains apply based on the PR diff and description:
 ## 4. Step 2 — Domain Checklists (P0 Gates)
 
 ### A. Worker & Edge API
-- [ ] **Standard Envelope**: Endpoints return `{ success, data?, error?, message?, code?, pagination? }` via `worker/src/utils/response.ts`.
+- [ ] **Standard Envelope**: Endpoints return `{ success, data?, error?, message?, code?, pagination? }` via `worker/src/response.rs`.
 - [ ] **Status Code Semantics**: `200`/`201` success, `400` validation error, `401` unauthenticated, `403` forbidden, `404` not found, `409` conflict, sanitized `500` (no stack traces or raw SQLite errors).
 - [ ] **Input Bounds**: Request body size, JSON depth, array limits, string lengths, and query parameters are validated and bounded before processing.
 - [ ] **Fail-Closed**: Errors, exceptions, and validation failures fail closed with structured error responses.

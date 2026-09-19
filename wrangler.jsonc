@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "gamecreator-worker-dev",
-	"main": "rust-worker/build/index.js",
+	"main": "worker/build/index.js",
 	"build": {
 		"command": "WORKER_FEATURES=creator sh scripts/build-rust-worker.sh"
 	},

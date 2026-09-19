@@ -9,7 +9,7 @@ Before conducting PR reviews, read and execute [prompts/review-pr.prompt.md](pro
 ## 1. Platform & Technology Stack
 
 - **Frontend**: React 18 / 19, TypeScript, Vite, Tailwind CSS v4, RS Design System tokens (`vendor/RS`).
-- **Backend / Edge API**: Cloudflare Worker (`worker/src/index.ts`, `ExportedHandler<Env>`).
+- **Backend / Edge API**: Cloudflare Worker (`worker/src/lib.rs`, Rust Worker entrypoint).
 - **Database**: Cloudflare D1 (SQLite) with sequential, idempotent migrations in `migrations/*.sql`.
 - **Platform Boundary**: Exclusively Cloudflare Worker + D1 + React. ICP/Canister technologies (`ic_cdk`, Motoko, Candid, `wl_caller`, stable memory) are excluded.
 
@@ -28,7 +28,7 @@ Before conducting PR reviews, read and execute [prompts/review-pr.prompt.md](pro
 - **Progressive Migration**: `AuthContext` and `apiClient` represent existing baseline code. Existing patterns may be maintained for targeted bugfixes, while new shared features and refactors must adopt the Zustand store structure.
 
 ### B. Worker & API Contracts
-- **Standard Envelope**: All API endpoints return `{ success: boolean, data?: T, error?: string, message?: string, code?: string, pagination?: {...} }` via `worker/src/utils/response.ts`.
+- **Standard Envelope**: All API endpoints return `{ success: boolean, data?: T, error?: string, message?: string, code?: string, pagination?: {...} }` via `worker/src/response.rs`.
 - **HTTP Status Code Discipline**:
   - `200` / `201`: Successful read/write.
   - `400`: Malformed input / validation error with structured machine-readable code.

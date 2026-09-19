@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { routeTitleMap } from '../src/config/routeTitles.js';
+import { routeTitleMap } from '../frontend/src/config/routeTitles.js';
 
 const SITE_URL = 'https://randseed.org';
 const STORAGE_URL = 'https://storage.randseed.org';

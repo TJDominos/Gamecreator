@@ -15,12 +15,12 @@ npm run worker:rust:deploy:dev
 npm run worker:play:build
 ```
 
-`worker:rust:check` requires the `wasm32-unknown-unknown` Rust target. The host-target check (`cargo check --manifest-path rust-worker/Cargo.toml`) is useful for local API diagnostics but is not a deploy validation.
+`worker:rust:check` requires the `wasm32-unknown-unknown` Rust target. The host-target check (`cargo check --manifest-path worker/Cargo.toml`) is useful for local API diagnostics but is not a deploy validation.
 
 Wrangler uses `scripts/build-rust-worker.sh` for the Rust bundle. The script
 bootstraps the stable Rust toolchain when `cargo` is not already available,
 adds the `wasm32-unknown-unknown` target, installs the pinned `worker-build`
-version, and writes the Wrangler entrypoint under `rust-worker/build/`. This
+version, and writes the Wrangler entrypoint under `worker/build/`. This
 keeps Cloudflare Workers Builds and GitHub Actions independent of a preinstalled
 Rust environment.
 
@@ -30,7 +30,7 @@ Deploy the Play data plane independently:
 npm run worker:play:deploy:dev
 ```
 
-Creator and Play reuse the same `rust-worker` crate and output path. Wrangler
+Creator and Play reuse the same `worker` crate and output path. Wrangler
 selects the `creator` or `play` Cargo feature for each deployment; the Play
 feature exposes only read-only D1/R2 delivery routes.
 

@@ -40,5 +40,5 @@ if [ ! -x "$worker_build_bin" ] || [ ! -f "$worker_build_marker" ]; then
   cargo install --path "$worker_build_source" --force --quiet
   : > "$worker_build_marker"
 fi
-cd rust-worker
+cd worker
 worker-build --release --no-opt --no-default-features --features "$worker_features"
