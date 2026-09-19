@@ -41,6 +41,15 @@ struct GithubUserProfile {
     email: Option<String>,
 }
 
+fn github_callback_url(env: &Env) -> String {
+    env.var("GITHUB_CALLBACK_URL")
+        .map(|value| value.to_string())
+        .unwrap_or_else(|_| {
+            let main_url = env.var("MAIN_SITE_URL").map(|value| value.to_string()).unwrap_or_default();
+            format!("{}/api/github/callback", main_url.trim_end_matches('/'))
+        })
+}
+
 pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>> {
     let path = request.path();
     match (request.method(), path.as_str()) {
@@ -117,6 +126,7 @@ async fn github_user_profile(env: &Env, code: &str) -> std::result::Result<Githu
         "client_id": client_id,
         "client_secret": client_secret,
         "code": code,
+        "redirect_uri": github_callback_url(env),
     }).to_string());
     let mut init = RequestInit::new();
     init.with_method(Method::Post).with_headers(headers).with_body(Some(body));
@@ -157,7 +167,10 @@ async fn github_status(
 }
 
 fn app_jwt(env: &Env) -> std::result::Result<String, GithubError> {
-    let app_id = env.var("GITHUB_APP_ID").map(|value| value.to_string()).map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))?;
+    let app_id = env.var("GITHUB_APP_ID")
+        .map(|value| value.to_string())
+        .or_else(|_| env.secret("GITHUB_APP_ID").map(|value| value.to_string()))
+        .map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))?;
     let private_key = env.secret("GITHUB_APP_PRIVATE_KEY").map(|value| value.to_string()).or_else(|_| env.var("GITHUB_APP_PRIVATE_KEY").map(|value| value.to_string())).map_err(|_| GithubError::new(503, "GitHub App credentials are not configured"))?;
     let key_text = private_key.replace("\\n", "\n");
     let key = RsaPrivateKey::from_pkcs8_pem(&key_text).or_else(|_| RsaPrivateKey::from_pkcs1_pem(&key_text)).map_err(|_| GithubError::new(503, "Invalid GitHub App private key"))?;
@@ -345,9 +358,7 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
     }
     let installation_id = url.query_pairs().find(|(key, _)| key == "installation_id").and_then(|(_, value)| value.parse::<i64>().ok());
     let state = url.query_pairs().find(|(key, _)| key == "state").map(|(_, value)| value.to_string()).unwrap_or_default();
-    let Some(code) = url.query_pairs().find(|(key, _)| key == "code").map(|(_, value)| value.to_string()).filter(|value| !value.is_empty()) else {
-        return response::error(request, env, "Missing OAuth code in callback", 400, "MISSING_CODE");
-    };
+    let code = url.query_pairs().find(|(key, _)| key == "code").map(|(_, value)| value.to_string()).filter(|value| !value.is_empty());
 
     let Some(installation_id) = installation_id.filter(|value| *value > 0) else {
         return response::error(request, env, "Missing installation_id in callback", 400, "MISSING_PARAM");
@@ -369,17 +380,20 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
     }
     let now = js_sys::Date::now() as i64;
     let database = db::database(env)?;
-    if db::run_changes(
+    if db::first(
         &database,
-        "UPDATE github_oauth_states SET used_at = ? WHERE nonce = ? AND principal_id = ? AND (? = game_id OR (? IS NULL AND game_id IS NULL)) AND used_at IS NULL AND expires_at > ?",
-        &[json!(now), json!(nonce), json!(claims.principal_id.clone()), json!(claims.game_id.clone()), json!(claims.game_id.clone()), json!(now)],
-    ).await? != 1 {
+        "SELECT nonce FROM github_oauth_states WHERE nonce = ? AND principal_id = ? AND (? = game_id OR (? IS NULL AND game_id IS NULL)) AND used_at IS NULL AND expires_at > ?",
+        &[json!(nonce), json!(claims.principal_id.clone()), json!(claims.game_id.clone()), json!(claims.game_id.clone()), json!(now)],
+    ).await?.is_none() {
         return response::error(request, env, "GitHub installation state is expired or already used", 400, "INVALID_STATE");
     }
 
-    let github_user = match github_user_profile(env, &code).await {
-        Ok(profile) => Some(profile),
-        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_OAUTH_ERROR"),
+    let github_user = match code.as_deref() {
+        Some(code) => match github_user_profile(env, code).await {
+            Ok(profile) => Some(profile),
+            Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_OAUTH_ERROR"),
+        },
+        None => None,
     };
 
     let installation = match installation_info(env, installation_id).await {
@@ -391,6 +405,13 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
     };
     let account_type = installation.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
     let permissions = installation.get("permissions").cloned().unwrap_or_else(|| json!({}));
+    if db::run_changes(
+        &database,
+        "UPDATE github_oauth_states SET used_at = ? WHERE nonce = ? AND principal_id = ? AND (? = game_id OR (? IS NULL AND game_id IS NULL)) AND used_at IS NULL AND expires_at > ?",
+        &[json!(now), json!(nonce), json!(claims.principal_id.clone()), json!(claims.game_id.clone()), json!(claims.game_id.clone()), json!(now)],
+    ).await? != 1 {
+        return response::error(request, env, "GitHub installation state is expired or already used", 400, "INVALID_STATE");
+    }
     db::run(
         &database,
         "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, github_user_id, github_user_login, github_user_name, github_user_avatar_url, github_user_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, github_user_id = COALESCE(excluded.github_user_id, github_installations.github_user_id), github_user_login = COALESCE(excluded.github_user_login, github_installations.github_user_login), github_user_name = COALESCE(excluded.github_user_name, github_installations.github_user_name), github_user_avatar_url = COALESCE(excluded.github_user_avatar_url, github_installations.github_user_avatar_url), github_user_email = COALESCE(excluded.github_user_email, github_installations.github_user_email), updated_at = excluded.updated_at",
