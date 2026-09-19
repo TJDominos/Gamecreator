@@ -19,7 +19,7 @@ import {
   GitPullRequest
 } from "lucide-react";
 import { ensureGamePersisted, GameRepoInfo } from "./gameData";
-import { githubApi } from "../../../services/githubApi";
+import { githubApi, type GitHubRepositoryOption } from "../../../services/githubApi";
 import workflowTemplate from "../../../../../docs/templates/randseed-deploy.yml?raw";
 
 const GITHUB_APP_SLUG = "RDcreatordev";
@@ -71,6 +71,8 @@ export function GitHubSyncCard({
   const [installError, setInstallError] = useState<string | null>(null);
   const [isOpeningGitHub, setIsOpeningGitHub] = useState(false);
   const [installationId, setInstallationId] = useState<number | null>(null);
+  const [availableRepositories, setAvailableRepositories] = useState<GitHubRepositoryOption[]>([]);
+  const [isLoadingRepositories, setIsLoadingRepositories] = useState(false);
 
   const refreshRepoInfo = async () => {
     try {
@@ -86,25 +88,69 @@ export function GitHubSyncCard({
     }
   };
 
+  const loadRepositories = async (nextInstallationId: number) => {
+    setIsLoadingRepositories(true);
+    setLinkError(null);
+    try {
+      const response = await githubApi.listRepositories(nextInstallationId);
+      if (!response.success) {
+        throw new Error(response.error || "Unable to load GitHub repositories.");
+      }
+      const repositories = response.repositories || [];
+      setAvailableRepositories(repositories);
+      setRepoInput(current => repositories.some(repository => repository.full_name === current)
+        ? current
+        : repositories[0]?.full_name || "");
+      const selected = repositories.find(repository => repository.full_name === repoInput);
+      setBranchInput(selected?.default_branch || repositories[0]?.default_branch || "main");
+      if (repositories.length === 0) {
+        setLinkError("No repositories are available from this GitHub App installation.");
+      }
+    } catch (error) {
+      setAvailableRepositories([]);
+      setLinkError(error instanceof Error ? error.message : "Unable to load GitHub repositories.");
+    } finally {
+      setIsLoadingRepositories(false);
+    }
+  };
+
+  const handleInstallationReady = (nextInstallationId: number) => {
+    setInstallationId(nextInstallationId);
+    setIsOpeningGitHub(false);
+    setInstallError(null);
+    setShowConnectModal(true);
+    void loadRepositories(nextInstallationId);
+  };
+
   const handleConnectGitHub = async () => {
     setIsOpeningGitHub(true);
     setInstallError(null);
+    const popup = window.open(
+      "about:blank",
+      "randseed-github-install",
+      "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
+    );
+    if (!popup) {
+      setInstallError("GitHub could not be opened. Please allow popups and try again.");
+      setIsOpeningGitHub(false);
+      return;
+    }
     try {
       const info = await githubApi.getInstallInfo(gameId);
       if (!info.install_url) {
         throw new Error("GitHub App installation URL was not returned.");
       }
       setInstallUrl(info.install_url);
-      const popup = window.open(
-        info.install_url,
-        "randseed-github-install",
-        "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
-      );
-      if (!popup) {
-        throw new Error("GitHub could not be opened. Please allow popups and try again.");
-      }
+      popup.location.href = info.install_url;
       popup.focus();
+      const closePollId = window.setInterval(() => {
+        if (popup.closed) {
+          window.clearInterval(closePollId);
+          setIsOpeningGitHub(false);
+        }
+      }, 500);
     } catch (error) {
+      popup.close();
       setInstallError(
         error instanceof Error
           ? error.message
@@ -118,21 +164,16 @@ export function GitHubSyncCard({
   // is created after the user explicitly clicks Connect GitHub.
   useEffect(() => {
     let isMounted = true;
-    const installationStorageKey = `randseed:github-install:${gameId}`;
 
-    const handleInstallationStorage = (event: StorageEvent) => {
-      if (event.key !== installationStorageKey || !event.newValue) return;
-      const parsedInstallationId = Number(event.newValue);
+    const handleInstallationMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "randseed:github-installed") return;
+      const parsedInstallationId = Number(event.data.installationId);
       if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
-      setInstallationId(parsedInstallationId);
-      setIsOpeningGitHub(false);
-      setInstallError(null);
-      setShowConnectModal(true);
-      window.localStorage.removeItem(installationStorageKey);
+      handleInstallationReady(parsedInstallationId);
       void refreshRepoInfo();
     };
 
-    window.addEventListener("storage", handleInstallationStorage);
+    window.addEventListener("message", handleInstallationMessage);
 
     githubApi.getGameRepo(gameId).then(res => {
       if (isMounted && res.success && res.repo_info) {
@@ -152,19 +193,21 @@ export function GitHubSyncCard({
       Number.isSafeInteger(callbackInstallationId) &&
       callbackInstallationId > 0
     ) {
-      window.localStorage.setItem(installationStorageKey, String(callbackInstallationId));
-      setInstallationId(callbackInstallationId);
-      setShowConnectModal(true);
       if (window.opener && window.opener !== window) {
+        window.opener.postMessage(
+          { type: "randseed:github-installed", installationId: callbackInstallationId },
+          window.location.origin,
+        );
         window.close();
       } else {
+        handleInstallationReady(callbackInstallationId);
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
 
     return () => {
       isMounted = false;
-      window.removeEventListener("storage", handleInstallationStorage);
+      window.removeEventListener("message", handleInstallationMessage);
     };
   }, [gameId]);
 
@@ -418,12 +461,15 @@ export function GitHubSyncCard({
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
                 Step 2: Repository Full Name <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <input
-                type="text"
-                placeholder="e.g. owner/repository"
+              <select
                 value={repoInput}
-                onChange={e => setRepoInput(e.target.value)}
+                onChange={e => {
+                  const repository = availableRepositories.find(item => item.full_name === e.target.value);
+                  setRepoInput(e.target.value);
+                  if (repository) setBranchInput(repository.default_branch || "main");
+                }}
                 required
+                disabled={isLoadingRepositories}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -431,12 +477,22 @@ export function GitHubSyncCard({
                   border: '1px solid #d1d5db',
                   fontSize: '14px',
                   outline: 'none',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  background: '#fff'
                 }}
-              />
-              <small style={{ display: 'block', marginTop: '4px', fontSize: '11px', color: '#6b7280' }}>
-                The GitHub owner and repository name (e.g. <code>owner/repository</code>)
-              </small>
+              >
+                <option value="" disabled>
+                  {isLoadingRepositories ? "Loading authorized repositories..." : "Select an authorized repository..."}
+                </option>
+                {availableRepositories.map(repository => (
+                  <option key={repository.full_name} value={repository.full_name}>
+                    {repository.full_name}{repository.private ? " (Private)" : ""}
+                  </option>
+                ))}
+                {repoInfo.repository && !availableRepositories.some(repository => repository.full_name === repoInfo.repository) && (
+                  <option value={repoInfo.repository}>{repoInfo.repository}</option>
+                )}
+              </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>

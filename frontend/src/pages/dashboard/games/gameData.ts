@@ -1,5 +1,6 @@
 import { gameApi } from "../../../services/gameApi";
 import { ApiError } from "../../../services/apiClient";
+import { gamesActions, gamesStore } from "../../../state/gamesStore";
 
 export type GameStatus =
   | 'DRAFT'
@@ -74,30 +75,14 @@ export interface Game {
   createdAt?: number;
 }
 
-export const STORAGE_KEY = "randseed_creator_games";
 export const GAMES_UPDATED_EVENT = "randseed_games_updated";
 
 export function getStoredGames(): Game[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((game): game is Game => Boolean(game?.id)) : [];
-  } catch (err) {
-    console.error("Failed to load stored games", err);
-    return [];
-  }
+  return gamesStore.getSnapshot();
 }
 
 export function saveStoredGames(games: Game[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-    window.dispatchEvent(new CustomEvent(GAMES_UPDATED_EVENT, { detail: games }));
-  } catch (err) {
-    console.error("Failed to save stored games", err);
-  }
+  gamesActions.replace(games);
 }
 
 export function getGameById(id: string): Game | undefined {

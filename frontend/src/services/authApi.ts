@@ -67,6 +67,18 @@ export const authApi = {
     });
   },
 
+  async refresh(): Promise<MeResponse> {
+    return request<MeResponse>("/api/auth/refresh", {
+      method: "POST",
+    });
+  },
+
+  async logout(): Promise<void> {
+    await request<{ success: boolean }>("/api/auth/logout", {
+      method: "POST",
+    });
+  },
+
   async becomeCreator(): Promise<{ success: boolean; role: "player" | "creator" | "admin"; roles?: Array<"player" | "creator" | "admin">; token?: string }> {
     return request<{ success: boolean; role: "player" | "creator" | "admin"; roles?: Array<"player" | "creator" | "admin">; token?: string }>("/api/auth/become-creator", {
       method: "POST",

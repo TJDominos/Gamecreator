@@ -29,6 +29,7 @@ pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>>
     let path = request.path();
     match (request.method(), path.as_str()) {
         (Method::Get, "/api/github/install") => Ok(Some(install(request, env).await?)),
+        (Method::Get, "/api/github/repositories") => Ok(Some(list_repositories(request, env).await?)),
         (Method::Get, "/api/github/callback") => Ok(Some(callback(request, env).await?)),
         (Method::Post, "/api/webhooks/github") => Ok(Some(webhook(request, env).await?)),
         (Method::Post, "/api/sandbox/deploy") => Ok(Some(response::error(request, env, "Legacy deployment tokens are disabled; use GitHub Actions OIDC and the deployment upload API", 410, "LEGACY_DEPLOY_DISABLED")?)),
@@ -130,6 +131,25 @@ async fn installation_token(env: &Env, installation_id: i64) -> std::result::Res
 async fn installation_info(env: &Env, installation_id: i64) -> std::result::Result<Value, GithubError> {
     let token = app_jwt(env)?;
     github_response(&format!("{GITHUB_API}/app/installations/{installation_id}"), &token, Method::Get, None).await
+}
+
+async fn installation_repositories(env: &Env, installation_id: i64) -> std::result::Result<Vec<Value>, GithubError> {
+    let token = installation_token(env, installation_id).await?;
+    let mut repositories = Vec::new();
+    for page in 1..=10 {
+        let value: Value = github_response(&format!("{GITHUB_API}/installation/repositories?per_page=100&page={page}"), &token, Method::Get, None).await?;
+        let page_repositories = value.get("repositories").and_then(Value::as_array).cloned().unwrap_or_default();
+        let page_len = page_repositories.len();
+        repositories.extend(page_repositories.into_iter().filter_map(|repository| {
+            Some(json!({
+                "full_name": repository.get("full_name")?.as_str()?,
+                "default_branch": repository.get("default_branch").and_then(Value::as_str).unwrap_or("main"),
+                "private": repository.get("private").and_then(Value::as_bool).unwrap_or(false),
+            }))
+        }));
+        if page_len < 100 { break; }
+    }
+    Ok(repositories)
 }
 
 async fn repository_info(env: &Env, installation_id: i64, repository: &str, branch: &str) -> std::result::Result<(String, String), GithubError> {
@@ -237,6 +257,22 @@ async fn install(request: &Request, env: &Env) -> Result<Response> {
     let state = auth::sign(claims, &auth::secret(env)?, 600)?;
     let slug = env.var("GITHUB_APP_SLUG").map(|value| value.to_string()).unwrap_or_else(|_| "RDcreatordev".to_string());
     response::json(request, env, &json!({ "success": true, "app_slug": slug, "install_url": format!("https://github.com/apps/{slug}/installations/new?state={}&game_id={}", urlencoding::encode(&state), urlencoding::encode(&game_id.unwrap_or_default())) }), 200)
+}
+
+async fn list_repositories(request: &Request, env: &Env) -> Result<Response> {
+    let claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
+    let url = request.url()?;
+    let installation_id = url.query_pairs().find(|(key, _)| key == "installation_id").and_then(|(_, value)| value.parse::<i64>().ok());
+    let Some(installation_id) = installation_id.filter(|value| *value > 0) else { return response::error(request, env, "Missing required 'installation_id' parameter", 400, "MISSING_INSTALLATION_ID"); };
+    let database = db::database(env)?;
+    if db::first(&database, "SELECT installation_id FROM github_installations WHERE installation_id = ? AND owner_principal = ?", &[json!(installation_id), json!(claims.principal_id)]).await?.is_none() {
+        return response::error(request, env, "GitHub installation is not owned by the authenticated creator", 403, "FORBIDDEN");
+    }
+    let repositories = match installation_repositories(env, installation_id).await {
+        Ok(value) => value,
+        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
+    };
+    response::json(request, env, &json!({ "success": true, "repositories": repositories }), 200)
 }
 
 async fn callback(request: &Request, env: &Env) -> Result<Response> {

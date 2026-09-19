@@ -20,7 +20,7 @@ import {
   Copy 
 } from "lucide-react";
 import { ensureGamePersisted, getGameById, updateGame, GAMES_UPDATED_EVENT, type GameRepoInfo } from "./gameData";
-import { githubApi } from "../../../services/githubApi";
+import { githubApi, type GitHubRepositoryOption } from "../../../services/githubApi";
 
 const GITHUB_APP_SLUG = "RDcreatordev";
 
@@ -67,6 +67,8 @@ export function GameConsole(): React.ReactElement {
   const [installUrl, setInstallUrl] = useState<string | null>(null);
   const [installationId, setInstallationId] = useState<number | null>(null);
   const [isOpeningGitHub, setIsOpeningGitHub] = useState(false);
+  const [availableRepositories, setAvailableRepositories] = useState<GitHubRepositoryOption[]>([]);
+  const [isLoadingRepositories, setIsLoadingRepositories] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -95,41 +97,70 @@ export function GameConsole(): React.ReactElement {
     }
   };
 
-  const handleOpenGitHubInstall = () => {
-    if (!installUrl) return;
-    const popup = window.open(
-      installUrl,
-      "randseed-github-install",
-      "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
-    );
-    if (!popup) {
-      setLinkError("GitHub could not be opened. Please allow popups and try again.");
-      return;
+  const loadRepositories = async (nextInstallationId: number) => {
+    setIsLoadingRepositories(true);
+    setLinkError(null);
+    try {
+      const response = await githubApi.listRepositories(nextInstallationId);
+      if (!response.success) {
+        throw new Error(response.error || "Unable to load GitHub repositories.");
+      }
+      const repositories = response.repositories || [];
+      setAvailableRepositories(repositories);
+      setRepoInput(current => repositories.some(repository => repository.full_name === current)
+        ? current
+        : repositories[0]?.full_name || "");
+      const selected = repositories.find(repository => repository.full_name === repoInput);
+      setBranchInput(selected?.default_branch || repositories[0]?.default_branch || "main");
+      if (repositories.length === 0) {
+        setLinkError("No repositories are available from this GitHub App installation.");
+      }
+    } catch (error) {
+      setAvailableRepositories([]);
+      setLinkError(error instanceof Error ? error.message : "Unable to load GitHub repositories.");
+    } finally {
+      setIsLoadingRepositories(false);
     }
-    popup.focus();
+  };
+
+  const handleInstallationReady = (nextInstallationId: number) => {
+    setInstallationId(nextInstallationId);
+    setIsOpeningGitHub(false);
+    setLinkError(null);
+    setShowConnectModal(true);
+    void loadRepositories(nextInstallationId);
   };
 
   const handleConnectGitHub = async () => {
     setIsOpeningGitHub(true);
     setLinkError(null);
+    const popup = window.open(
+      "about:blank",
+      "randseed-github-install",
+      "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
+    );
+    if (!popup) {
+      setLinkError("GitHub could not be opened. Please allow popups and try again.");
+      setIsOpeningGitHub(false);
+      return;
+    }
     try {
       const info = await githubApi.getInstallInfo(gameId || "");
       if (!info.install_url) {
         throw new Error("GitHub App installation URL was not returned.");
       }
       setInstallUrl(info.install_url);
-      const popup = window.open(
-        info.install_url,
-        "randseed-github-install",
-        "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
-      );
-      if (!popup) {
-        throw new Error("GitHub could not be opened. Please allow popups and try again.");
-      }
+      popup.location.href = info.install_url;
       popup.focus();
+      const closePollId = window.setInterval(() => {
+        if (popup.closed) {
+          window.clearInterval(closePollId);
+          setIsOpeningGitHub(false);
+        }
+      }, 500);
     } catch (error) {
+      popup.close();
       setLinkError(error instanceof Error ? error.message : "Unable to open GitHub. Please try again.");
-    } finally {
       setIsOpeningGitHub(false);
     }
   };
@@ -158,18 +189,16 @@ export function GameConsole(): React.ReactElement {
   useEffect(() => {
     if (!gameId) return;
     let isMounted = true;
-    const installationStorageKey = `randseed:github-install:${gameId}`;
-    const handleInstallationStorage = (event: StorageEvent) => {
-      if (event.key !== installationStorageKey || !event.newValue) return;
-      const parsedInstallationId = Number(event.newValue);
+
+    const handleInstallationMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "randseed:github-installed") return;
+      const parsedInstallationId = Number(event.data.installationId);
       if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
-      setInstallationId(parsedInstallationId);
-      setShowConnectModal(true);
-      window.localStorage.removeItem(installationStorageKey);
+      handleInstallationReady(parsedInstallationId);
       void refreshRepoInfo();
     };
 
-    window.addEventListener("storage", handleInstallationStorage);
+    window.addEventListener("message", handleInstallationMessage);
     githubApi.getInstallInfo(gameId).then(info => {
       if (isMounted && info.install_url) setInstallUrl(info.install_url);
     }).catch(() => {});
@@ -188,19 +217,21 @@ export function GameConsole(): React.ReactElement {
       Number.isSafeInteger(callbackInstallationId) &&
       callbackInstallationId > 0
     ) {
-      window.localStorage.setItem(installationStorageKey, String(callbackInstallationId));
-      setInstallationId(callbackInstallationId);
-      setShowConnectModal(true);
       if (window.opener && window.opener !== window) {
+        window.opener.postMessage(
+          { type: "randseed:github-installed", installationId: callbackInstallationId },
+          window.location.origin,
+        );
         window.close();
       } else {
+        handleInstallationReady(callbackInstallationId);
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
 
     return () => {
       isMounted = false;
-      window.removeEventListener("storage", handleInstallationStorage);
+      window.removeEventListener("message", handleInstallationMessage);
     };
   }, [gameId]);
 
@@ -611,8 +642,8 @@ export function GameConsole(): React.ReactElement {
                 </div>
                 <button
                   type="button"
-                  onClick={handleOpenGitHubInstall}
-                  disabled={!installUrl}
+                  onClick={() => void handleConnectGitHub()}
+                  disabled={isOpeningGitHub}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -625,8 +656,8 @@ export function GameConsole(): React.ReactElement {
                     fontWeight: 600,
                     textDecoration: 'none',
                     border: 'none',
-                    cursor: installUrl ? 'pointer' : 'not-allowed',
-                    opacity: installUrl ? 1 : 0.5
+                    cursor: isOpeningGitHub ? 'wait' : 'pointer',
+                    opacity: isOpeningGitHub ? 0.5 : 1
                   }}
                 >
                   <span>Authorize on GitHub</span>
@@ -643,12 +674,26 @@ export function GameConsole(): React.ReactElement {
                 <div style={{ position: 'relative' }}>
                   <select
                     value={repoInput}
-                    onChange={e => setRepoInput(e.target.value)}
+                    onChange={e => {
+                      const repository = availableRepositories.find(item => item.full_name === e.target.value);
+                      setRepoInput(e.target.value);
+                      if (repository) setBranchInput(repository.default_branch || "main");
+                    }}
                     required
+                    disabled={isLoadingRepositories}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', outline: 'none', boxSizing: 'border-box', appearance: 'none', backgroundColor: '#fff', cursor: 'pointer' }}
                   >
-                    <option value="" disabled>Select an authorized repository...</option>
-                    {repoInfo.repository && <option value={repoInfo.repository}>{repoInfo.repository}</option>}
+                    <option value="" disabled>
+                      {isLoadingRepositories ? "Loading authorized repositories..." : "Select an authorized repository..."}
+                    </option>
+                    {availableRepositories.map(repository => (
+                      <option key={repository.full_name} value={repository.full_name}>
+                        {repository.full_name}{repository.private ? " (Private)" : ""}
+                      </option>
+                    ))}
+                    {repoInfo.repository && !availableRepositories.some(repository => repository.full_name === repoInfo.repository) && (
+                      <option value={repoInfo.repository}>{repoInfo.repository}</option>
+                    )}
                   </select>
                   <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>

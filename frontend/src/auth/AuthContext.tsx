@@ -5,11 +5,20 @@ import React, {
   useCallback,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { UserProfileInfo } from "../types/userProfile";
 import { WLAuthClient } from "./wlAuthClient";
 import { authApi } from "../services/authApi";
-import { ApiError, AUTH_UNAUTHORIZED_EVENT } from "../services/apiClient";
+import { AUTH_UNAUTHORIZED_EVENT } from "../services/apiClient";
+import {
+  sessionActions,
+  sessionSelectors,
+  sessionState,
+  type ApiSession,
+} from "../state/sessionStore";
+import { profileActions, profileState } from "../state/profileStore";
+import { profileCache } from "../state/profileCache";
 import {
   UserRole,
   Permission,
@@ -17,13 +26,8 @@ import {
   hasPermission as checkPermission,
 } from "./permissionSystem";
 
-const SESSION_KEY = "randseed_auth_session";
-const CUSTOM_TOKEN_KEY = "randseed_custom_jwt";
-const USER_PROFILE_KEY = "user_profile_data";
-const USER_PROFILES_KEY = "randseed_user_profiles";
 const ORGANIZATIONS_KEY = "randseed_developer_organizations";
 const AUTH_SYNC_CHANNEL = "randseed_creator_auth_sync";
-const AUTH_SYNC_STORAGE_KEY = "randseed_creator_auth_event";
 const SSO_VERIFIER_KEY = "randseed_sso_code_verifier";
 const SSO_STATE_KEY = "randseed_sso_state";
 
@@ -77,10 +81,13 @@ type DeveloperOrganizationInput = Omit<
 
 interface AuthContextValue {
   accountId: string | null;
+  apiSession: ApiSession | null;
   profile: UserProfile | null;
   organization: DeveloperOrganization | null;
   isAuthLoading: boolean;
   isSignedIn: boolean;
+  hasActiveSession: boolean;
+  isAnonymousSession: boolean;
   isSsoFrameOpen: boolean;
   role: UserRole;
   permissions: Permission[];
@@ -94,12 +101,13 @@ interface AuthContextValue {
   signIn: (accountId: string) => void;
   signInWithSSO: () => void;
   closeSsoFrame: () => void;
-  signOut: () => Promise<void>;
-  updateProfile: (profile: UserProfile, accountId?: string) => void;
+  signOut: (options?: { notifyMainSite?: boolean }) => Promise<void>;
+  updateProfile: (profile: UserProfile, accountId?: string) => Promise<void>;
   saveOrganization: (
     input: DeveloperOrganizationInput,
   ) => Promise<DeveloperOrganization>;
   isOrganizationNameAvailable: (name: string) => boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -117,10 +125,6 @@ function readOrganizations(): Record<string, DeveloperOrganization> {
   return readJson<Record<string, DeveloperOrganization>>(ORGANIZATIONS_KEY, {});
 }
 
-function readProfiles(): Record<string, UserProfile> {
-  return readJson<Record<string, UserProfile>>(USER_PROFILES_KEY, {});
-}
-
 function createOrganizationId(): string {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
@@ -133,10 +137,59 @@ export function AuthProvider({
   children: React.ReactNode;
 }): React.ReactElement {
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [organization, setOrganization] = useState<DeveloperOrganization | null>(null);
   const [isSsoFrameOpen, setIsSsoFrameOpen] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const apiSessionState = useSyncExternalStore(
+    sessionState.subscribe,
+    sessionState.getSnapshot,
+    sessionState.getSnapshot,
+  );
+  const apiSession = apiSessionState.session;
+  const profileSnapshot = useSyncExternalStore(
+    profileState.subscribe,
+    profileState.getSnapshot,
+    profileState.getSnapshot,
+  );
+  const profile = profileSnapshot.profile;
+
+  const refreshProfile = useCallback(async () => {
+    if (!accountId) return;
+    if (profileState.getSnapshot().status === "refreshing") return;
+    profileActions.beginRefresh();
+    try {
+      const response = await authApi.getMe();
+      if (response.token) {
+        sessionActions.establishAuthenticated(response.token, response.user.principal_id);
+      }
+      const currentProfile = profileState.getSnapshot().profile;
+      const nextProfile: UserProfile = {
+        ...currentProfile,
+        avatarUrl: response.user.avatarUrl || currentProfile?.avatarUrl || "",
+        username: currentProfile?.username || response.user.email?.split("@")[0] || accountId.substring(0, 10),
+        isVerified: response.user.isEmailVerified,
+        hasStake: currentProfile?.hasStake ?? false,
+        lastActive: "Just now",
+        bio: currentProfile?.bio || "",
+        location: currentProfile?.location || "",
+        joinedDate: currentProfile?.joinedDate || new Date().toISOString().split("T")[0],
+        role: response.user.role,
+        roles: response.user.roles ?? [response.user.role],
+        email: response.user.email ?? undefined,
+        isEmailVerified: response.user.isEmailVerified,
+        creatorOrgName: response.user.creatorOrgName ?? currentProfile?.creatorOrgName ?? null,
+        withdrawalToken: response.user.withdrawalToken ?? null,
+        withdrawalNetwork: response.user.withdrawalNetwork ?? null,
+        withdrawalAddress: response.user.withdrawalAddress ?? null,
+        withdrawalUpdatedAt: response.user.withdrawalUpdatedAt ?? null,
+      };
+      profileActions.setServerProfile(nextProfile);
+      profileCache.write(accountId, nextProfile);
+      setOrganization(response.organization);
+    } catch (error) {
+      profileActions.setError(error instanceof Error ? error.message : "Unable to refresh profile");
+    }
+  }, [accountId]);
 
   const processSsoCode = useCallback(async (ssoCode: string, redirectUri: string, state: string) => {
     try {
@@ -149,32 +202,29 @@ export function AuthProvider({
         const ssoRes = await authApi.verifySSO(ssoCode, redirectUri, verifier);
         if (ssoRes && ssoRes.token) {
           const uid = ssoRes.uid || ssoRes.user.principal_id;
-          localStorage.removeItem("randseed_signed_out");
-          localStorage.setItem(CUSTOM_TOKEN_KEY, ssoRes.token);
-          localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
+          sessionActions.establishAuthenticated(ssoRes.token, uid);
 
-          const profiles = readProfiles();
+          const cachedProfile = profileCache.read(uid);
           const updatedProfile: UserProfile = {
-            avatarUrl: ssoRes.user.avatarUrl || profiles[uid]?.avatarUrl || "",
-            username: profiles[uid]?.username || (ssoRes.user.email?.split("@")[0] ?? uid.substring(0, 10)),
+            avatarUrl: ssoRes.user.avatarUrl || cachedProfile?.avatarUrl || "",
+            username: cachedProfile?.username || (ssoRes.user.email?.split("@")[0] ?? uid.substring(0, 10)),
             isVerified: ssoRes.user.isEmailVerified,
-            hasStake: profiles[uid]?.hasStake ?? false,
+            hasStake: cachedProfile?.hasStake ?? false,
             lastActive: "Just now",
-            bio: profiles[uid]?.bio || "",
-            location: profiles[uid]?.location || "",
-            joinedDate: profiles[uid]?.joinedDate || new Date().toISOString().split("T")[0],
+            bio: cachedProfile?.bio || "",
+            location: cachedProfile?.location || "",
+            joinedDate: cachedProfile?.joinedDate || new Date().toISOString().split("T")[0],
             role: ssoRes.user.role,
             roles: ssoRes.user.roles ?? [ssoRes.user.role],
             email: ssoRes.user.email ?? undefined,
             isEmailVerified: ssoRes.user.isEmailVerified,
+            creatorOrgName: cachedProfile?.creatorOrgName ?? null,
           };
 
-          profiles[uid] = updatedProfile;
-          localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-          localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updatedProfile));
+          profileCache.write(uid, updatedProfile);
 
           setAccountId(uid);
-          setProfile(updatedProfile);
+          profileActions.hydrate(updatedProfile);
           setIsSsoFrameOpen(false);
           sessionStorage.removeItem(SSO_VERIFIER_KEY);
           sessionStorage.removeItem(SSO_STATE_KEY);
@@ -196,7 +246,6 @@ export function AuthProvider({
               organization: ssoRes.organization ?? null,
             },
           };
-          localStorage.setItem(AUTH_SYNC_STORAGE_KEY, JSON.stringify(loginEvent));
           try {
             const channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
             channel.postMessage(loginEvent);
@@ -253,65 +302,36 @@ export function AuthProvider({
           return;
         }
 
-        // 2. Fallback: Check local storage for existing Custom Token / Session
-        if (localStorage.getItem("randseed_signed_out") === "true") {
-          // User explicitly signed out, do not restore previous session or auto-renew
-          localStorage.removeItem(SESSION_KEY);
-          localStorage.removeItem(CUSTOM_TOKEN_KEY);
-          localStorage.removeItem(USER_PROFILE_KEY);
+        // The access token stays memory-only. The HttpOnly refresh cookie can
+        // restore a fresh access token without exposing a credential to JS.
+        try {
+          const response = await authApi.refresh();
+          const uid = response.user.principal_id;
+          const cachedProfile = profileCache.read(uid);
+          const restoredProfile: UserProfile = {
+            avatarUrl: response.user.avatarUrl || cachedProfile?.avatarUrl || "",
+            username: cachedProfile?.username || response.user.email?.split("@")[0] || uid.substring(0, 10),
+            isVerified: response.user.isEmailVerified,
+            hasStake: cachedProfile?.hasStake ?? false,
+            lastActive: "Just now",
+            bio: cachedProfile?.bio || "",
+            location: cachedProfile?.location || "",
+            joinedDate: cachedProfile?.joinedDate || new Date().toISOString().split("T")[0],
+            role: response.user.role,
+            roles: response.user.roles ?? [response.user.role],
+            email: response.user.email ?? undefined,
+            isEmailVerified: response.user.isEmailVerified,
+            creatorOrgName: response.user.creatorOrgName ?? null,
+          };
+          sessionActions.establishAuthenticated(response.token!, uid);
+          setAccountId(uid);
+          profileActions.hydrate(restoredProfile);
+          profileCache.write(uid, restoredProfile);
+          setOrganization(response.organization);
+        } catch {
+          sessionActions.clear();
+          profileActions.clear();
           setAccountId(null);
-          setProfile(null);
-          setOrganization(null);
-          return;
-        }
-
-        const storedSession = readJson<string | null>(SESSION_KEY, null);
-        const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
-
-        if (storedSession && token) {
-          setAccountId(storedSession);
-          void authApi
-            .getMe()
-            .then((meRes) => {
-              if (!meRes?.user) return;
-              if (meRes.token) {
-                localStorage.setItem(CUSTOM_TOKEN_KEY, meRes.token);
-              }
-              setProfile((prev) => ({
-                ...prev,
-                avatarUrl: meRes.user.avatarUrl || prev?.avatarUrl || "",
-                username: prev?.username || (meRes.user.email?.split("@")[0] ?? storedSession),
-                isVerified: meRes.user.isEmailVerified,
-                hasStake: prev?.hasStake ?? false,
-                lastActive: prev?.lastActive || "Recently",
-                bio: prev?.bio || "",
-                location: prev?.location || "",
-                joinedDate: prev?.joinedDate || new Date().toISOString().split("T")[0],
-                role: meRes.user.role,
-                roles: meRes.user.roles ?? [meRes.user.role],
-                email: meRes.user.email ?? undefined,
-                isEmailVerified: meRes.user.isEmailVerified,
-                creatorOrgName: meRes.user.creatorOrgName,
-                withdrawalToken: meRes.user.withdrawalToken,
-                withdrawalNetwork: meRes.user.withdrawalNetwork,
-                withdrawalAddress: meRes.user.withdrawalAddress,
-                withdrawalUpdatedAt: meRes.user.withdrawalUpdatedAt,
-              }));
-              if (meRes.organization) {
-                setOrganization(meRes.organization);
-              }
-            })
-            .catch((error) => {
-              if (error instanceof ApiError && (error.status === 401 || error.status === 404)) {
-                void signOut();
-              }
-            });
-        } else if (!token) {
-          // Clear any orphan session keys
-          localStorage.removeItem(SESSION_KEY);
-          localStorage.removeItem(USER_PROFILE_KEY);
-          setAccountId(null);
-          setProfile(null);
           setOrganization(null);
         }
       } finally {
@@ -328,19 +348,45 @@ export function AuthProvider({
 
   useEffect(() => {
     setOrganization(accountId ? readOrganizations()[accountId] ?? null : null);
-    const nextProfile = accountId ? readProfiles()[accountId] ?? null : null;
-    setProfile(nextProfile);
-    if (nextProfile) {
-      localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(nextProfile));
-    } else {
-      localStorage.removeItem(USER_PROFILE_KEY);
-    }
+    const cachedProfile = accountId ? profileCache.read(accountId) : null;
+    profileActions.hydrate(cachedProfile as UserProfile | null);
   }, [accountId]);
 
+  useEffect(() => {
+    if (!accountId || apiSession?.kind !== "authenticated") return;
+    void refreshProfile();
+  }, [accountId, apiSession?.kind, refreshProfile]);
+
+  useEffect(() => {
+    if (apiSession?.kind !== "authenticated" || !apiSession.expiresAt) return;
+    const refreshLeadTime = 60_000;
+    const delay = Math.max(1_000, apiSession.expiresAt - Date.now() - refreshLeadTime);
+    const timeoutId = window.setTimeout(() => {
+      void refreshProfile();
+    }, delay);
+    return () => window.clearTimeout(timeoutId);
+  }, [apiSession?.kind, apiSession?.expiresAt, refreshProfile]);
+
+  useEffect(() => {
+    if (!accountId || apiSession?.kind !== "authenticated") return;
+    const staleTime = 5 * 60_000;
+    const refreshIfStale = () => {
+      const lastSyncedAt = profileState.getSnapshot().lastSyncedAt;
+      if (!lastSyncedAt || Date.now() - lastSyncedAt >= staleTime) {
+        void refreshProfile();
+      }
+    };
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    return () => {
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
+  }, [accountId, apiSession?.kind, refreshProfile]);
+
   const signIn = useCallback((nextAccountId: string) => {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(nextAccountId));
-    const profiles = readProfiles();
-    if (!profiles[nextAccountId]) {
+    const cachedProfile = profileCache.read(nextAccountId);
+    if (!cachedProfile) {
       const defaultProfile: UserProfile = {
         avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${nextAccountId}`,
         username: nextAccountId.startsWith("0x")
@@ -356,10 +402,8 @@ export function AuthProvider({
         email: nextAccountId.includes("@") ? nextAccountId : `${nextAccountId.substring(0, 8)}@web3.user`,
         isEmailVerified: true,
       };
-      profiles[nextAccountId] = defaultProfile;
-      localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-      localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(defaultProfile));
-      setProfile(defaultProfile);
+      profileCache.write(nextAccountId, defaultProfile);
+      profileActions.hydrate(defaultProfile);
     }
     setAccountId(nextAccountId);
   }, []);
@@ -393,25 +437,26 @@ export function AuthProvider({
     setIsSsoFrameOpen(false);
   }, []);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (options?: { notifyMainSite?: boolean }) => {
+    const notifyMainSite = options?.notifyMainSite !== false;
+    try {
+      await authApi.logout();
+    } catch {}
+
     try {
       const client = WLAuthClient.getInstance();
       await client.logout(); // Clear local IC identity if it exists
     } catch {}
 
-    localStorage.setItem("randseed_signed_out", "true");
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(CUSTOM_TOKEN_KEY);
-    localStorage.removeItem(USER_PROFILE_KEY);
+    sessionActions.clear();
+    profileActions.clear();
     localStorage.removeItem(ORGANIZATIONS_KEY);
     setAccountId(null);
-    setProfile(null);
     setOrganization(null);
     setIsSsoFrameOpen(false);
 
     // Broadcast logout to all other open tabs/windows
     const logoutEvent = { type: "LOGOUT", timestamp: Date.now() };
-    localStorage.setItem(AUTH_SYNC_STORAGE_KEY, JSON.stringify(logoutEvent));
     try {
       const channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
       channel.postMessage(logoutEvent);
@@ -419,7 +464,7 @@ export function AuthProvider({
     } catch {}
 
     // Trigger Single Logout (SLO) on RandSeed main site via a hidden iframe
-    if (typeof document !== "undefined") {
+    if (notifyMainSite && typeof document !== "undefined") {
       try {
         const mainSiteUrl =
           import.meta.env.VITE_WL_LOGIN_URL ||
@@ -462,40 +507,59 @@ export function AuthProvider({
     }
   }, []);
 
+  useEffect(() => {
+    const handleMainSiteLogout = (event: MessageEvent) => {
+      let isAllowedOrigin = ALLOWED_SSO_ORIGINS.includes(event.origin);
+      try {
+        const mainSiteUrl = import.meta.env.VITE_WL_LOGIN_URL || import.meta.env.VITE_MAIN_SITE_URL;
+        if (mainSiteUrl && new URL(mainSiteUrl).origin === event.origin) isAllowedOrigin = true;
+      } catch {}
+      if (!isAllowedOrigin) return;
+      const type = event.data?.type;
+      if (type === "RANDSEED_LOGOUT" || type === "RANDSEED_LOGOUT_COMPLETE" || type === "RANDSEED_SSO_LOGOUT") {
+        void signOut({ notifyMainSite: false });
+      }
+    };
+
+    window.addEventListener("message", handleMainSiteLogout);
+    return () => window.removeEventListener("message", handleMainSiteLogout);
+  }, [signOut]);
+
   // Multi-window auth state synchronization (cross-tab logout & login)
   useEffect(() => {
-    const handleSyncEvent = (data: { type: string; timestamp: number; payload?: any }) => {
+    const handleSyncEvent = async (data: { type: string; timestamp: number; payload?: any }) => {
       if (!data || typeof data !== "object") return;
       if (data.type === "LOGOUT") {
+        sessionActions.clear();
         setAccountId(null);
-        setProfile(null);
+        profileActions.clear();
         setOrganization(null);
         setIsSsoFrameOpen(false);
         if (window.location.pathname.startsWith("/dashboard")) {
           window.location.href = "/";
         }
-      } else if (data.type === "LOGIN" && data.payload) {
-        setAccountId(data.payload.uid);
-        setProfile(data.payload.profile);
-        setOrganization(data.payload.organization ?? null);
-        setIsSsoFrameOpen(false);
-      }
-    };
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === AUTH_SYNC_STORAGE_KEY && e.newValue) {
+      } else if (data.type === "LOGIN") {
         try {
-          const parsed = JSON.parse(e.newValue);
-          handleSyncEvent(parsed);
-        } catch {}
+          const response = await authApi.refresh();
+          sessionActions.establishAuthenticated(response.token!, response.user.principal_id);
+          setAccountId(response.user.principal_id);
+          profileActions.hydrate(data.payload?.profile ?? null);
+          setOrganization(response.organization ?? data.payload?.organization ?? null);
+          setIsSsoFrameOpen(false);
+        } catch {
+          sessionActions.clear();
+        }
       }
     };
-
-    window.addEventListener("storage", handleStorage);
 
     // Global 401 unauthorized listener: clear local state and sync logout across all tabs without prompt
-    const handleUnauthorized = () => {
-      void signOut();
+    const handleUnauthorized = (event: Event) => {
+      const sessionKind = (event as CustomEvent<{ sessionKind?: string }>).detail?.sessionKind;
+      if (sessionKind === "authenticated") {
+        void signOut();
+      } else if (sessionKind === "anonymous") {
+        sessionActions.clear();
+      }
     };
     window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
 
@@ -503,12 +567,11 @@ export function AuthProvider({
     try {
       channel = new BroadcastChannel(AUTH_SYNC_CHANNEL);
       channel.onmessage = (e) => {
-        if (e.data) handleSyncEvent(e.data);
+        if (e.data) void handleSyncEvent(e.data);
       };
     } catch {}
 
     return () => {
-      window.removeEventListener("storage", handleStorage);
       window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
       if (channel) channel.close();
     };
@@ -522,7 +585,7 @@ export function AuthProvider({
       }
       const response = await authApi.becomeCreator();
       if (response.token) {
-        localStorage.setItem(CUSTOM_TOKEN_KEY, response.token);
+        sessionActions.establishAuthenticated(response.token, currentAcc);
       }
 
       const updatedProfile: UserProfile = {
@@ -540,32 +603,34 @@ export function AuthProvider({
         isEmailVerified: true,
       };
 
-      const profiles = readProfiles();
-      profiles[currentAcc] = updatedProfile;
-      localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-      localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updatedProfile));
-      setProfile(updatedProfile);
+      profileCache.write(currentAcc, updatedProfile);
+      profileActions.setServerProfile(updatedProfile);
       setAccountId(currentAcc);
-      localStorage.removeItem("randseed_signed_out");
-
       return organization;
     },
     [accountId, organization, profile],
   );
 
   const updateProfile = useCallback(
-    (nextProfile: UserProfile, profileAccountId?: string) => {
+    async (nextProfile: UserProfile, profileAccountId?: string) => {
       const targetAccount = profileAccountId ?? accountId;
       if (!targetAccount) {
         throw new Error("You must sign in before updating a profile.");
       }
-      const profiles = readProfiles();
-      profiles[targetAccount] = nextProfile;
-      localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
-      localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(nextProfile));
-      setProfile(nextProfile);
+      if (targetAccount === accountId) {
+        await authApi.updateProfile({
+          email: nextProfile.email,
+          creator_org_name: nextProfile.creatorOrgName,
+          withdrawal_token: nextProfile.withdrawalToken,
+          withdrawal_network: nextProfile.withdrawalNetwork,
+          withdrawal_address: nextProfile.withdrawalAddress,
+        });
+        await refreshProfile();
+        return;
+      }
+      profileCache.write(targetAccount, nextProfile);
     },
-    [accountId],
+    [accountId, refreshProfile],
   );
 
   const isOrganizationNameAvailable = useCallback(
@@ -648,11 +713,14 @@ export function AuthProvider({
   const value = useMemo<AuthContextValue>(
     () => ({
       accountId,
+      apiSession,
       profile,
       organization,
       isAuthLoading,
       isSsoFrameOpen,
       isSignedIn: Boolean(accountId),
+      hasActiveSession: Boolean(apiSession),
+      isAnonymousSession: sessionSelectors.isAnonymous({ session: apiSession }),
       role: currentRole,
       permissions,
       hasPermission,
@@ -667,9 +735,11 @@ export function AuthProvider({
       updateProfile,
       saveOrganization,
       isOrganizationNameAvailable,
+      refreshProfile,
     }),
     [
       accountId,
+      apiSession,
       profile,
       organization,
       isAuthLoading,
@@ -685,6 +755,7 @@ export function AuthProvider({
       updateProfile,
       saveOrganization,
       isOrganizationNameAvailable,
+      refreshProfile,
     ],
   );
 

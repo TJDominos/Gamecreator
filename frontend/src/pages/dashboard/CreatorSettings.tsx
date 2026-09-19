@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../auth/AuthContext";
-import { authApi } from "../../services/authApi";
 import { Save, AlertTriangle, CheckCircle2, Building, Wallet, Loader2 } from "lucide-react";
 
 export function CreatorSettings() {
@@ -46,9 +45,8 @@ export function CreatorSettings() {
   const handleSaveOrgName = async () => {
     setIsSavingOrg(true);
     try {
-      await authApi.updateProfile({ creator_org_name: orgName });
       if (profile) {
-        updateProfile({ ...profile, creatorOrgName: orgName });
+        await updateProfile({ ...profile, creatorOrgName: orgName });
       }
       setOrgSuccess(true);
       setTimeout(() => setOrgSuccess(false), 3000);
@@ -70,20 +68,12 @@ export function CreatorSettings() {
     setIsSavingWithdrawal(true);
     setWithdrawalError("");
     try {
-      await authApi.updateProfile({
-        withdrawal_token: withdrawalToken,
-        withdrawal_network: withdrawalNetwork,
-        withdrawal_address: withdrawalAddress,
-      });
-      
-      const now = Date.now();
       if (profile) {
-        updateProfile({ 
+        await updateProfile({
           ...profile, 
           withdrawalToken, 
           withdrawalNetwork, 
           withdrawalAddress,
-          withdrawalUpdatedAt: now
         });
       }
       setWithdrawalSuccess(true);

@@ -1,4 +1,5 @@
 import { request } from "./apiClient";
+import { getAuthToken } from "./authTokenStore";
 import type { Bounty, BountyState, Category, Creator, GameExample, PublishedGame } from "../pages/dashboard/bounties/bountyData";
 
 interface RawBounty {
@@ -117,7 +118,7 @@ export function mapBounty(raw: RawBounty): Bounty {
 
 export const bountyApi = {
   async uploadMedia(file: File): Promise<{ url: string }> {
-    const token = localStorage.getItem("randseed_custom_jwt");
+    const token = getAuthToken();
     const formData = new FormData();
     formData.append("file", file);
     const response = await fetch("/api/admin/bounties/media", {

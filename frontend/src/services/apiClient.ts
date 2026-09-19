@@ -1,4 +1,6 @@
-const CUSTOM_TOKEN_KEY = "randseed_custom_jwt";
+import { getAuthToken, getAuthTokenKind } from "./authTokenStore";
+import { sessionActions } from "../state/sessionStore";
+
 const REQUEST_TIMEOUT_MS = 15000;
 
 export interface ApiResponse<T = any> {
@@ -24,6 +26,8 @@ export class ApiError extends Error {
   }
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
 export function getBaseApiUrl(): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl && typeof envUrl === "string" && envUrl.trim()) {
@@ -32,16 +36,43 @@ export function getBaseApiUrl(): string {
   return import.meta.env.DEV ? "https://devcreator.randseed.org" : "";
 }
 
-export async function request<T = any>(
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${getBaseApiUrl()}/api/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { token?: string; user?: { principal_id?: string } };
+      if (!payload.token) return null;
+      sessionActions.establishAuthenticated(payload.token, payload.user?.principal_id);
+      return payload.token;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function requestInternal<T = any>(
   endpoint: string,
   options: RequestInit = {},
+  allowRefresh = true,
 ): Promise<T> {
   const baseUrl = getBaseApiUrl();
   const url = endpoint.startsWith("http")
     ? endpoint
     : `${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  const token = localStorage.getItem(CUSTOM_TOKEN_KEY);
+  const token = getAuthToken();
+  const sessionKind = getAuthTokenKind();
   const headers = new Headers(options.headers || {});
 
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
@@ -60,6 +91,7 @@ export async function request<T = any>(
   try {
     const response = await fetch(url, {
       ...options,
+      credentials: options.credentials ?? "include",
       headers,
       signal: requestController?.signal ?? options.signal,
     });
@@ -74,9 +106,22 @@ export async function request<T = any>(
     }
 
     if (!response.ok) {
+      const isRefreshEndpoint = endpoint === "/api/auth/refresh" || endpoint.endsWith("/api/auth/refresh");
+      const canRefresh = response.status === 401 && allowRefresh && !isRefreshEndpoint && Boolean(token) && sessionKind === "authenticated";
+      if (canRefresh) {
+        const nextToken = await refreshAccessToken();
+        if (nextToken) {
+          const retryHeaders = new Headers(options.headers || {});
+          retryHeaders.set("Authorization", `Bearer ${nextToken}`);
+          return requestInternal<T>(endpoint, { ...options, headers: retryHeaders }, false);
+        }
+      }
+
       if (response.status === 401) {
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT));
+          window.dispatchEvent(new CustomEvent(AUTH_UNAUTHORIZED_EVENT, {
+            detail: { sessionKind },
+          }));
         }
       }
 
@@ -106,4 +151,8 @@ export async function request<T = any>(
       window.clearTimeout(timeoutId);
     }
   }
+}
+
+export function request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  return requestInternal<T>(endpoint, options);
 }

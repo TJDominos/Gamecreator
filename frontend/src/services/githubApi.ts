@@ -7,6 +7,18 @@ export interface GitHubInstallInfo {
   install_url: string;
 }
 
+export interface GitHubRepositoryOption {
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+}
+
+export interface GitHubRepositoriesResponse {
+  success: boolean;
+  repositories?: GitHubRepositoryOption[];
+  error?: string;
+}
+
 export interface GameRepoResponse {
   success: boolean;
   repo_info?: GameRepoInfo;
@@ -116,6 +128,13 @@ export const githubApi = {
     return request<GitHubInstallInfo>(`/api/github/install${query}`, {
       method: "GET",
     });
+  },
+
+  async listRepositories(installationId: number): Promise<GitHubRepositoriesResponse> {
+    return request<GitHubRepositoriesResponse>(
+      `/api/github/repositories?installation_id=${encodeURIComponent(installationId)}`,
+      { method: "GET" },
+    );
   },
 
   /**

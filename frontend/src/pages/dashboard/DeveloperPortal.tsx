@@ -38,7 +38,8 @@ import {
   useLocation,
   useNavigate,
 } from "react-router";
-import { getStoredGames, createNextNewGameAsync, syncGamesWithBackend, GAMES_UPDATED_EVENT } from "./games/gameData";
+import { createNextNewGameAsync, syncGamesWithBackend } from "./games/gameData";
+import { useGamesStore } from "../../state/gamesStore";
 import { CreatorAccessGate, DashboardAccessGate } from "./DashboardAccessGate";
 import { useAuth } from "../../auth/AuthContext";
 import { WltLogo } from "../../components/WltLogo";
@@ -422,22 +423,14 @@ function Dashboard(): React.ReactElement {
   const { organization } = useAuth();
   const [startDate, setStartDate] = useState("2026-07-24");
   const [endDate, setEndDate] = useState("2026-08-23");
-  const [games, setGames] = useState(() => getStoredGames());
+  const games = useGamesStore();
   
   const [isCreatingGame, setIsCreatingGame] = useState(false);
   const endDateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Synchronize games from backend database
-    syncGamesWithBackend().then((fresh) => {
-      if (fresh) setGames(fresh);
-    }).catch(() => undefined);
-
-    const handleUpdate = () => {
-      setGames(getStoredGames());
-    };
-    window.addEventListener(GAMES_UPDATED_EVENT, handleUpdate);
-    return () => window.removeEventListener(GAMES_UPDATED_EVENT, handleUpdate);
+    void syncGamesWithBackend().catch(() => undefined);
   }, []);
 
   const totalPlayers = games.reduce((total, game) => total + parseGameMetric(game.players), 0);

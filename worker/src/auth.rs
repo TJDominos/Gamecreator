@@ -1,15 +1,20 @@
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD}, Engine};
 use candid::{CandidType, Decode, Encode};
 use hmac::{Hmac, Mac};
 use ic_agent::{export::Principal, Agent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
 use worker::{js_sys, Env, Method, Request, Result, Response};
 
 use crate::{db, response};
 
 type HmacSha256 = Hmac<Sha256>;
+
+const ACCESS_TOKEN_TTL_SECONDS: i64 = 15 * 60;
+const REFRESH_SESSION_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE_NAME: &str = "__Host-randseed-refresh";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -79,6 +84,113 @@ pub fn user(request: &Request, env: &Env) -> Option<Claims> {
     verify(token, &secret(env).ok()?)
 }
 
+fn now_ms() -> i64 {
+    js_sys::Date::now() as i64
+}
+
+fn opaque_token() -> String {
+    format!("{}.{}", Uuid::new_v4(), Uuid::new_v4())
+}
+
+fn token_hash(token: &str) -> String {
+    hex::encode(Sha256::digest(token.as_bytes()))
+}
+
+fn access_token(
+    env: &Env,
+    principal_id: String,
+    role: String,
+    roles: Vec<String>,
+    email: Option<String>,
+    is_email_verified: bool,
+) -> Result<String> {
+    sign(
+        Claims {
+            principal_id,
+            role,
+            roles,
+            game_id: None,
+            email,
+            is_email_verified,
+            iat: 0,
+            exp: 0,
+        },
+        &secret(env)?,
+        ACCESS_TOKEN_TTL_SECONDS,
+    )
+}
+
+fn cookie_value(request: &Request) -> Option<String> {
+    let cookies = request.headers().get("Cookie").ok().flatten()?;
+    cookies.split(';').find_map(|part| {
+        let (name, value) = part.trim().split_once('=')?;
+        (name == REFRESH_COOKIE_NAME).then(|| value.to_string())
+    })
+}
+
+fn cookie_same_site(request: &Request) -> &'static str {
+    let origin = request.headers().get("Origin").ok().flatten().unwrap_or_default();
+    if origin.starts_with("http://localhost") || origin.starts_with("http://127.0.0.1") {
+        "None"
+    } else {
+        "Lax"
+    }
+}
+
+fn refresh_cookie(request: &Request, token: &str) -> String {
+    format!(
+        "{REFRESH_COOKIE_NAME}={token}; Max-Age={}; Path=/; HttpOnly; Secure; SameSite={}",
+        REFRESH_SESSION_TTL_MS / 1000,
+        cookie_same_site(request)
+    )
+}
+
+fn clear_refresh_cookie(request: &Request) -> String {
+    format!("{REFRESH_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite={}", cookie_same_site(request))
+}
+
+fn with_cookie(mut response: Response, cookie: &str) -> Result<Response> {
+    response.headers_mut().set("Set-Cookie", cookie)?;
+    Ok(response)
+}
+
+async fn create_refresh_session(
+    database: &worker::d1::D1Database,
+    principal_id: &str,
+    family_id: &str,
+    token: &str,
+    user_agent: Option<String>,
+    now: i64,
+) -> Result<()> {
+    db::run(
+        database,
+        "INSERT INTO auth_refresh_sessions (token_hash, family_id, principal_id, created_at, last_used_at, expires_at, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        &[
+            json!(token_hash(token)),
+            json!(family_id),
+            json!(principal_id),
+            json!(now),
+            json!(now),
+            json!(now + REFRESH_SESSION_TTL_MS),
+            json!(user_agent),
+        ],
+    )
+    .await
+}
+
+async fn revoke_refresh_family(
+    database: &worker::d1::D1Database,
+    family_id: &str,
+    now: i64,
+) -> Result<()> {
+    db::run(
+        database,
+        "UPDATE auth_refresh_sessions SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL",
+        &[json!(now), json!(family_id)],
+    )
+    .await
+}
+
 pub fn has_role(claims: &Claims, required: &str) -> bool {
     claims.roles.iter().any(|role| role == "admin" || role == required || (role == "creator" && required == "player"))
         || claims.role == "admin"
@@ -97,6 +209,8 @@ pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>>
     let path = request.path();
     match (request.method(), path.as_str()) {
         (Method::Get, "/api/auth/me") => Ok(Some(me(request, env).await?)),
+        (Method::Post, "/api/auth/refresh") => Ok(Some(refresh(request, env).await?)),
+        (Method::Post, "/api/auth/logout") => Ok(Some(logout(request, env).await?)),
         (Method::Post, "/api/auth/become-creator") => Ok(Some(become_creator(request, env).await?)),
         (Method::Post, "/api/auth/sso") | (Method::Post, "/verifyRandseedSSO") => Ok(Some(sso(request, env).await?)),
         (Method::Put, "/api/auth/profile") => Ok(Some(update_profile(request, env).await?)),
@@ -157,6 +271,30 @@ async fn profile(env: &Env, principal_id: &str) -> Option<UserProfile> {
     Decode!(&bytes, Option<UserProfile>).ok()?.or(None)
 }
 
+fn avatar_url(value: String) -> Option<String> {
+    let value = value.trim().to_string();
+    if value.is_empty() || value == "-1" {
+        return None;
+    }
+    if value.starts_with("https://") || value.starts_with("http://") || value.starts_with("data:") {
+        return Some(value);
+    }
+
+    let bytes = STANDARD.decode(&value).ok()?;
+    let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        "image/png"
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        "image/jpeg"
+    } else if bytes.starts_with(b"GIF8") {
+        "image/gif"
+    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        "image/webp"
+    } else {
+        return None;
+    };
+    Some(format!("data:{mime};base64,{value}"))
+}
+
 async fn sso(request: &mut Request, env: &Env) -> Result<Response> {
     let body = request.json::<Value>().await.unwrap_or_else(|_| json!({}));
     let code = body.get("sso_code").and_then(Value::as_str).unwrap_or_default().trim().to_string();
@@ -168,9 +306,9 @@ async fn sso(request: &mut Request, env: &Env) -> Result<Response> {
     let Some(authorization) = redeem_sso(env, &code, &redirect_uri, &verifier).await? else { return response::error(request, env, "Invalid or expired SSO authorization code", 401, "INVALID_SSO_CODE"); };
     let principal_id = authorization.principal_id.clone();
     let email = authorization.email.clone();
-    let avatar = profile(env, &principal_id).await.map(|value| value.logo).filter(|value| !value.trim().is_empty());
+    let avatar = profile(env, &principal_id).await.and_then(|value| avatar_url(value.logo));
     let database = db::database(env)?;
-    let now = js_sys::Date::now() as i64;
+    let now = now_ms();
     let admin_emails = env.var("ADMIN_EMAILS").map(|value| value.to_string()).unwrap_or_default();
     let configured_admin = email.as_deref().map(|value| admin_emails.split(',').any(|item| item.trim().eq_ignore_ascii_case(value))).unwrap_or(false);
     let existing = db::first(&database, "SELECT * FROM users WHERE principal_id = ?", &[json!(principal_id.clone())]).await?;
@@ -179,8 +317,98 @@ async fn sso(request: &mut Request, env: &Env) -> Result<Response> {
     let role = if user_roles.iter().any(|item| item == "admin") { "admin" } else if user_roles.iter().any(|item| item == "creator") { "creator" } else { "player" };
     db::run(&database, "INSERT INTO users (principal_id, role, roles, email, avatar_url, email_verified, last_login_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(principal_id) DO UPDATE SET role = excluded.role, roles = excluded.roles, email = COALESCE(excluded.email, users.email), avatar_url = COALESCE(excluded.avatar_url, users.avatar_url), email_verified = excluded.email_verified, last_login_at = excluded.last_login_at, updated_at = excluded.updated_at", &[json!(principal_id.clone()), json!(role), json!(serde_json::to_string(&user_roles)?), json!(email.clone()), json!(avatar.clone()), json!(if authorization.is_email_verified { 1 } else { 0 }), json!(now), json!(now), json!(now)]).await?;
     let organization = db::first(&database, "SELECT * FROM developer_organizations WHERE owner_principal = ?", &[json!(principal_id.clone())]).await?;
-    let token = sign(Claims { principal_id: principal_id.clone(), role: role.to_string(), roles: user_roles.clone(), game_id: None, email: email.clone(), is_email_verified: authorization.is_email_verified, iat: 0, exp: 0 }, &secret(env)?, 60 * 60 * 24 * 7)?;
-    response::json(request, env, &json!({ "success": true, "token": token, "customToken": token, "uid": principal_id.clone(), "user": { "principal_id": principal_id, "role": role, "roles": user_roles, "email": email, "avatarUrl": avatar, "isEmailVerified": authorization.is_email_verified, "lastPortalLoginAt": now }, "organization": organization }), 200)
+    let refresh_token = opaque_token();
+    create_refresh_session(&database, &principal_id, &Uuid::new_v4().to_string(), &refresh_token, request.headers().get("User-Agent").ok().flatten(), now).await?;
+    let token = access_token(env, principal_id.clone(), role.to_string(), user_roles.clone(), email.clone(), authorization.is_email_verified)?;
+    let response = response::json(request, env, &json!({ "success": true, "token": token, "customToken": token, "uid": principal_id.clone(), "user": { "principal_id": principal_id, "role": role, "roles": user_roles, "email": email, "avatarUrl": avatar, "isEmailVerified": authorization.is_email_verified, "lastPortalLoginAt": now }, "organization": organization }), 200)?;
+    with_cookie(response, &refresh_cookie(request, &refresh_token))
+}
+
+async fn refresh(request: &Request, env: &Env) -> Result<Response> {
+    let Some(raw_token) = cookie_value(request) else {
+        return response::error(request, env, "Refresh session is missing", 401, "REFRESH_SESSION_MISSING");
+    };
+    let database = db::database(env)?;
+    let hash = token_hash(&raw_token);
+    let Some(session) = db::first(&database, "SELECT * FROM auth_refresh_sessions WHERE token_hash = ?", &[json!(hash.clone())]).await? else {
+        return with_cookie(response::error(request, env, "Refresh session is invalid", 401, "REFRESH_SESSION_INVALID")?, &clear_refresh_cookie(request));
+    };
+    let now = now_ms();
+    let family_id = db::string(&session, "family_id").unwrap_or_default();
+    if db::integer(&session, "revoked_at") != 0 {
+        revoke_refresh_family(&database, &family_id, now).await?;
+        return with_cookie(response::error(request, env, "Refresh session was revoked", 401, "REFRESH_SESSION_REVOKED")?, &clear_refresh_cookie(request));
+    }
+    if db::integer(&session, "expires_at") <= now {
+        revoke_refresh_family(&database, &family_id, now).await?;
+        return with_cookie(response::error(request, env, "Refresh session has expired", 401, "REFRESH_SESSION_EXPIRED")?, &clear_refresh_cookie(request));
+    }
+
+    let principal_id = db::string(&session, "principal_id").unwrap_or_default();
+    let Some(row) = db::first(&database, "SELECT * FROM users WHERE principal_id = ?", &[json!(principal_id.clone())]).await? else {
+        revoke_refresh_family(&database, &family_id, now).await?;
+        return with_cookie(response::error(request, env, "User not found", 404, "USER_NOT_FOUND")?, &clear_refresh_cookie(request));
+    };
+    let (role, user_roles) = role_from_row(&row);
+    let email = db::string(&row, "email");
+    let verified = db::integer(&row, "email_verified") == 1;
+    let next_refresh_token = opaque_token();
+    let next_hash = token_hash(&next_refresh_token);
+    let rotated = db::run_changes(
+        &database,
+        "UPDATE auth_refresh_sessions SET revoked_at = ?, last_used_at = ? WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?",
+        &[json!(now), json!(now), json!(hash), json!(now)],
+    ).await?;
+    if rotated != 1 {
+        revoke_refresh_family(&database, &family_id, now).await?;
+        return with_cookie(response::error(request, env, "Refresh session rotation failed", 401, "REFRESH_ROTATION_FAILED")?, &clear_refresh_cookie(request));
+    }
+    db::run(
+        &database,
+        "INSERT INTO auth_refresh_sessions (token_hash, family_id, principal_id, created_at, last_used_at, expires_at, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        &[
+            json!(next_hash),
+            json!(family_id),
+            json!(principal_id.clone()),
+            json!(now),
+            json!(now),
+            json!(now + REFRESH_SESSION_TTL_MS),
+            json!(request.headers().get("User-Agent").ok().flatten()),
+        ],
+    ).await?;
+    let token = access_token(env, principal_id.clone(), role.clone(), user_roles.clone(), email.clone(), verified)?;
+    let organization = db::first(&database, "SELECT * FROM developer_organizations WHERE owner_principal = ?", &[json!(principal_id.clone())]).await?;
+    let response = response::json(request, env, &json!({
+        "success": true,
+        "token": token,
+        "user": {
+            "principal_id": principal_id,
+            "role": role,
+            "roles": user_roles,
+            "email": email,
+            "avatarUrl": db::string(&row, "avatar_url"),
+            "isEmailVerified": verified,
+            "tosAcceptedVersion": db::string(&row, "tos_accepted_version"),
+            "kycStatus": db::string(&row, "kyc_status"),
+            "creatorOrgName": db::string(&row, "creator_org_name"),
+            "lastLoginAt": row.get("last_login_at"),
+            "createdAt": row.get("created_at")
+        },
+        "organization": organization
+    }), 200)?;
+    with_cookie(response, &refresh_cookie(request, &next_refresh_token))
+}
+
+async fn logout(request: &Request, env: &Env) -> Result<Response> {
+    if let Some(raw_token) = cookie_value(request) {
+        let database = db::database(env)?;
+        if let Some(session) = db::first(&database, "SELECT family_id FROM auth_refresh_sessions WHERE token_hash = ?", &[json!(token_hash(&raw_token))]).await? {
+            if let Some(family_id) = db::string(&session, "family_id") {
+                db::run(&database, "UPDATE auth_refresh_sessions SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL", &[json!(now_ms()), json!(family_id)]).await?;
+            }
+        }
+    }
+    with_cookie(response::json(request, env, &json!({ "success": true }), 200)?, &clear_refresh_cookie(request))
 }
 
 async fn update_profile(request: &mut Request, env: &Env) -> Result<Response> {
@@ -206,10 +434,8 @@ async fn me(request: &Request, env: &Env) -> Result<Response> {
     };
     let (role, user_roles) = role_from_row(&row);
     let organization = db::first(&db::database(env)?, "SELECT * FROM developer_organizations WHERE owner_principal = ?", &[json!(claims.principal_id)]).await?;
-    let token = sign(Claims { principal_id: claims.principal_id.clone(), role: role.clone(), roles: user_roles.clone(), game_id: None, email: db::string(&row, "email"), is_email_verified: db::integer(&row, "email_verified") == 1, iat: 0, exp: 0 }, &secret(env)?, 60 * 60 * 24 * 7)?;
     response::json(request, env, &json!({
         "success": true,
-        "token": token,
         "user": {
             "principal_id": claims.principal_id,
             "role": role,
@@ -240,7 +466,7 @@ async fn become_creator(request: &Request, env: &Env) -> Result<Response> {
     if !user_roles.iter().any(|role| role == "creator") { user_roles.push("creator".to_string()); }
     let primary = if user_roles.iter().any(|role| role == "admin") { "admin" } else { "creator" };
     db::run(&database, "UPDATE users SET role = ?, roles = ?, updated_at = ? WHERE principal_id = ?", &[json!(primary), json!(serde_json::to_string(&user_roles)?), json!(js_sys::Date::now() as i64), json!(claims.principal_id.clone())]).await?;
-    let token = sign(Claims { principal_id: claims.principal_id, role: primary.to_string(), roles: user_roles.clone(), game_id: None, email: db::string(&row, "email"), is_email_verified: db::integer(&row, "email_verified") == 1, iat: 0, exp: 0 }, &secret(env)?, 60 * 60 * 24 * 7)?;
+    let token = access_token(env, claims.principal_id, primary.to_string(), user_roles.clone(), db::string(&row, "email"), db::integer(&row, "email_verified") == 1)?;
     response::json(request, env, &json!({ "success": true, "role": primary, "roles": user_roles, "token": token }), 200)
 }
 

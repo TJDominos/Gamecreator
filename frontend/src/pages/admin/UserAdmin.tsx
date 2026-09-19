@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Plus, Users, ShieldCheck, Gamepad2, Search, Trash2, UserMinus } from "lucide-react";
 import { authApi } from "../../services/authApi"; // Wait, authApi doesn't have it. We can just use fetch with token.
+import { getAuthToken } from "../../services/authTokenStore";
 
 export function UserAdmin(): React.ReactElement {
   const [users, setUsers] = useState<any[]>([]);
@@ -14,7 +15,7 @@ export function UserAdmin(): React.ReactElement {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem("randseed_custom_token");
+      const token = getAuthToken();
       const res = await fetch("/api/admin/users", {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -34,7 +35,7 @@ export function UserAdmin(): React.ReactElement {
     if (!confirm(`Are you sure you want to completely delete the user ${email || principalId}?\n\nWARNING: This action cannot be undone.`)) return;
     
     try {
-      const token = localStorage.getItem("randseed_custom_token");
+      const token = getAuthToken();
       const res = await fetch("/api/admin/users", {
         method: "DELETE",
         headers: { 
@@ -60,7 +61,7 @@ export function UserAdmin(): React.ReactElement {
     if (!confirm(`Are you sure you want to revoke privileges and demote ${email} to Player?`)) return;
     
     try {
-      const token = localStorage.getItem("randseed_custom_token");
+      const token = getAuthToken();
       const res = await fetch("/api/admin/users/role", {
         method: "POST",
         headers: { 
@@ -85,7 +86,7 @@ export function UserAdmin(): React.ReactElement {
     e.preventDefault();
     if (!newEmail) return;
     try {
-      const token = localStorage.getItem("randseed_custom_token");
+      const token = getAuthToken();
       const res = await fetch("/api/admin/users/role", {
         method: "POST",
         headers: { 

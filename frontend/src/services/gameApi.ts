@@ -1,4 +1,5 @@
 import { ApiError, request } from "./apiClient";
+import { getAuthToken } from "./authTokenStore";
 import type { Game } from "../pages/dashboard/games/gameData";
 
 export interface CreateGamePayload {
@@ -125,7 +126,7 @@ export const gameApi = {
     formData.append("type", type);
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "";
-    const token = localStorage.getItem("randseed_custom_jwt");
+    const token = getAuthToken();
 
     const headers: Record<string, string> = {};
     if (token) {

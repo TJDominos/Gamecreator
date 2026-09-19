@@ -4,6 +4,7 @@ import { Target, Plus, Search, ArrowRight, ArrowLeft, Trash2, Save, Edit2, Eye, 
 import { Bounty, Category } from './bountyData';
 import { GAME_CATEGORIES } from '../games/gameData';
 import { bountyApi, mapBounty } from '../../../services/bountyApi';
+import { getAuthToken } from '../../../services/authTokenStore';
 import { MediaUploadField } from '../../../components/MediaUploadField';
 import { Toast } from '../../../components/Toast';
 
@@ -23,7 +24,7 @@ export function BountyManagement(): React.ReactElement {
   const fetchBounties = async (page = 1, state = filterState, search = searchQuery): Promise<Bounty[]> => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("randseed_custom_jwt");
+      const token = getAuthToken();
       const params = new URLSearchParams({ state, page: String(page), pageSize: String(itemsPerPage) });
       if (search.trim()) params.set('search', search.trim());
       const res = await fetch(`/api/admin/bounties?${params.toString()}`, {
@@ -133,7 +134,7 @@ export function BountyManagement(): React.ReactElement {
     
     savingRef.current = true;
     setIsSaving(true);
-    const token = localStorage.getItem("randseed_custom_jwt");
+    const token = getAuthToken();
     const isEdit = !!selectedBounty;
     const url = isEdit ? `/api/admin/bounties/${selectedBounty.id}` : "/api/admin/bounties";
     const method = isEdit ? "PUT" : "POST";

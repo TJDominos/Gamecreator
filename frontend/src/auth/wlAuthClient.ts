@@ -2,11 +2,6 @@ import { DelegationIdentity, DelegationChain, Ed25519KeyIdentity } from "@dfinit
 import { Actor, HttpAgent } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 
-const DELEGATION_STORAGE_KEY = "wl_delegation";
-const SESSION_KEY_STORAGE_KEY = "wl_session_key";
-const LOGIN_METHOD_STORAGE_KEY = "wl_login_method";
-const WALLET_SESSION_STORAGE_KEY = "wl_wallet_session";
-
 export type LoginMethod = 'email' | 'wallet' | 'passkey' | 'ii';
 export type WalletSession = any; // Replace with actual type if available
 
@@ -17,28 +12,28 @@ export interface StoredDelegation {
   walletSession: WalletSession | null;
 }
 
-// Minimal stub for the storage abstraction you use (wlAuthClientStorage)
+const memoryStorage = new Map<string, unknown>();
+
 export const wlAuthClientStorage = {
   async setItem(key: string, value: any): Promise<void> {
     if (value === undefined || value === null) {
-      localStorage.removeItem(key);
+      memoryStorage.delete(key);
     } else {
-      localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+      memoryStorage.set(key, value);
     }
   },
   async getItem<T = any>(key: string): Promise<T | null> {
-    const item = localStorage.getItem(key);
-    if (!item) return null;
-    try {
-      return JSON.parse(item) as T;
-    } catch {
-      return item as unknown as T;
-    }
+    return (memoryStorage.get(key) as T | undefined) ?? null;
   },
   async removeItem(key: string): Promise<void> {
-    localStorage.removeItem(key);
+    memoryStorage.delete(key);
   }
 };
+
+const DELEGATION_STORAGE_KEY = "wl_delegation";
+const SESSION_KEY_STORAGE_KEY = "wl_session_key";
+const LOGIN_METHOD_STORAGE_KEY = "wl_login_method";
+const WALLET_SESSION_STORAGE_KEY = "wl_wallet_session";
 
 export async function saveDelegation(
   identity: DelegationIdentity,
