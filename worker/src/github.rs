@@ -30,7 +30,6 @@ pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>>
     match (request.method(), path.as_str()) {
         (Method::Get, "/api/github/install") => Ok(Some(install(request, env).await?)),
         (Method::Get, "/api/github/repositories") => Ok(Some(list_repositories(request, env).await?)),
-        (Method::Post, "/api/github/claim") => Ok(Some(claim_installation(request, env).await?)),
         (Method::Get, "/api/github/callback") => Ok(Some(callback(request, env).await?)),
         (Method::Post, "/api/webhooks/github") => Ok(Some(webhook(request, env).await?)),
         (Method::Post, "/api/sandbox/deploy") => Ok(Some(response::error(request, env, "Legacy deployment tokens are disabled; use GitHub Actions OIDC and the deployment upload API", 410, "LEGACY_DEPLOY_DISABLED")?)),
@@ -282,13 +281,18 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
     let state = url.query_pairs().find(|(key, _)| key == "state").map(|(_, value)| value.to_string()).unwrap_or_default();
     let code = url.query_pairs().find(|(key, _)| key == "code").map(|(_, value)| value.to_string());
 
-    let verified_claims = if !state.is_empty() {
-        auth::secret(env).ok().and_then(|secret| auth::verify(&state, &secret))
-    } else {
-        None
+    let Some(installation_id) = installation_id.filter(|value| *value > 0) else {
+        return response::error(request, env, "Missing installation_id in callback", 400, "MISSING_PARAM");
     };
 
-    let (mut user_login, mut user_id) = (String::new(), None::<i64>);
+    let Some(claims) = auth::secret(env).ok().and_then(|secret| auth::verify(&state, &secret)) else {
+        return response::error(request, env, "Invalid or expired installation state", 400, "INVALID_STATE");
+    };
+
+    if !auth::has_role(&claims, "creator") {
+        return response::error(request, env, "Creator access required", 403, "FORBIDDEN");
+    }
+
     if let Some(code) = code {
         let client_id = env.var("GITHUB_CLIENT_ID").map(|v| v.to_string()).unwrap_or_default();
         let client_secret = env.secret("GITHUB_CLIENT_SECRET").map(|v| v.to_string()).or_else(|_| env.var("GITHUB_CLIENT_SECRET").map(|v| v.to_string())).unwrap_or_default();
@@ -305,110 +309,20 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
             let mut init = RequestInit::new();
             init.with_method(Method::Post).with_headers(headers).with_body(Some(JsValue::from_str(&body.to_string())));
             if let Ok(outbound) = Request::new_with_init("https://github.com/login/oauth/access_token", &init) {
-                if let Ok(mut resp) = Fetch::Request(outbound).send().await {
-                    if let Ok(token_data) = resp.json::<Value>().await {
-                        if let Some(access_token) = token_data.get("access_token").and_then(Value::as_str) {
-                            let mut u_headers = Headers::new();
-                            let _ = u_headers.set("Accept", "application/vnd.github+json");
-                            let _ = u_headers.set("Authorization", &format!("Bearer {access_token}"));
-                            let _ = u_headers.set("User-Agent", "RandSeed-Gamecreator-Worker");
-                            let _ = u_headers.set("X-GitHub-Api-Version", "2022-11-28");
-                            let mut u_init = RequestInit::new();
-                            u_init.with_method(Method::Get).with_headers(u_headers);
-                            if let Ok(u_req) = Request::new_with_init("https://api.github.com/user", &u_init) {
-                                if let Ok(mut u_resp) = Fetch::Request(u_req).send().await {
-                                    if let Ok(profile) = u_resp.json::<Value>().await {
-                                        if let Some(login) = profile.get("login").and_then(Value::as_str) {
-                                            user_login = login.to_string();
-                                        }
-                                        user_id = profile.get("id").and_then(Value::as_i64);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                let _ = Fetch::Request(outbound).send().await;
             }
         }
     }
 
-    if let (Some(inst_id), Some(claims)) = (installation_id, &verified_claims) {
-        if auth::has_role(claims, "creator") {
-            if let Ok(inst_info) = installation_info(env, inst_id).await {
-                if let Some(account) = inst_info.pointer("/account/login").and_then(Value::as_str) {
-                    let account_type = inst_info.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
-                    let permissions = inst_info.get("permissions").cloned().unwrap_or_else(|| json!({}));
-                    let now = js_sys::Date::now() as i64;
-                    if let Ok(database) = db::database(env) {
-                        let _ = db::run(&database, "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, updated_at = excluded.updated_at", &[json!(format!("gh_inst_{inst_id}")), json!(inst_id), json!(account), json!(account_type), json!(claims.principal_id), json!(permissions.to_string()), json!(now), json!(now)]).await;
-                    }
-                }
-            }
-        }
-    }
-
-    let install_id_str = installation_id.map(|id| id.to_string()).unwrap_or_else(|| "null".to_string());
-    let sanitized_login = user_login.replace('\\', "\\\\").replace('\'', "\\'");
-
-    let html_content = format!(
-        r#"<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>GitHub Connected</title></head>
-<body style="background:#0f172a;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-  <div style="text-align:center;padding:24px;">
-    <h3 style="margin-bottom:8px;">Connected to GitHub</h3>
-    <p style="color:#94a3b8;font-size:14px;">Returning to Creator Portal...</p>
-  </div>
-  <script>
-    const payload = {{
-      type: "randseed:github-installed",
-      installationId: {install_id_str},
-      githubUser: '{sanitized_login}'
-    }};
-    if (window.opener && window.opener !== window) {{
-      try {{ window.opener.postMessage(payload, "*"); }} catch(e) {{}}
-    }}
-    try {{
-      localStorage.setItem("randseed:github-installed-broadcast", JSON.stringify({{
-        ...payload,
-        time: Date.now()
-      }}));
-    }} catch(e) {{}}
-    setTimeout(() => {{
-      window.close();
-    }}, 400);
-  </script>
-</body>
-</html>"#
-    );
-
-    let mut response = Response::ok(html_content)?;
-    response.headers_mut().set("Content-Type", "text/html; charset=utf-8")?;
-    Ok(response)
-}
-
-async fn claim_installation(request: &mut Request, env: &Env) -> Result<Response> {
-    let claims = match creator(request, env) {
-        Ok(value) => value,
-        Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"),
-        Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN"),
-    };
-    let body = request.json::<Value>().await.unwrap_or_else(|_| json!({}));
-    let installation_id = body.get("installation_id").and_then(Value::as_i64);
-    let Some(installation_id) = installation_id.filter(|v| *v > 0) else {
-        return response::error(request, env, "Missing required 'installation_id' parameter", 400, "MISSING_INSTALLATION_ID");
-    };
-
-    let inst_info = match installation_info(env, installation_id).await {
+    let installation = match installation_info(env, installation_id).await {
         Ok(value) => value,
         Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
     };
-
-    let Some(account) = inst_info.pointer("/account/login").and_then(Value::as_str).filter(|v| !v.is_empty()) else {
+    let Some(account) = installation.pointer("/account/login").and_then(Value::as_str).filter(|value| !value.is_empty()) else {
         return response::error(request, env, "GitHub installation has no account", 502, "GITHUB_API_ERROR");
     };
-    let account_type = inst_info.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
-    let permissions = inst_info.get("permissions").cloned().unwrap_or_else(|| json!({}));
+    let account_type = installation.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
+    let permissions = installation.get("permissions").cloned().unwrap_or_else(|| json!({}));
     let now = js_sys::Date::now() as i64;
     let database = db::database(env)?;
 
@@ -427,17 +341,12 @@ async fn claim_installation(request: &mut Request, env: &Env) -> Result<Response
         ],
     ).await?;
 
-    let repositories = match installation_repositories(env, installation_id).await {
-        Ok(value) => value,
-        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_API_ERROR"),
-    };
-
-    response::json(request, env, &json!({
-        "success": true,
-        "installation_id": installation_id,
-        "account_login": account,
-        "repositories": repositories
-    }), 200)
+    let main_url = env.var("MAIN_SITE_URL").map(|value| value.to_string()).unwrap_or_default();
+    let redirect_path = claims.game_id.as_deref().map(|game_id| format!("/dashboard/games/{}/publish", urlencoding::encode(game_id))).unwrap_or_else(|| "/dashboard/games".to_string());
+    let redirect = format!("{main_url}{redirect_path}?github_installed=true&installation_id={installation_id}");
+    let mut response = Response::empty()?.with_status(302);
+    response.headers_mut().set("Location", &redirect)?;
+    Ok(response)
 }
 
 async fn get_repo(game_id: &str, request: &Request, env: &Env) -> Result<Response> {

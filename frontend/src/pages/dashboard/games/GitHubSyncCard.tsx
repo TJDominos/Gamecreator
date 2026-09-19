@@ -120,10 +120,9 @@ export function GitHubSyncCard({
     setIsLoadingRepositories(true);
     setLinkError(null);
     try {
-      // Use claimInstallation to bind the installation to the current authenticated creator
-      const response = await githubApi.claimInstallation(nextInstallationId);
+      const response = await githubApi.listRepositories(nextInstallationId);
       if (!response.success) {
-        throw new Error(response.error || "Unable to claim and load GitHub repositories.");
+        throw new Error(response.error || "Unable to load GitHub repositories.");
       }
       const repositories = response.repositories || [];
       setAvailableRepositories(repositories);
@@ -230,17 +229,16 @@ export function GitHubSyncCard({
       void refreshRepoInfo();
     };
 
-    const callbackBroadcastKey = "randseed:github-installed-broadcast";
     const handleInstallationStorage = (event: StorageEvent) => {
-      if ((event.key !== callbackStorageKey && event.key !== callbackBroadcastKey) || !event.newValue) return;
+      if (event.key !== callbackStorageKey || !event.newValue) return;
       try {
         const parsedInstallationId = Number(JSON.parse(event.newValue).installationId);
         if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
-        if (event.key) window.localStorage.removeItem(event.key);
+        window.localStorage.removeItem(callbackStorageKey);
         handleInstallationReady(parsedInstallationId);
         void refreshRepoInfo();
       } catch {
-        if (event.key) window.localStorage.removeItem(event.key);
+        window.localStorage.removeItem(callbackStorageKey);
       }
     };
 
