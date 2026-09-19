@@ -12,12 +12,12 @@ base64 = "0.22"
 candid = "0.10"
 hex = "0.4"
 hmac = "0.12"
-ic-agent = { version = "0.47", features = ["wasm-bindgen"] }
+ic-agent = { version = "0.47", default-features = false, features = ["wasm-bindgen"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4", "js", "serde"] }
 urlencoding = "2"
 rsa = { version = "0.9", default-features = false, features = ["pem", "sha2"] }
-wasm-bindgen = "0.2"
+wasm-bindgen = "=0.2.123"
 worker = { version = "0.8.0", features = ["d1"] }

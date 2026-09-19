@@ -48,7 +48,7 @@
 		"MAX_ARTIFACT_BYTES": "26214400"
 	},
 	"build": {
-		"command": "cd rust-worker && cargo install -q worker-build --version 0.8.4 && worker-build --release --no-opt"
+		"command": "sh scripts/build-rust-worker.sh"
 	},
 	"rules": [
 		{ "globs": ["**/*.wasm"], "type": "CompiledWasm", "fallthrough": true }

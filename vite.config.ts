@@ -405,7 +405,6 @@ export default defineConfig({
       "@tiptap/starter-kit",
       "@tiptap/extension-placeholder",
       "tiptap-markdown",
-      "@uiw/react-md-editor",
       "react-markdown",
       "@dfinity/agent",
       "@dfinity/identity",

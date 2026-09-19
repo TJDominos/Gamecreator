@@ -16,6 +16,13 @@ npm run worker:rust:deploy:dev
 
 `worker:rust:check` requires the `wasm32-unknown-unknown` Rust target. The host-target check (`cargo check --manifest-path rust-worker/Cargo.toml`) is useful for local API diagnostics but is not a deploy validation.
 
+Wrangler uses `scripts/build-rust-worker.sh` for the Rust bundle. The script
+bootstraps the stable Rust toolchain when `cargo` is not already available,
+adds the `wasm32-unknown-unknown` target, installs the pinned `worker-build`
+version, and writes the Wrangler entrypoint under `rust-worker/build/`. This
+keeps Cloudflare Workers Builds and GitHub Actions independent of a preinstalled
+Rust environment.
+
 Deploy the Play data plane independently:
 
 ```sh
