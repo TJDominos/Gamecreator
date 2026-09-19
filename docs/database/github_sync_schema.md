@@ -36,7 +36,19 @@ Stores user or organization authorization records when the creator installs the 
 - `account_type` (TEXT): `'User'` or `'Organization'`
 - `owner_principal` (TEXT FK): Maps to `users.principal_id`
 - `permissions_json` (TEXT): JSON dump of granted permissions
+- `github_user_id` (INTEGER): GitHub user ID returned by OAuth authorization
+- `github_user_login` (TEXT): GitHub login returned by OAuth authorization
+- `github_user_name` (TEXT): Optional GitHub display name
+- `github_user_avatar_url` (TEXT): Optional GitHub avatar URL
+- `github_user_email` (TEXT): Optional GitHub email, when granted by GitHub
 - `created_at` / `updated_at` (INTEGER): Millisecond timestamps
+
+### `github_oauth_states`
+Stores short-lived, one-time nonces for GitHub installation callbacks:
+- `nonce` (TEXT PK): Random state nonce embedded in the signed JWT
+- `principal_id` (TEXT FK): Creator who initiated installation
+- `game_id` (TEXT): Game being connected
+- `created_at` / `expires_at` / `used_at` (INTEGER): Millisecond timestamps
 
 ### `game_repo_bindings`
 Binds an individual game to a specific repository and branch:

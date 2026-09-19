@@ -163,50 +163,14 @@ export function GitHubSyncCard({
     lastHandledInstallationId.current = null;
     setIsOpeningGitHub(true);
     setInstallError(null);
-    const popup = window.open(
-      "about:blank",
-      "randseed-github-install",
-      "popup,width=1100,height=800,resizable=yes,scrollbars=yes",
-    );
-    if (!popup) {
-      setInstallError("GitHub could not be opened. Please allow popups and try again.");
-      setIsOpeningGitHub(false);
-      return;
-    }
     try {
       const info = await githubApi.getInstallInfo(gameId);
       if (!info.install_url) {
         throw new Error("GitHub App installation URL was not returned.");
       }
       setInstallUrl(info.install_url);
-      popup.location.href = info.install_url;
-      popup.focus();
-      const closePollId = window.setInterval(() => {
-        if (popup.closed) {
-          window.clearInterval(closePollId);
-          setIsOpeningGitHub(false);
-          return;
-        }
-        try {
-          const callbackUrl = new URL(popup.location.href);
-          const callbackInstallationId = Number(callbackUrl.searchParams.get("installation_id"));
-          if (
-            callbackUrl.origin === window.location.origin &&
-            callbackUrl.searchParams.get("github_installed") === "true" &&
-            Number.isSafeInteger(callbackInstallationId) &&
-            callbackInstallationId > 0
-          ) {
-            window.clearInterval(closePollId);
-            handleInstallationReady(callbackInstallationId);
-            void refreshRepoInfo();
-            popup.close();
-          }
-        } catch {
-          // Reading popup.location is blocked while the popup is on GitHub.
-        }
-      }, 500);
+      window.location.assign(info.install_url);
     } catch (error) {
-      popup.close();
       setInstallError(
         error instanceof Error
           ? error.message
@@ -220,30 +184,6 @@ export function GitHubSyncCard({
   // is created after the user explicitly clicks Connect GitHub.
   useEffect(() => {
     let isMounted = true;
-
-    const handleInstallationMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.data?.type !== "randseed:github-installed") return;
-      const parsedInstallationId = Number(event.data.installationId);
-      if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
-      handleInstallationReady(parsedInstallationId);
-      void refreshRepoInfo();
-    };
-
-    const handleInstallationStorage = (event: StorageEvent) => {
-      if (event.key !== callbackStorageKey || !event.newValue) return;
-      try {
-        const parsedInstallationId = Number(JSON.parse(event.newValue).installationId);
-        if (!Number.isSafeInteger(parsedInstallationId) || parsedInstallationId <= 0) return;
-        window.localStorage.removeItem(callbackStorageKey);
-        handleInstallationReady(parsedInstallationId);
-        void refreshRepoInfo();
-      } catch {
-        window.localStorage.removeItem(callbackStorageKey);
-      }
-    };
-
-    window.addEventListener("message", handleInstallationMessage);
-    window.addEventListener("storage", handleInstallationStorage);
 
     const handleOpenConnect = (event: Event) => {
       const detail = (event as CustomEvent<{ gameId?: string }>).detail;
@@ -271,28 +211,12 @@ export function GitHubSyncCard({
       Number.isSafeInteger(callbackInstallationId) &&
       callbackInstallationId > 0
     ) {
-      window.localStorage.setItem(
-        callbackStorageKey,
-        JSON.stringify({ installationId: callbackInstallationId }),
-      );
-      if (window.opener && window.opener !== window) {
-        window.opener.postMessage(
-          { type: "randseed:github-installed", installationId: callbackInstallationId },
-          window.location.origin,
-        );
-        window.close();
-      } else if (window.name === "randseed-github-install") {
-        window.close();
-      } else {
-        handleInstallationReady(callbackInstallationId);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
+      handleInstallationReady(callbackInstallationId);
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     return () => {
       isMounted = false;
-      window.removeEventListener("message", handleInstallationMessage);
-      window.removeEventListener("storage", handleInstallationStorage);
       window.removeEventListener("randseed:open-github-connect", handleOpenConnect);
     };
   }, [gameId]);

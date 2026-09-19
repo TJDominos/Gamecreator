@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD}, Engine};
 use hmac::{Hmac, Mac};
 use rsa::{pkcs1::DecodeRsaPrivateKey, pkcs1v15::{Signature as RsaSignature, SigningKey, VerifyingKey}, pkcs8::DecodePrivateKey, signature::{SignatureEncoding, Signer, Verifier}, BigUint, RsaPrivateKey, RsaPublicKey};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use wasm_bindgen::JsValue;
@@ -23,6 +23,22 @@ impl GithubError {
     fn new(status: u16, message: impl Into<String>) -> Self {
         Self { status, message: message.into() }
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubOAuthTokenResponse {
+    access_token: Option<String>,
+    error: Option<String>,
+    error_description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubUserProfile {
+    id: i64,
+    login: String,
+    name: Option<String>,
+    avatar_url: Option<String>,
+    email: Option<String>,
 }
 
 pub async fn route(request: &mut Request, env: &Env) -> Result<Option<Response>> {
@@ -87,6 +103,37 @@ async fn github_response<T: DeserializeOwned>(
         return Err(GithubError::new(status, format!("GitHub API request failed ({status})")));
     }
     response.json().await.map_err(|_| GithubError::new(502, "Invalid GitHub response"))
+}
+
+async fn github_user_profile(env: &Env, code: &str) -> std::result::Result<GithubUserProfile, GithubError> {
+    let client_id = env.var("GITHUB_CLIENT_ID").map(|value| value.to_string()).map_err(|_| GithubError::new(503, "GitHub OAuth credentials are not configured"))?;
+    let client_secret = env.secret("GITHUB_CLIENT_SECRET").map(|value| value.to_string()).or_else(|_| env.var("GITHUB_CLIENT_SECRET").map(|value| value.to_string())).map_err(|_| GithubError::new(503, "GitHub OAuth credentials are not configured"))?;
+
+    let mut headers = Headers::new();
+    headers.set("Accept", "application/json").map_err(|_| GithubError::new(502, "GitHub OAuth request setup failed"))?;
+    headers.set("Content-Type", "application/json").map_err(|_| GithubError::new(502, "GitHub OAuth request setup failed"))?;
+    headers.set("User-Agent", "RandSeed-Gamecreator-Worker").map_err(|_| GithubError::new(502, "GitHub OAuth request setup failed"))?;
+    let body = JsValue::from_str(&json!({
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+    }).to_string());
+    let mut init = RequestInit::new();
+    init.with_method(Method::Post).with_headers(headers).with_body(Some(body));
+    let outbound = Request::new_with_init("https://github.com/login/oauth/access_token", &init).map_err(|_| GithubError::new(502, "GitHub OAuth request setup failed"))?;
+    let mut response = Fetch::Request(outbound).send().await.map_err(|_| GithubError::new(502, "GitHub OAuth token request failed"))?;
+    let status = response.status_code();
+    let token_response: GithubOAuthTokenResponse = response.json().await.map_err(|_| GithubError::new(502, "Invalid GitHub OAuth response"))?;
+    let GithubOAuthTokenResponse { access_token, error, error_description } = token_response;
+    let access_token = access_token.filter(|value| !value.trim().is_empty()).ok_or_else(|| {
+        GithubError::new(
+            if (200..300).contains(&status) { 400 } else { status },
+            error_description.or(error).unwrap_or_else(|| "GitHub OAuth authorization failed".to_string()),
+        )
+    })?;
+
+    let profile: Value = github_response("https://api.github.com/user", &access_token, Method::Get, None).await?;
+    serde_json::from_value(profile).map_err(|_| GithubError::new(502, "Invalid GitHub user profile"))
 }
 
 async fn github_status(
@@ -252,11 +299,25 @@ async fn owns_game(game_id: &str, claims: &auth::Claims, env: &Env) -> Result<bo
 async fn install(request: &Request, env: &Env) -> Result<Response> {
     let mut claims = match creator(request, env) { Ok(value) => value, Err(error) if error.to_string() == "UNAUTHORIZED" => return response::error(request, env, "Authentication required", 401, "UNAUTHORIZED"), Err(_) => return response::error(request, env, "Creator access required", 403, "FORBIDDEN") };
     let url = request.url()?;
-    let game_id = url.query_pairs().find(|(key, _)| key == "game_id").map(|(_, value)| value.to_string());
-    claims.game_id = game_id.clone();
-    let state = auth::sign(claims, &auth::secret(env)?, 600)?;
+    let Some(game_id) = url.query_pairs().find(|(key, _)| key == "game_id").map(|(_, value)| value.to_string()).filter(|value| !value.trim().is_empty()) else {
+        return response::error(request, env, "Missing required 'game_id' parameter", 400, "MISSING_GAME_ID");
+    };
+    if !owns_game(&game_id, &claims, env).await? {
+        return response::error(request, env, "You do not have access to this game", 403, "FORBIDDEN");
+    }
+    let nonce = uuid::Uuid::new_v4().to_string();
+    claims.game_id = Some(game_id.clone());
+    claims.purpose = Some("github_bind".to_string());
+    claims.nonce = Some(nonce.clone());
+    let state = auth::sign(claims.clone(), &auth::secret(env)?, 600)?;
+    let now = js_sys::Date::now() as i64;
+    db::run(
+        &db::database(env)?,
+        "INSERT INTO github_oauth_states (nonce, principal_id, game_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        &[json!(nonce), json!(claims.principal_id), json!(game_id.clone()), json!(now), json!(now + 600_000)],
+    ).await?;
     let slug = env.var("GITHUB_APP_SLUG").map(|value| value.to_string()).unwrap_or_else(|_| "RDcreatordev".to_string());
-    response::json(request, env, &json!({ "success": true, "app_slug": slug, "install_url": format!("https://github.com/apps/{slug}/installations/new?state={}&game_id={}", urlencoding::encode(&state), urlencoding::encode(&game_id.unwrap_or_default())) }), 200)
+    response::json(request, env, &json!({ "success": true, "app_slug": slug, "install_url": format!("https://github.com/apps/{slug}/installations/new?state={}&game_id={}", urlencoding::encode(&state), urlencoding::encode(&game_id)) }), 200)
 }
 
 async fn list_repositories(request: &Request, env: &Env) -> Result<Response> {
@@ -277,9 +338,16 @@ async fn list_repositories(request: &Request, env: &Env) -> Result<Response> {
 
 async fn callback(request: &Request, env: &Env) -> Result<Response> {
     let url = request.url()?;
+    let callback_error = url.query_pairs().find(|(key, _)| key == "error").map(|(_, value)| value.to_string());
+    let error_description = url.query_pairs().find(|(key, _)| key == "error_description").map(|(_, value)| value.to_string());
+    if let Some(error) = callback_error {
+        return response::error(request, env, &format!("GitHub authorization failed: {}", error_description.unwrap_or(error)), 400, "GITHUB_OAUTH_DENIED");
+    }
     let installation_id = url.query_pairs().find(|(key, _)| key == "installation_id").and_then(|(_, value)| value.parse::<i64>().ok());
     let state = url.query_pairs().find(|(key, _)| key == "state").map(|(_, value)| value.to_string()).unwrap_or_default();
-    let code = url.query_pairs().find(|(key, _)| key == "code").map(|(_, value)| value.to_string());
+    let Some(code) = url.query_pairs().find(|(key, _)| key == "code").map(|(_, value)| value.to_string()).filter(|value| !value.is_empty()) else {
+        return response::error(request, env, "Missing OAuth code in callback", 400, "MISSING_CODE");
+    };
 
     let Some(installation_id) = installation_id.filter(|value| *value > 0) else {
         return response::error(request, env, "Missing installation_id in callback", 400, "MISSING_PARAM");
@@ -293,26 +361,26 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
         return response::error(request, env, "Creator access required", 403, "FORBIDDEN");
     }
 
-    if let Some(code) = code {
-        let client_id = env.var("GITHUB_CLIENT_ID").map(|v| v.to_string()).unwrap_or_default();
-        let client_secret = env.secret("GITHUB_CLIENT_SECRET").map(|v| v.to_string()).or_else(|_| env.var("GITHUB_CLIENT_SECRET").map(|v| v.to_string())).unwrap_or_default();
-        if !client_id.is_empty() && !client_secret.is_empty() {
-            let mut headers = Headers::new();
-            let _ = headers.set("Accept", "application/json");
-            let _ = headers.set("Content-Type", "application/json");
-            let _ = headers.set("User-Agent", "RandSeed-Gamecreator-Worker");
-            let body = json!({
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "code": code,
-            });
-            let mut init = RequestInit::new();
-            init.with_method(Method::Post).with_headers(headers).with_body(Some(JsValue::from_str(&body.to_string())));
-            if let Ok(outbound) = Request::new_with_init("https://github.com/login/oauth/access_token", &init) {
-                let _ = Fetch::Request(outbound).send().await;
-            }
-        }
+    let Some(nonce) = claims.nonce.as_deref().filter(|value| !value.is_empty()) else {
+        return response::error(request, env, "Invalid GitHub installation state", 400, "INVALID_STATE");
+    };
+    if claims.purpose.as_deref() != Some("github_bind") {
+        return response::error(request, env, "Invalid GitHub installation state", 400, "INVALID_STATE");
     }
+    let now = js_sys::Date::now() as i64;
+    let database = db::database(env)?;
+    if db::run_changes(
+        &database,
+        "UPDATE github_oauth_states SET used_at = ? WHERE nonce = ? AND principal_id = ? AND (? = game_id OR (? IS NULL AND game_id IS NULL)) AND used_at IS NULL AND expires_at > ?",
+        &[json!(now), json!(nonce), json!(claims.principal_id.clone()), json!(claims.game_id.clone()), json!(claims.game_id.clone()), json!(now)],
+    ).await? != 1 {
+        return response::error(request, env, "GitHub installation state is expired or already used", 400, "INVALID_STATE");
+    }
+
+    let github_user = match github_user_profile(env, &code).await {
+        Ok(profile) => Some(profile),
+        Err(error) => return response::error(request, env, &error.message, error.status, "GITHUB_OAUTH_ERROR"),
+    };
 
     let installation = match installation_info(env, installation_id).await {
         Ok(value) => value,
@@ -323,12 +391,9 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
     };
     let account_type = installation.pointer("/account/type").and_then(Value::as_str).unwrap_or("User");
     let permissions = installation.get("permissions").cloned().unwrap_or_else(|| json!({}));
-    let now = js_sys::Date::now() as i64;
-    let database = db::database(env)?;
-
     db::run(
         &database,
-        "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, updated_at = excluded.updated_at",
+        "INSERT INTO github_installations (id, installation_id, account_login, account_type, owner_principal, permissions, github_user_id, github_user_login, github_user_name, github_user_avatar_url, github_user_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(installation_id) DO UPDATE SET account_login = excluded.account_login, account_type = excluded.account_type, permissions = excluded.permissions, owner_principal = excluded.owner_principal, github_user_id = COALESCE(excluded.github_user_id, github_installations.github_user_id), github_user_login = COALESCE(excluded.github_user_login, github_installations.github_user_login), github_user_name = COALESCE(excluded.github_user_name, github_installations.github_user_name), github_user_avatar_url = COALESCE(excluded.github_user_avatar_url, github_installations.github_user_avatar_url), github_user_email = COALESCE(excluded.github_user_email, github_installations.github_user_email), updated_at = excluded.updated_at",
         &[
             json!(format!("gh_inst_{installation_id}")),
             json!(installation_id),
@@ -336,6 +401,11 @@ async fn callback(request: &Request, env: &Env) -> Result<Response> {
             json!(account_type),
             json!(claims.principal_id),
             json!(permissions.to_string()),
+            json!(github_user.as_ref().map(|profile| profile.id)),
+            json!(github_user.as_ref().map(|profile| profile.login.clone())),
+            json!(github_user.as_ref().and_then(|profile| profile.name.clone())),
+            json!(github_user.as_ref().and_then(|profile| profile.avatar_url.clone())),
+            json!(github_user.as_ref().and_then(|profile| profile.email.clone())),
             json!(now),
             json!(now),
         ],

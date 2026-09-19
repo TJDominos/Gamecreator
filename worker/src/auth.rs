@@ -28,6 +28,10 @@ pub struct Claims {
     pub email: Option<String>,
     #[serde(default)]
     pub is_email_verified: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
     pub iat: i64,
     pub exp: i64,
 }
@@ -55,6 +59,9 @@ pub fn verify(token: &str, secret: &str) -> Option<Claims> {
     let header = parts.next()?;
     let payload = parts.next()?;
     let signature = URL_SAFE_NO_PAD.decode(parts.next()?).ok()?;
+    if parts.next().is_some() || header != URL_SAFE_NO_PAD.encode(br#"{"alg":"HS256","typ":"JWT"}"#) {
+        return None;
+    }
     let message = format!("{header}.{payload}");
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).ok()?;
     mac.update(message.as_bytes());
@@ -112,6 +119,8 @@ fn access_token(
             game_id: None,
             email,
             is_email_verified,
+            purpose: None,
+            nonce: None,
             iat: 0,
             exp: 0,
         },
@@ -483,6 +492,8 @@ mod tests {
             game_id: None,
             email: None,
             is_email_verified: true,
+            purpose: None,
+            nonce: None,
             iat: 0,
             exp: 0,
         };
